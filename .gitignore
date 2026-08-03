@@ -1,0 +1,55 @@
+# ---------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# ---------------------------------------------------------------------
+# Testing / tooling caches
+# ---------------------------------------------------------------------
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# ---------------------------------------------------------------------
+# Editors / OS
+# ---------------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+desktop.ini
+Desktop.ini
+
+# ---------------------------------------------------------------------
+# Session scratch — Playwright MCP dumps browser state here during
+# dashboard verification. Not part of the project.
+# ---------------------------------------------------------------------
+.playwright-mcp/
+
+# ---------------------------------------------------------------------
+# NOTE ON `outputs/`
+# ---------------------------------------------------------------------
+# outputs/*.png IS tracked on purpose (~3 MB). Those figures are the
+# validation evidence REPORT.md cites section by section — the Haldane
+# fit, the midparent-offspring regression, the mtDNA bottleneck vs its
+# closed form. For a thesis the figure that backs a claim belongs in
+# history next to the code that produced it, so a reviewer can check
+# that they still match. Regenerate with:
+#     python health_engine_prototype.py
