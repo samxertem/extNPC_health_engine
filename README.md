@@ -13,16 +13,25 @@ genetics — and which says so honestly when it cannot.
 
 ## What makes this different from a trait-blending system
 
-The v0.2 prototype this replaced modelled inheritance with Simulated Binary
-Crossover, single-gene Mendelian dominance, and a self-adaptive mutation sigma.
-Each is a defensible engineering choice; none is how a genome works. The
-consequences were structural, not cosmetic: one locus meant one trait, so no
-gene could affect two things; loci assorted independently, so there was no
-linkage and no genome; and interpolating a child's phenotype between its
-parents' meant heritability could not be a parameter and selection response was
-simply wrong.
+> **Historical note — this section describes the *old* v0.2 prototype and why it
+> was replaced. Everything it criticises was removed in July 2026 (Stage 0,
+> session 1). It is here to show what the current engine does differently, not
+> to describe the current engine.**
 
-What replaced it:
+<details>
+<summary><strong>The v0.2 prototype (removed) — click to expand</strong></summary>
+
+v0.2 modelled inheritance with Simulated Binary Crossover, single-gene Mendelian
+dominance, and a self-adaptive mutation sigma. Each is a defensible engineering
+choice; none is how a genome works. The consequences were structural, not
+cosmetic: one locus meant one trait, so no gene could affect two things; loci
+assorted independently, so there was no linkage and no genome; and interpolating
+a child's phenotype between its parents' meant heritability could not be a
+parameter and selection response was simply wrong.
+
+</details>
+
+**The current engine — what replaced all of the above:**
 
 | | |
 |---|---|
