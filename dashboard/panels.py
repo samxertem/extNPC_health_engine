@@ -25,10 +25,15 @@ from simulation import metrics as M
 SURFACE = "#1a1a19"
 PLANE = "#0d0d0d"
 INK = "#ffffff"
-INK2 = "#c3c2b7"
-MUTED = "#898781"
+INK2 = "#d3d2c9"
+# Lifted from #898781 (~4.7:1 on SURFACE). That scrapes past WCAG AA for body
+# text but fails it at the 9-11px sizes this UI actually uses for axis ticks,
+# slider marks and secondary labels. #a5a39c is ~6.6:1 -- comfortably AA at
+# small sizes, AAA at normal ones -- and nothing here should be less legible
+# than that, because every muted string in this dashboard is a data label.
+MUTED = "#a5a39c"
 GRID = "#2c2c2a"
-AXIS = "#383835"
+AXIS = "#4a4a46"
 
 CAT = ["#3987e5", "#199e70", "#c98500", "#008300",
        "#9085e9", "#e66767", "#d55181", "#d95926"]
@@ -674,3 +679,138 @@ def map_figure(world, selected: Optional[str] = None) -> go.Figure:
 def lineage_legend(world) -> List:
     """(name, hex) swatch data for the founder-lineage legend beside the map."""
     return world.registry.legend()
+
+
+# =====================================================================
+# Comparative analysis (A vs B) and historical scrubbing
+# =====================================================================
+
+def compare_radar_figure(world, a: Optional[str], b: Optional[str]) -> go.Figure:
+    """
+    Two individuals' phenotype fingerprints as overlapping polygons, with the
+    population mean behind them for scale. Each keeps its own bloodline
+    colour, so the reading matches the map and the dot-cloud rather than
+    inventing a fresh A/B palette.
+    """
+    fig = go.Figure()
+    traits = _OCEAN + _BODY
+    labels = [t[:4].upper() for t in _OCEAN] + ["HGT", "BMI", "AERO", "INS", "IMM"]
+
+    if world.living:
+        pop = [n.phenotype() for n in world.living]
+        _radar(fig, labels,
+               [float(np.mean([_to_score(t, p[t]) for p in pop])) for t in traits],
+               "population", MUTED)
+
+    for name in (a, b):
+        if name and name in world.people:
+            p = world.people[name].phenotype()
+            colour = world.meta[name].color if name in world.meta else ACCENT
+            _radar(fig, labels, [_to_score(t, p[t]) for t in traits],
+                   name.split("-")[0], colour)
+
+    _style(fig, "Phenotype fingerprints — A vs B", height=380, legend=True)
+    fig.update_polars(bgcolor=SURFACE,
+                      radialaxis=dict(range=[0, 100], gridcolor=GRID,
+                                      tickfont=dict(color=MUTED, size=8),
+                                      linecolor=AXIS),
+                      angularaxis=dict(gridcolor=GRID, linecolor=AXIS,
+                                       tickfont=dict(color=INK2, size=10)))
+    return fig
+
+
+def compare_bars_figure(world, a: Optional[str], b: Optional[str]) -> go.Figure:
+    """
+    Metabolic / physiological set-points as paired bars. A radar is good for
+    overall shape but poor for reading a difference; this is the companion
+    that answers "by how much".
+
+    Plotted as z-scores against the CURRENT population, not raw phenotype
+    values. These traits do not share a unit -- bp_set_point is in mmHg-like
+    units and lung_capacity in its own scale, while insulin_sensitivity is
+    already a liability -- so putting the raw numbers on one axis would put
+    +109 next to +0.7 and label the axis "SD", which is simply false.
+    Standardising makes the axis honest and the traits comparable.
+    """
+    fig = go.Figure()
+    keys = ["insulin_sensitivity", "bp_set_point", "lipid_profile",
+            "lung_capacity", "immune_reactivity", "inflammation_tone"]
+    nice = ["insulin sens.", "BP set point", "lipids", "lung cap.",
+            "immune react.", "inflam. tone"]
+
+    pop = [n.phenotype() for n in world.living]
+    mu, sd = {}, {}
+    for k in keys:
+        vals = np.array([float(p[k]) for p in pop if k in p], dtype=float) \
+            if pop else np.array([0.0])
+        mu[k] = float(vals.mean()) if vals.size else 0.0
+        s = float(vals.std()) if vals.size else 0.0
+        sd[k] = s if s > 1e-9 else 1.0        # a monomorphic trait -> no scaling
+
+    for name in (a, b):
+        if name and name in world.people:
+            p = world.people[name].phenotype()
+            colour = world.meta[name].color if name in world.meta else ACCENT
+            z = [(float(p.get(k, mu[k])) - mu[k]) / sd[k] for k in keys]
+            fig.add_trace(go.Bar(
+                x=nice, y=z, name=name.split("-")[0], marker_color=colour,
+                customdata=[float(p.get(k, 0.0)) for k in keys],
+                hovertemplate="%{x}<br>%{y:+.2f} SD from population mean"
+                              "<br>raw %{customdata:.2f}<extra></extra>"))
+
+    fig.add_hline(y=0.0, line=dict(color=AXIS, width=1))
+    _style(fig, "Set-points, standardised against the living population",
+           height=280, legend=True)
+    fig.update_layout(barmode="group")
+    fig.update_yaxes(title="SD from population mean")
+    return fig
+
+
+def history_columns_upto(world, tick: Optional[int]) -> Dict[str, List[float]]:
+    """
+    History transposed to columns, truncated at `tick`.
+
+    This is what makes the timeline scrubber work for every time-series chart:
+    the charts are pure functions of these columns, so trimming the columns
+    rewinds the charts with no other change. `tick=None` means live.
+    """
+    cols = world.history_columns()
+    if not cols or tick is None:
+        return cols
+    ticks = cols.get("tick", [])
+    keep = sum(1 for t in ticks if t <= tick)
+    if keep >= len(ticks):
+        return cols
+    return {k: v[:keep] for k, v in cols.items()}
+
+
+def scatter_figure_from_frame(world, frame: Optional[dict],
+                              selected: Optional[str] = None) -> go.Figure:
+    """
+    The genetic dot-cloud for a HISTORICAL frame.
+
+    The PCA embedding itself is refit on the living population, so a past
+    frame cannot be re-embedded faithfully -- the snapshot keeps map
+    coordinates, not genome projections. Rather than fake it, this plots the
+    settlement layout the frame does carry and says so in the title. The live
+    dot-cloud remains `scatter_figure`.
+    """
+    fig = go.Figure()
+    if frame and frame["people"]:
+        xs = [p["x"] for p in frame["people"]]
+        ys = [p["y"] for p in frame["people"]]
+        cs = [p["color"] for p in frame["people"]]
+        names = [p["name"] for p in frame["people"]]
+        sizes = [13 if n == selected else 9 for n in names]
+        fig.add_trace(go.Scatter(
+            x=xs, y=ys, mode="markers", customdata=names,
+            marker=dict(size=sizes, color=cs,
+                        line=dict(width=[2 if n == selected else 0.5 for n in names],
+                                  color=[INK if n == selected else "rgba(0,0,0,0.5)"
+                                         for n in names])),
+            hovertemplate="%{customdata}<extra></extra>", showlegend=False))
+    _style(fig, f"Settlement positions — year {frame['tick'] if frame else 0} "
+                f"(historical; PCA embedding is live-only)", height=420)
+    fig.update_xaxes(showticklabels=False, title="")
+    fig.update_yaxes(showticklabels=False, title="", scaleanchor="x")
+    return fig

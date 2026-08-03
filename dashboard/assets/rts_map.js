@@ -132,12 +132,28 @@
     drawBridges(ctx, data, m);
 
     // territories (soft team-coloured rings)
+    //
+    // When an overlay layer is active each deme carries `wash` + `washAlpha`,
+    // computed server-side from the snapshot frame. A radial gradient reads as
+    // a heat field rather than a flat disc, and the ring keeps its bloodline
+    // colour so the settlement stays identifiable under any layer.
     var S = Math.min(W, H) - 52;
+    var layer = data.layer || "default";
     (data.demes || []).forEach(function (d) {
       var p = m(d.x, d.y), rr = d.r / MAPU * S;
       ctx.beginPath(); ctx.arc(p[0], p[1], rr, 0, 6.283);
-      ctx.fillStyle = hexA(d.color, 0.12); ctx.fill();
-      ctx.lineWidth = 2; ctx.strokeStyle = hexA(d.color, 0.55); ctx.stroke();
+      if (d.wash) {
+        var g = ctx.createRadialGradient(p[0], p[1], rr * 0.10, p[0], p[1], rr);
+        g.addColorStop(0, hexA(d.wash, Math.min(0.92, d.washAlpha * 1.7)));
+        g.addColorStop(1, hexA(d.wash, d.washAlpha * 0.30));
+        ctx.fillStyle = g;
+      } else {
+        ctx.fillStyle = hexA(d.color, 0.12);
+      }
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = hexA(d.wash || d.color, d.wash ? 0.75 : 0.55);
+      ctx.stroke();
     });
 
     // migration routes (dashed, thickness = flow)
@@ -204,6 +220,7 @@
 
     // town name plates on top of everyone, so they stay readable
     drawNamePlates(ctx, data, m);
+    drawHistoryBanner(ctx, data, W);
 
     // selection ring
     if (data.selected && screen[data.selected]) {
@@ -327,7 +344,33 @@
       ctx.lineWidth = 1.5; ctx.strokeStyle = "rgba(255,255,255,0.18)"; ctx.stroke();
       ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.fillText(label, p[0], py + 10);
+
+      // overlay badge: the number the active layer is actually colouring, so
+      // the heat field is readable as a value and not only as a hue.
+      if (d.badge) {
+        ctx.font = "bold 11px system-ui, sans-serif";
+        var bw = ctx.measureText(d.badge).width;
+        var by = py + 23;
+        ctx.fillStyle = hexA(d.wash || "#4ea3ff", 0.92);
+        roundRect(ctx, p[0] - bw / 2 - 7, by, bw + 14, 17, 5); ctx.fill();
+        ctx.fillStyle = "#0b0e12";
+        ctx.fillText(d.badge, p[0], by + 9);
+      }
     });
+  }
+
+  // Historical-mode banner: time travel must never be mistaken for live.
+  function drawHistoryBanner(ctx, data, W) {
+    if (!data.historical) return;
+    var txt = "⏱ HISTORY — year " + data.tick;
+    ctx.save();
+    ctx.font = "bold 13px system-ui, sans-serif";
+    var tw = ctx.measureText(txt).width;
+    ctx.fillStyle = "rgba(201,133,0,0.92)";
+    roundRect(ctx, W / 2 - tw / 2 - 12, 12, tw + 24, 26, 7); ctx.fill();
+    ctx.fillStyle = "#141414"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(txt, W / 2, 25);
+    ctx.restore();
   }
 
   // ---- helpers -----------------------------------------------------------

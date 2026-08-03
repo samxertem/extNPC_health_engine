@@ -24,12 +24,12 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from dash import (Dash, dcc, html, Input, Output, State, ctx, no_update,
+from dash import (ALL, Dash, dcc, html, Input, Output, State, ctx, no_update,
                   ClientsideFunction)
 
 from simulation import (World, DemographyParams, SCENARIOS, scenario_list,
                         SHOCK_KINDS, GLOSSARY)
-from . import panels
+from . import inspector, panels
 
 # ---------------------------------------------------------------------
 # One long-lived world, mutated by the interval callback.
@@ -370,19 +370,81 @@ def panels_deme_label(d):
     return deme_label(d)
 
 
-def build_mapdata(world, selected):
-    """Compact JSON payload the canvas renderer (rts_map.js) draws from."""
-    demes = [{"id": d["deme"], "label": d["label"].split("-")[0],
-              "x": d["x"], "y": d["y"], "r": d["radius"], "n": d["n"],
-              "color": panels.deme_color(d["deme"])}
-             for d in world.map_demes()]
-    people = [{"name": p["name"], "x": p["map_x"], "y": p["map_y"],
-               "color": p["color"], "sex": p["sex"]}
-              for p in world.living_frame()]
+def _stress_ramp(t: float) -> str:
+    """
+    Calm-to-critical ramp for the stress overlay.
+
+    Deliberately NOT a red-green scale: it runs teal -> amber -> red, which
+    stays separable under the common CVD types and keeps the same ordering in
+    greyscale. `t` is already normalised.
+    """
+    t = max(0.0, min(1.0, float(t)))
+    stops = [(0.0, (32, 122, 118)), (0.5, (201, 133, 0)), (1.0, (208, 59, 59))]
+    for (t0, c0), (t1, c1) in zip(stops, stops[1:]):
+        if t <= t1:
+            f = 0.0 if t1 == t0 else (t - t0) / (t1 - t0)
+            r, g, b = (int(a + (b_ - a) * f) for a, b_ in zip(c0, c1))
+            return f"#{r:02x}{g:02x}{b:02x}"
+    return "#d03b3b"
+
+
+def build_mapdata(world, selected, frame=None, layer="default",
+                  historical=False):
+    """
+    Compact JSON payload the canvas renderer (rts_map.js) draws from.
+
+    Reads a snapshot `frame` rather than the live world, so the identical path
+    serves both live rendering and time travel. `layer` selects the overlay:
+
+      default    -- villagers tinted by bloodline (the original view)
+      dominance  -- each territory washed with its dominant bloodline's colour,
+                    opacity = how dominant it is
+      stress     -- each territory washed by mean physiological load
+
+    Stress is `inflammation_state`, a LIABILITY in SD units, so it is signed.
+    The overlay normalises across the settlements present in this frame rather
+    than assuming a 0-based scale (a calm population sits below zero).
+    """
+    frame = frame or world.frame_at(None)
+    if not frame:
+        return {"size": 100, "seed": int(world.seed), "demes": [], "people": [],
+                "flows": [], "selected": selected, "layer": layer,
+                "historical": historical, "tick": world.tick}
+
+    stresses = [d["mean_stress"] for d in frame["demes"] if d["n"] > 0]
+    lo, hi = (min(stresses), max(stresses)) if stresses else (0.0, 1.0)
+    if hi - lo < 1e-6:                      # flat -> mid-ramp, not divide-by-zero
+        lo, hi = lo - 0.5, hi + 0.5
+
+    demes = []
+    for d in frame["demes"]:
+        row = {"id": d["deme"], "label": _deme_short(d["deme"]),
+               "x": d["x"], "y": d["y"], "r": d["r"], "n": d["n"],
+               "color": panels.deme_color(d["deme"])}
+        if layer == "dominance":
+            row["wash"] = d["dominant_color"]
+            row["washAlpha"] = round(0.10 + 0.45 * d["dominance"], 3)
+            row["badge"] = f"{d['dominant'].split('-')[0]} {d['dominance']:.0%}"
+        elif layer == "stress":
+            t = (d["mean_stress"] - lo) / (hi - lo)
+            row["wash"] = _stress_ramp(t)
+            row["washAlpha"] = round(0.16 + 0.42 * t, 3)
+            row["badge"] = f"load {d['mean_stress']:+.2f}"
+        demes.append(row)
+
+    people = [{"name": p["name"], "x": p["x"], "y": p["y"],
+               "color": p["color"], "sex": p["sex"]} for p in frame["people"]]
     flows = [{"x0": f["x0"], "y0": f["y0"], "x1": f["x1"], "y1": f["y1"],
-              "w": f["weight"]} for f in world.map_flows()]
+              "w": f["w"]} for f in frame["flows"]]
     return {"size": 100, "seed": int(world.seed), "demes": demes,
-            "people": people, "flows": flows, "selected": selected}
+            "people": people, "flows": flows, "selected": selected,
+            "layer": layer, "historical": bool(historical),
+            "tick": int(frame["tick"])}
+
+
+def _deme_short(d: int) -> str:
+    from simulation import deme_label
+    return deme_label(d).split("-")[0]
 
 
 def lineage_legend_view():
@@ -396,6 +458,71 @@ def lineage_legend_view():
             html.Span(name.split("-")[0], style={"fontSize": "12px", "color": INK2}),
         ], style={"marginBottom": "4px"}))
     return rows
+
+
+MAP_LAYERS = [
+    ("default", "Bloodlines", "villagers tinted by founder lineage"),
+    ("dominance", "Dominance", "which bloodline holds each settlement"),
+    ("stress", "Stress load", "mean physiological load per settlement"),
+]
+
+
+def layer_selector():
+    """Segmented control for the world-map overlays."""
+    return html.Div(style={"display": "flex", "gap": "4px", "flexWrap": "wrap"},
+                    children=[
+        html.Button(label, id=f"layer-{key}", n_clicks=0, title=hint, style={
+            "background": "transparent", "border": f"1px solid {GRID}",
+            "borderRadius": "999px", "color": INK2, "padding": "5px 13px",
+            "fontSize": "11px", "fontWeight": 700, "cursor": "pointer"})
+        for key, label, hint in MAP_LAYERS])
+
+
+def inspector_column(suffix: str, extras=None):
+    """
+    The persistent right-hand drawer, one instance per host tab.
+
+    Distinct ids per tab (rather than one shared component moved around)
+    because Dash needs every id to exist exactly once in the DOM; a single
+    callback fans the same content into all of them, so they never diverge.
+    """
+    extras = extras or []
+    return html.Div(style={"display": "flex", "flexDirection": "column",
+                           "gap": "12px", "minWidth": 0}, children=[
+        html.Div(id=f"drawer-{suffix}", style={**CARD, "minHeight": "260px"}),
+        html.Div(style={**CARD, "padding": "10px 12px"}, children=[
+            html.Div(style={"display": "flex", "gap": "4px", "marginBottom": "9px"},
+                     children=[
+                html.Button("★ Extremes", id=f"dmode-extremes-{suffix}", n_clicks=0,
+                            style={"flex": 1, "background": "transparent",
+                                   "border": f"1px solid {GRID}", "color": INK2,
+                                   "borderRadius": "7px", "padding": "5px",
+                                   "fontSize": "11px", "fontWeight": 700,
+                                   "cursor": "pointer"}),
+                html.Button("🔍 Directory", id=f"dmode-directory-{suffix}", n_clicks=0,
+                            style={"flex": 1, "background": "transparent",
+                                   "border": f"1px solid {GRID}", "color": INK2,
+                                   "borderRadius": "7px", "padding": "5px",
+                                   "fontSize": "11px", "fontWeight": 700,
+                                   "cursor": "pointer"}),
+            ]),
+            html.Div(id=f"dirtools-{suffix}", style={"display": "none"}, children=[
+                dcc.Input(id=f"dirq-{suffix}", type="text", debounce=True,
+                          placeholder="name or bloodline…",
+                          style={"width": "100%", "background": PLANE, "color": INK,
+                                 "border": f"1px solid {GRID}", "borderRadius": "6px",
+                                 "padding": "6px 8px", "fontSize": "12px",
+                                 "marginBottom": "6px"}),
+                dcc.Dropdown(id=f"dirsort-{suffix}",
+                             options=inspector.SORT_FIELDS, value="age",
+                             clearable=False, className="dk-dd",
+                             style={"marginBottom": "8px", "fontSize": "12px"}),
+            ]),
+            html.Div(id=f"dlist-{suffix}",
+                     style={"maxHeight": "420px", "overflowY": "auto"}),
+        ]),
+        *extras,
+    ])
 
 
 def _g(title, body):
@@ -519,10 +646,20 @@ def panel(id_, children, visible=False):
 CTRL_INPUTS = ["K", "birth", "mort", "sel", "mut", "recomb", "assort",
                "inbreed", "ndemes", "migr", "equity", "smoke", "stress", "prenat"]
 
+# The split-screen: main content, then the persistent inspector drawer.
+# `minmax(0, …)` on the first column stops wide Plotly figures from forcing
+# the grid wider than the viewport (the classic CSS-grid overflow trap).
+SPLIT = {"display": "grid",
+         "gridTemplateColumns": "minmax(0, 3fr) minmax(260px, 1fr)",
+         "gap": "12px", "alignItems": "start"}
+
+# Drawer instances, one per host tab. Every fan-out callback iterates this.
+DRAWERS = ["overview", "map", "genetics"]
+
 
 app.layout = html.Div(style={
     "background": f"radial-gradient(1200px 600px at 20% -10%, #14161c 0%, {PLANE} 60%)",
-    "minHeight": "100vh", "padding": "14px 18px",
+    "minHeight": "100vh", "padding": "14px 18px 120px",
     "fontFamily": 'system-ui, "Segoe UI", sans-serif', "color": INK}, children=[
 
     dcc.Store(id="tick", data=WORLD.tick),
@@ -531,6 +668,18 @@ app.layout = html.Div(style={
     dcc.Store(id="active-tab", data="overview"),
     dcc.Store(id="char-tab", data="info"),
     dcc.Store(id="shock-log", data=0),
+    # None = live; an int = viewing that historical year (time travel)
+    dcc.Store(id="timeline", data=None),
+    # Last value written to the slider BY THE APP rather than by the user.
+    # Without this the slider is a feedback loop: the tick callback moves the
+    # handle to the newest frame, that move re-fires the drag handler, and if
+    # the world has advanced in between, the stale value pins the view to a
+    # past year. Comparing against the echo tells a real drag from a redraw.
+    dcc.Store(id="slider-echo", data=None),
+    dcc.Store(id="drawer-mode", data="extremes"),
+    dcc.Store(id="map-layer", data="default"),
+    dcc.Store(id="cmp-on", data=False),
+    dcc.Store(id="cmp-b", data=None),
     dcc.Interval(id="timer", interval=1000, disabled=True),
 
     # ---- header ------------------------------------------------------
@@ -604,21 +753,27 @@ app.layout = html.Div(style={
 
     # ---- OVERVIEW ----------------------------------------------------
     panel("panel-overview", visible=True, children=[
-        html.Div(style={"display": "grid", "gridTemplateColumns": "1.7fr 1fr",
-                        "gap": "12px", "marginBottom": "12px"}, children=[
-            html.Div(style=CARD, children=[graph("g-scatter",
-                     panels.scatter_figure(WORLD))]),
-            html.Div(style={**CARD, "maxHeight": "540px", "overflowY": "auto"},
-                     children=[
-                html.Div("CHRONICLE", style={**LBL, "marginBottom": "8px"}),
-                html.Div(id="chronicle"),
+        html.Div(style=SPLIT, children=[
+            # main column
+            html.Div(style={"minWidth": 0}, children=[
+                html.Div(style={**CARD, "marginBottom": "12px"},
+                         children=[graph("g-scatter",
+                                         panels.scatter_figure(WORLD))]),
+                html.Div(style={"display": "grid",
+                                "gridTemplateColumns": "1fr 1fr 1fr",
+                                "gap": "12px", "marginBottom": "12px"}, children=[
+                    html.Div(style=CARD, children=[graph("g-pop")]),
+                    html.Div(style=CARD, children=[graph("g-bd")]),
+                    html.Div(style=CARD, children=[graph("g-div-o")]),
+                ]),
+                html.Div(style={**CARD, "maxHeight": "300px",
+                                "overflowY": "auto"}, children=[
+                    html.Div("CHRONICLE", style={**LBL, "marginBottom": "8px"}),
+                    html.Div(id="chronicle"),
+                ]),
             ]),
-        ]),
-        html.Div(style={"display": "grid", "gridTemplateColumns": "1fr 1fr 1fr",
-                        "gap": "12px"}, children=[
-            html.Div(style=CARD, children=[graph("g-pop")]),
-            html.Div(style=CARD, children=[graph("g-bd")]),
-            html.Div(style=CARD, children=[graph("g-div-o")]),
+            # persistent inspector drawer
+            inspector_column("overview"),
         ]),
     ]),
 
@@ -626,22 +781,41 @@ app.layout = html.Div(style={
     panel("panel-map", children=[
         dcc.Store(id="mapdata"),
         html.Div(id="rts-sink", style={"display": "none"}),
-        html.Div(style={"display": "grid", "gridTemplateColumns": "3fr 1fr",
-                        "gap": "12px"}, children=[
-            html.Div(style={**CARD, "background": "#0f1216", "padding": "6px"},
-                     children=[
-                html.Canvas(id="rts-canvas",
-                            style={"width": "100%", "height": "620px",
-                                   "display": "block", "borderRadius": "8px",
-                                   "imageRendering": "pixelated"}),
-                html.Div("Art: Kenney “Tiny Town” (CC0) · villagers team-tinted "
-                         "by bloodline · click a villager to inspect",
-                         style={"color": MUTED, "fontSize": "10px",
-                                "textAlign": "center", "padding": "4px"}),
+        html.Div(style=SPLIT, children=[
+            html.Div(style={"minWidth": 0}, children=[
+                # command bar above the map
+                html.Div(style={**CARD, "display": "flex", "alignItems": "center",
+                                "gap": "12px", "flexWrap": "wrap",
+                                "marginBottom": "10px", "padding": "9px 12px"},
+                         children=[
+                    html.Span("MAP LAYER", style=LBL),
+                    layer_selector(),
+                    html.Div(style={"flex": 1}),
+                    html.Div(id="layer-hint", style={"color": MUTED,
+                                                     "fontSize": "11px"}),
+                ]),
+                html.Div(style={**CARD, "background": "#0b0e12", "padding": "8px",
+                                "boxShadow": "0 18px 48px rgba(0,0,0,0.55), "
+                                             "inset 0 0 0 1px rgba(78,163,255,0.10)",
+                                "borderColor": "#1d2530"}, children=[
+                    # Height is solved against the chrome above it (header, KPI
+                    # strip, tabs, layer bar) and the sticky scrubber below, so
+                    # the map fills the viewport without the scrubber floating
+                    # over it. A flat vh value overshot and clipped the map.
+                    html.Canvas(id="rts-canvas",
+                                style={"width": "100%",
+                                       "height": "calc(100vh - 440px)",
+                                       "minHeight": "460px",
+                                       "display": "block", "borderRadius": "10px",
+                                       "imageRendering": "pixelated"}),
+                    html.Div("Art: Kenney “Tiny Town” (CC0) · villagers team-tinted "
+                             "by bloodline · click a villager to inspect",
+                             style={"color": MUTED, "fontSize": "10px",
+                                    "textAlign": "center", "padding": "6px 4px 2px"}),
+                ]),
             ]),
-            html.Div(style={"display": "flex", "flexDirection": "column", "gap": "12px"},
-                     children=[
-                html.Div(id="map-legend", style={**CARD, "maxHeight": "300px",
+            inspector_column("map", extras=[
+                html.Div(id="map-legend", style={**CARD, "maxHeight": "220px",
                                                  "overflowY": "auto"}),
                 html.Div(style=CARD, children=[
                     html.Div("HOW TO READ THIS MAP", style={**LBL, "marginBottom": "8px"}),
@@ -666,16 +840,23 @@ app.layout = html.Div(style={
 
     # ---- GENETICS ----------------------------------------------------
     panel("panel-genetics", children=[
-        html.Div(style={"display": "grid", "gridTemplateColumns": "1.4fr 1fr",
-                        "gap": "12px", "marginBottom": "12px"}, children=[
-            html.Div(style=CARD, children=[graph("g-traits")]),
-            html.Div(style=CARD, children=[graph("g-pop-radar")]),
-        ]),
-        html.Div(style={"display": "grid", "gridTemplateColumns": "1fr 1fr 1fr",
-                        "gap": "12px"}, children=[
-            html.Div(style=CARD, children=[graph("g-div-g")]),
-            html.Div(style=CARD, children=[graph("g-cand")]),
-            html.Div(style=CARD, children=[graph("g-skew")]),
+        html.Div(style=SPLIT, children=[
+            html.Div(style={"minWidth": 0}, children=[
+                html.Div(style={"display": "grid",
+                                "gridTemplateColumns": "1.4fr 1fr",
+                                "gap": "12px", "marginBottom": "12px"}, children=[
+                    html.Div(style=CARD, children=[graph("g-traits")]),
+                    html.Div(style=CARD, children=[graph("g-pop-radar")]),
+                ]),
+                html.Div(style={"display": "grid",
+                                "gridTemplateColumns": "1fr 1fr 1fr",
+                                "gap": "12px"}, children=[
+                    html.Div(style=CARD, children=[graph("g-div-g")]),
+                    html.Div(style=CARD, children=[graph("g-cand")]),
+                    html.Div(style=CARD, children=[graph("g-skew")]),
+                ]),
+            ]),
+            inspector_column("genetics"),
         ]),
     ]),
 
@@ -766,6 +947,35 @@ app.layout = html.Div(style={
     panel("panel-individual", children=[
         html.Div(id="char-header", style={**CARD, "marginBottom": "10px",
                                           "padding": "12px 14px"}),
+
+        # ---- compare mode --------------------------------------------
+        html.Div(style={**CARD, "marginBottom": "10px", "padding": "10px 14px",
+                        "display": "flex", "alignItems": "center", "gap": "12px",
+                        "flexWrap": "wrap"}, children=[
+            html.Button("⇄ Compare mode", id="btn-compare", n_clicks=0, style={
+                "background": "transparent", "border": f"1px solid {GRID}",
+                "borderRadius": "999px", "color": INK2, "padding": "6px 15px",
+                "fontSize": "12px", "fontWeight": 700, "cursor": "pointer"}),
+            html.Div(id="cmp-picker-wrap", style={"display": "none",
+                                                  "flex": 1, "minWidth": "220px"},
+                     children=[
+                dcc.Dropdown(id="cmp-picker", options=[], value=None,
+                             placeholder="choose a second individual…",
+                             className="dk-dd", style={"fontSize": "12px"}),
+            ]),
+            html.Div(id="cmp-note", style={"color": MUTED, "fontSize": "11px"}),
+        ]),
+        html.Div(id="cmp-section", style={"display": "none"}, children=[
+            html.Div(style={"display": "grid",
+                            "gridTemplateColumns": "minmax(0, 1fr) minmax(0, 1fr)",
+                            "gap": "12px", "marginBottom": "12px"}, children=[
+                html.Div(style=CARD, children=[graph("g-cmp-radar")]),
+                html.Div(style={**CARD, "maxHeight": "440px",
+                                "overflowY": "auto"}, id="cmp-table"),
+            ]),
+            html.Div(style={**CARD, "marginBottom": "12px"},
+                     children=[graph("g-cmp-bars")]),
+        ]),
         html.Div(style={"display": "flex", "gap": "4px", "borderBottom":
                  f"1px solid {GRID}", "marginBottom": "10px"},
                  children=[html.Button(CHAR_ICON[c], id=f"ctab-{c}", n_clicks=0,
@@ -791,6 +1001,34 @@ app.layout = html.Div(style={
 
     # ---- GUIDE -------------------------------------------------------
     panel("panel-guide", children=[html.Div(style=CARD, children=[guide_content()])]),
+
+    # ---- TIMELINE SCRUBBER (fixed above the footer) ------------------
+    # Sticky, so the scrubber is always reachable — but it must sit ABOVE the
+    # panels (z-index) and the page needs bottom padding, or it overlays the
+    # last card instead of floating clear of it.
+    html.Div(style={**CARD, "marginTop": "14px", "padding": "10px 16px 4px",
+                    "position": "sticky", "bottom": "10px", "zIndex": 60,
+                    "backdropFilter": "blur(8px)",
+                    "background": "rgba(20,22,28,0.96)",
+                    "border": f"1px solid {GRID}",
+                    "boxShadow": "0 -10px 30px rgba(0,0,0,0.65)"}, children=[
+        html.Div(style={"display": "flex", "alignItems": "center",
+                        "gap": "12px", "marginBottom": "2px"}, children=[
+            html.Span("TIMELINE", style=LBL),
+            html.Div(id="timeline-state", style={"fontSize": "11px",
+                                                 "fontWeight": 700}),
+            html.Div(style={"flex": 1}),
+            btn("⏮ Live", "btn-live"),
+        ]),
+        html.Div(id="timeline-wrap", children=[
+            dcc.Slider(id="timeline-slider", min=0, max=1, step=1, value=0,
+                       marks=None, updatemode="mouseup",
+                       tooltip={"placement": "top", "always_visible": False}),
+        ]),
+        html.Div(id="timeline-events", style={"color": MUTED, "fontSize": "10px",
+                                              "minHeight": "14px",
+                                              "paddingBottom": "4px"}),
+    ]),
 ])
 
 
@@ -968,12 +1206,16 @@ def render_always(_tick):
     Output("g-scatter", "figure"), Output("g-pop", "figure"),
     Output("g-bd", "figure"), Output("g-div-o", "figure"),
     Input("tick", "data"), Input("selected", "data"), Input("active-tab", "data"),
+    Input("timeline", "data"),
 )
-def render_overview(_tick, selected, active):
+def render_overview(_tick, selected, active, scrub):
     if active != "overview":
         return (no_update,) * 4
-    cols = WORLD.history_columns()
-    return (panels.scatter_figure(WORLD, selected),
+    cols = panels.history_columns_upto(WORLD, scrub)
+    scatter = (panels.scatter_figure_from_frame(WORLD, WORLD.frame_at(scrub), selected)
+               if scrub is not None
+               else panels.scatter_figure(WORLD, selected))
+    return (scatter,
             panels.population_figure(cols),
             panels.births_deaths_figure(cols),
             panels.diversity_figure(cols))
@@ -982,11 +1224,15 @@ def render_overview(_tick, selected, active):
 @app.callback(
     Output("mapdata", "data"), Output("map-legend", "children"),
     Input("tick", "data"), Input("selected", "data"), Input("active-tab", "data"),
+    Input("timeline", "data"), Input("map-layer", "data"),
 )
-def render_map(_tick, selected, active):
+def render_map(_tick, selected, active, scrub, layer):
     if active != "map":
         return no_update, no_update
-    return build_mapdata(WORLD, selected), lineage_legend_view()
+    frame = WORLD.frame_at(scrub)
+    return (build_mapdata(WORLD, selected, frame, layer or "default",
+                          historical=scrub is not None),
+            lineage_legend_view())
 
 
 # the clientside canvas renderer (rts_map.js) draws the map from `mapdata`
@@ -1001,12 +1247,12 @@ app.clientside_callback(
     Output("g-traits", "figure"), Output("g-pop-radar", "figure"),
     Output("g-div-g", "figure"), Output("g-cand", "figure"),
     Output("g-skew", "figure"),
-    Input("tick", "data"), Input("active-tab", "data"),
+    Input("tick", "data"), Input("active-tab", "data"), Input("timeline", "data"),
 )
-def render_genetics(_tick, active):
+def render_genetics(_tick, active, scrub):
     if active != "genetics":
         return (no_update,) * 5
-    cols = WORLD.history_columns()
+    cols = panels.history_columns_upto(WORLD, scrub)
     return (panels.traits_figure(cols),
             panels.population_radar_figure(WORLD),
             panels.diversity_figure(cols),
@@ -1018,12 +1264,12 @@ def render_genetics(_tick, active):
     Output("g-fst", "figure"), Output("g-deme", "figure"),
     Output("g-spiral", "figure"), Output("g-lin", "figure"),
     Output("g-rel", "figure"),
-    Input("tick", "data"), Input("active-tab", "data"),
+    Input("tick", "data"), Input("active-tab", "data"), Input("timeline", "data"),
 )
-def render_community(_tick, active):
+def render_community(_tick, active, scrub):
     if active != "community":
         return (no_update,) * 5
-    cols = WORLD.history_columns()
+    cols = panels.history_columns_upto(WORLD, scrub)
     return (panels.fst_figure(cols, WORLD.params.n_demes),
             panels.deme_bar_figure(WORLD),
             panels.spiral_figure(cols),
@@ -1079,6 +1325,270 @@ def apply_char_styles(active):
             "color": INK if on else MUTED, "padding": "8px 14px",
             "cursor": "pointer", "fontSize": "12px", "fontWeight": 600})
     return panel_styles + tab_styles
+
+
+# =====================================================================
+# Persistent inspector drawer  (feature 1)
+# =====================================================================
+# One callback fans identical content into every drawer instance, so the
+# copies cannot drift apart. Keeping all three in the DOM is what lets a
+# single Output list address them without conditional layouts.
+
+@app.callback(
+    [Output(f"drawer-{s}", "children") for s in DRAWERS],
+    Input("selected", "data"), Input("tick", "data"), Input("timeline", "data"),
+)
+def render_drawer(selected, _tick, scrub):
+    frame = WORLD.frame_at(scrub)
+    card = inspector.summary_card(WORLD, selected, frame,
+                                  historical=scrub is not None)
+    return [card] * len(DRAWERS)
+
+
+@app.callback(
+    Output("drawer-mode", "data"),
+    [Input(f"dmode-extremes-{s}", "n_clicks") for s in DRAWERS] +
+    [Input(f"dmode-directory-{s}", "n_clicks") for s in DRAWERS],
+    prevent_initial_call=True,
+)
+def set_drawer_mode(*_clicks):
+    trig = str(ctx.triggered_id or "")
+    return "directory" if trig.startswith("dmode-directory") else "extremes"
+
+
+@app.callback(
+    [Output(f"dirtools-{s}", "style") for s in DRAWERS] +
+    [Output(f"dmode-extremes-{s}", "style") for s in DRAWERS] +
+    [Output(f"dmode-directory-{s}", "style") for s in DRAWERS],
+    Input("drawer-mode", "data"),
+)
+def style_drawer_mode(mode):
+    directory = (mode == "directory")
+    base = {"flex": 1, "borderRadius": "7px", "padding": "5px",
+            "fontSize": "11px", "fontWeight": 700, "cursor": "pointer"}
+    on = {**base, "background": _rgba_hdr(ACCENT, 0.16),
+          "border": f"1px solid {ACCENT}", "color": ACCENT}
+    off = {**base, "background": "transparent",
+           "border": f"1px solid {GRID}", "color": INK2}
+    tools = {"display": "block" if directory else "none"}
+    return ([tools] * len(DRAWERS)
+            + [(off if directory else on)] * len(DRAWERS)
+            + [(on if directory else off)] * len(DRAWERS))
+
+
+@app.callback(
+    [Output(f"dlist-{s}", "children") for s in DRAWERS],
+    Input("drawer-mode", "data"), Input("tick", "data"),
+    Input("timeline", "data"), Input("selected", "data"),
+    [Input(f"dirq-{s}", "value") for s in DRAWERS],
+    [Input(f"dirsort-{s}", "value") for s in DRAWERS],
+)
+def render_drawer_list(mode, _tick, scrub, selected, *rest):
+    frame = WORLD.frame_at(scrub)
+    if mode == "directory":
+        queries, sorts = rest[:len(DRAWERS)], rest[len(DRAWERS):]
+        # each drawer keeps its own filter box, so these render per instance
+        return [inspector.directory_rows(frame, q or "", s or "age",
+                                         selected=selected)
+                for q, s in zip(queries, sorts)]
+    view = inspector.leaderboard_view(frame, selected)
+    return [view] * len(DRAWERS)
+
+
+@app.callback(
+    Output("selected", "data", allow_duplicate=True),
+    Input({"type": "board-pick", "name": ALL}, "n_clicks"),
+    Input({"type": "dir-pick", "name": ALL}, "n_clicks"),
+    prevent_initial_call=True,
+)
+def pick_from_list(_b, _d):
+    """
+    Clicking any leaderboard or directory row selects that individual.
+
+    The obvious guard -- trust `n_clicks` -- does not work here, and it took a
+    server-side trace to see why. The list is rebuilt on every tick, so each
+    rebuild hands React fresh buttons with n_clicks back at 0; a genuine click
+    therefore arrives reporting `value: 0`, indistinguishable from an untouched
+    button.
+
+    What *does* separate them is the shape of the trigger. Re-rendering the
+    list fires this callback with EVERY button in `ctx.triggered` (10-12
+    entries, all zero); a real click fires it with exactly one. So the arity of
+    the trigger is the signal, not the value.
+    """
+    if len(ctx.triggered) != 1:
+        return no_update                      # a list rebuild, not a click
+    trig = ctx.triggered_id
+    if not isinstance(trig, dict):
+        return no_update
+    name = trig.get("name")
+    # only select someone who actually exists in this run
+    return name if name and name in WORLD.people else no_update
+
+
+# =====================================================================
+# Timeline scrubber  (feature 3)
+# =====================================================================
+
+@app.callback(
+    Output("timeline-slider", "max"), Output("timeline-slider", "min"),
+    Output("timeline-slider", "marks"), Output("timeline-slider", "value"),
+    Output("slider-echo", "data"),
+    Input("tick", "data"), Input("timeline", "data"),
+)
+def sync_timeline(_tick, scrub):
+    lo, hi = WORLD.snapshots.first_tick, max(WORLD.snapshots.last_tick, 1)
+    marks = {}
+    step = max(1, (hi - lo) // 8)
+    for t in range(lo, hi + 1, step):
+        marks[int(t)] = {"label": str(int(t)),
+                         "style": {"color": MUTED, "fontSize": "9px"}}
+    # event markers take precedence over the regular ticks
+    icons = {"plague": "☣", "famine": "🌾", "bottleneck": "⧗"}
+    for e in WORLD.event_log:
+        t = int(e["tick"])
+        if lo <= t <= hi:
+            marks[t] = {"label": icons.get(e["kind"], "◆"),
+                        "style": {"color": CRIT, "fontSize": "12px"}}
+    value = hi if scrub is None else scrub
+    # record what we wrote, so set_timeline can ignore the echo
+    return hi, lo, marks, value, value
+
+
+@app.callback(
+    Output("timeline", "data"),
+    Input("timeline-slider", "value"), Input("btn-live", "n_clicks"),
+    Input("btn-reset", "n_clicks"),
+    State("slider-echo", "data"),
+    prevent_initial_call=True,
+)
+def set_timeline(value, _live, _reset, echo):
+    if ctx.triggered_id in ("btn-live", "btn-reset"):
+        return None
+    if value is None:
+        return no_update
+    # Ignore our own redraw. Comparing to `echo` rather than to
+    # snapshots.last_tick matters: under fast stepping the world advances
+    # between the write and the echo, so a last_tick comparison sees a stale
+    # value, decides the user scrubbed backwards, and freezes the dashboard in
+    # the past. That bug was live until this guard.
+    if echo is not None and int(value) == int(echo):
+        return no_update
+    return None if int(value) >= WORLD.snapshots.last_tick else int(value)
+
+
+@app.callback(
+    Output("timeline-state", "children"), Output("timeline-events", "children"),
+    Input("timeline", "data"), Input("tick", "data"),
+)
+def render_timeline_state(scrub, _tick):
+    if scrub is None:
+        state = html.Span("● LIVE", style={"color": GOOD})
+    else:
+        state = html.Span(f"⏱ VIEWING YEAR {scrub} — press Live to return",
+                          style={"color": WARN})
+    if not WORLD.event_log:
+        note = ("Drag to replay the run. Charts rebuild from history; the map "
+                "rebuilds from the snapshot buffer.")
+    else:
+        note = "events:  " + "   ".join(
+            f"y{e['tick']} {e['label']}" for e in WORLD.event_log[-6:])
+    return state, note
+
+
+# =====================================================================
+# Map layer selector  (feature 6)
+# =====================================================================
+
+@app.callback(
+    Output("map-layer", "data"),
+    [Input(f"layer-{k}", "n_clicks") for k, _, _ in MAP_LAYERS],
+    prevent_initial_call=True,
+)
+def set_map_layer(*_clicks):
+    return str(ctx.triggered_id or "layer-default").replace("layer-", "")
+
+
+@app.callback(
+    [Output(f"layer-{k}", "style") for k, _, _ in MAP_LAYERS] +
+    [Output("layer-hint", "children")],
+    Input("map-layer", "data"),
+)
+def style_map_layer(active):
+    active = active or "default"
+    base = {"borderRadius": "999px", "padding": "5px 13px", "fontSize": "11px",
+            "fontWeight": 700, "cursor": "pointer"}
+    styles, hint = [], ""
+    for key, _label, h in MAP_LAYERS:
+        if key == active:
+            styles.append({**base, "background": _rgba_hdr(ACCENT, 0.18),
+                           "border": f"1px solid {ACCENT}", "color": ACCENT})
+            hint = h
+        else:
+            styles.append({**base, "background": "transparent",
+                           "border": f"1px solid {GRID}", "color": INK2})
+    return styles + [hint]
+
+
+# =====================================================================
+# Comparative character matrix  (feature 2)
+# =====================================================================
+
+@app.callback(
+    Output("cmp-on", "data"), Input("btn-compare", "n_clicks"),
+    State("cmp-on", "data"), prevent_initial_call=True,
+)
+def toggle_compare(_n, on):
+    return not bool(on)
+
+
+@app.callback(
+    Output("btn-compare", "style"), Output("cmp-picker-wrap", "style"),
+    Output("cmp-section", "style"), Output("cmp-picker", "options"),
+    Output("cmp-note", "children"),
+    Input("cmp-on", "data"), Input("tick", "data"), Input("selected", "data"),
+)
+def sync_compare(on, _tick, selected):
+    base = {"borderRadius": "999px", "padding": "6px 15px", "fontSize": "12px",
+            "fontWeight": 700, "cursor": "pointer"}
+    if not on:
+        return ({**base, "background": "transparent",
+                 "border": f"1px solid {GRID}", "color": INK2},
+                {"display": "none"}, {"display": "none"}, [],
+                "Compare two individuals side by side — traits, set-points "
+                "and their genomic relatedness.")
+    opts = [{"label": f"{n.name.split('-')[0]} · {n.sex} · age {n.age}",
+             "value": n.name}
+            for n in sorted(WORLD.living, key=lambda p: p.name)
+            if n.name != selected]
+    note = ("Agent A is the selected individual."
+            if selected else "Select someone first — they become Agent A.")
+    return ({**base, "background": _rgba_hdr(ACCENT, 0.18),
+             "border": f"1px solid {ACCENT}", "color": ACCENT},
+            {"display": "block", "flex": 1, "minWidth": "220px"},
+            {"display": "block"}, opts, note)
+
+
+@app.callback(
+    Output("cmp-b", "data"), Input("cmp-picker", "value"),
+    prevent_initial_call=True,
+)
+def set_compare_b(value):
+    return value
+
+
+@app.callback(
+    Output("cmp-table", "children"), Output("g-cmp-radar", "figure"),
+    Output("g-cmp-bars", "figure"),
+    Input("cmp-on", "data"), Input("cmp-b", "data"), Input("selected", "data"),
+    Input("tick", "data"), Input("active-tab", "data"),
+)
+def render_compare(on, b, a, _tick, active):
+    if not on or active != "individual":
+        return no_update, no_update, no_update
+    return (inspector.compare_table(WORLD, a, b),
+            panels.compare_radar_figure(WORLD, a, b),
+            panels.compare_bars_figure(WORLD, a, b))
 
 
 if __name__ == "__main__":

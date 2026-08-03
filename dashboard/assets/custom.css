@@ -26,7 +26,11 @@ input.dash-range-slider-input,
 }
 .rc-slider-tooltip-arrow { border-bottom-color: #14161c !important; }
 
-/* Slider track / handle in the accent colour for a cohesive futuristic look */
+/* Slider track / handle in the accent colour for a cohesive futuristic look.
+   NOTE: Dash 4.x replaced rc-slider with its own .dash-slider-* widget, so the
+   legacy rules below match nothing on this version. They are kept only so a
+   downgrade still themes correctly; the rules that actually apply today are
+   the .dash-slider-* block further down. Verified against the live DOM. */
 .rc-slider-track { background-color: #4ea3ff !important; }
 .rc-slider-handle {
     border-color: #4ea3ff !important;
@@ -36,8 +40,30 @@ input.dash-range-slider-input,
 .rc-slider-handle:hover,
 .rc-slider-handle-click-focused:focus { border-color: #7bc0ff !important; }
 .rc-slider-rail { background-color: #2c2c2a !important; }
-.rc-slider-mark-text { color: #898781 !important; font-size: 9px !important; }
 .rc-slider-dot { border-color: #2c2c2a !important; background: #1a1a19 !important; }
+
+/* --- Dash 4.x slider (the one actually in use) ------------------------- */
+.dash-slider-track, [class*="dash-slider"] [data-orientation] > span > span {
+    background-color: #4ea3ff !important;
+}
+.dash-slider-range, .dash-slider-filled { background-color: #4ea3ff !important; }
+.dash-slider-rail, .dash-slider-wrapper [data-orientation="horizontal"] {
+    background-color: #2c2c2a !important;
+}
+.dash-slider-thumb, [class*="dash-slider"] [role="slider"] {
+    background-color: #0d0d0d !important;
+    border: 2px solid #4ea3ff !important;
+    box-shadow: 0 0 0 3px rgba(78,163,255,0.18) !important;
+}
+[class*="dash-slider"] [role="slider"]:hover,
+[class*="dash-slider"] [role="slider"]:focus-visible {
+    border-color: #7bc0ff !important;
+    outline: none !important;
+}
+.dash-slider-mark, .dash-slider-mark-label {
+    color: #a5a39c !important;
+    font-size: 10px !important;
+}
 
 /* Buttons: subtle lift on hover */
 button:hover { filter: brightness(1.12); transition: filter .12s ease; }
@@ -51,3 +77,108 @@ button:hover { filter: brightness(1.12); transition: filter .12s ease; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #2c2c2a; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #3a3a37; }
+
+/* ---------------------------------------------------------------------
+   Dropdowns (dcc.Dropdown)
+   ---------------------------------------------------------------------
+   Dash 4.x replaced the old react-select widget entirely: the markup is now
+   button.dash-dropdown > .dash-dropdown-trigger, with a .dash-dropdown-content
+   popup containing .dash-options-list-option rows. The legacy .Select-* rules
+   every dark-theme snippet on the internet still uses target nothing here.
+
+   Left unstyled the control renders WHITE text on a WHITE surface -- literally
+   invisible, and the worst contrast defect in the UI. Verified against the
+   live DOM rather than assumed. */
+.dash-dropdown,
+.dash-dropdown-wrapper .dash-dropdown {
+    background: #0d0d0d !important;
+    border: 1px solid #2c2c2a !important;
+    border-radius: 6px !important;
+    color: #ffffff !important;
+    box-shadow: none !important;
+    min-height: 32px;
+}
+.dash-dropdown-trigger { background: transparent !important; }
+.dash-dropdown-value,
+.dash-dropdown-value-item {
+    color: #ffffff !important;
+    font-size: 12px !important;
+}
+.dash-dropdown-placeholder { color: #a5a39c !important; font-size: 12px !important; }
+.dash-dropdown-trigger-icon { color: #a5a39c !important; fill: #a5a39c !important; }
+.dash-dropdown:hover { border-color: #4ea3ff !important; }
+.dash-dropdown-focus-target:focus-visible + .dash-dropdown,
+.dash-dropdown:focus-visible {
+    outline: none !important;
+    border-color: #4ea3ff !important;
+    box-shadow: 0 0 0 2px rgba(78,163,255,0.20) !important;
+}
+
+/* the popup */
+.dash-dropdown-content {
+    background: #14161c !important;
+    border: 1px solid #2c2c2a !important;
+    border-radius: 8px !important;
+    color: #ffffff !important;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.55) !important;
+}
+.dash-dropdown-search-container { background: #14161c !important; }
+.dash-dropdown-search {
+    background: #0d0d0d !important;
+    color: #ffffff !important;
+    border: 1px solid #2c2c2a !important;
+    border-radius: 5px !important;
+    font-size: 12px !important;
+}
+.dash-dropdown-search-icon { color: #a5a39c !important; }
+.dash-options-list, .dash-dropdown-options { background: #14161c !important; }
+.dash-options-list-option, .dash-dropdown-option {
+    color: #e9e8e2 !important;
+    background: transparent !important;
+    font-size: 12px !important;
+}
+.dash-options-list-option:hover, .dash-dropdown-option:hover {
+    background: rgba(78,163,255,0.18) !important;
+    color: #ffffff !important;
+}
+.dash-options-list-option.selected, .dash-dropdown-option.selected {
+    background: rgba(78,163,255,0.12) !important;
+    color: #4ea3ff !important;
+}
+
+/* Text inputs on the dark plane */
+input[type="text"]::placeholder { color: #a5a39c !important; opacity: 1; }
+input:focus, .dk-dd .Select-control:focus-within {
+    outline: none !important;
+    border-color: #4ea3ff !important;
+    box-shadow: 0 0 0 2px rgba(78,163,255,0.20) !important;
+}
+
+/* ---------------------------------------------------------------------
+   Legibility pass
+   ---------------------------------------------------------------------
+   The old muted grey (#898781 on #1a1a19) sits at ~4.7:1 -- it scrapes
+   past WCAG AA for body text but fails it at the 9-11px sizes this UI
+   actually uses for labels and marks. Lifted to #a5a39c (~6.6:1), which
+   clears AA comfortably at small sizes and AAA at normal ones. */
+.rc-slider-mark-text { color: #a5a39c !important; font-size: 10px !important; }
+.rc-slider-mark-text-active { color: #d8d6cd !important; }
+
+/* Timeline scrubber: taller hit area, accent handle, event marks legible */
+#timeline-wrap .rc-slider { margin-bottom: 22px; }
+#timeline-wrap .rc-slider-rail { height: 6px !important; border-radius: 3px; }
+#timeline-wrap .rc-slider-track { height: 6px !important; border-radius: 3px; }
+#timeline-wrap .rc-slider-handle {
+    width: 16px !important; height: 16px !important; margin-top: -5px !important;
+}
+#timeline-wrap .rc-slider-dot { display: none; }
+
+/* Drawer list rows: clear hover affordance so they read as clickable */
+#dlist-overview button:hover, #dlist-map button:hover,
+#dlist-genetics button:hover {
+    background: rgba(78,163,255,0.10) !important;
+    border-color: rgba(78,163,255,0.35) !important;
+}
+
+/* Canvas map: crisp pixel art at any scale */
+#rts-canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
