@@ -50,6 +50,7 @@ from .events import (Shock, bottleneck_survivor_fraction,
                      plague_mortality_multiplier)
 from .chronicle import Chronicle
 from .embedding import GenomePCA
+from .snapshots import SnapshotBuffer, capture as snapshot_capture
 from .lineage import LineageRegistry
 from . import metrics as M
 
@@ -108,9 +109,18 @@ class World:
         self.history: List[Dict[str, float]] = []
         # per-tick living headcount by dominant founder lineage
         self.lineage_history: List[Dict[str, int]] = []
+        # Compact per-tick frames so the dashboard can scrub backwards.
+        # `history` holds scalars only, which cannot rebuild a past map --
+        # see simulation/snapshots.py for what is and is not retained.
+        self.snapshots = SnapshotBuffer()
+        # Notable events, for the timeline scrubber's markers:
+        # [{"tick": int, "kind": str, "label": str}]
+        self.event_log: List[Dict[str, object]] = []
 
         self._seed_founders(n_founders)
         self._reposition()
+        # _record() captures frame 0 (the founding population) as a side
+        # effect, so there is exactly one capture point for the whole class.
         self._record(n_births=n_founders, n_deaths=0)
 
     # -- naming ----------------------------------------------------------
@@ -183,6 +193,8 @@ class World:
         famine_fert = 1.0
         birth_env = self.environment
         if shock is not None:
+            self.log_event(shock.kind, f"{shock.kind} (magnitude "
+                                       f"{shock.magnitude:.2f})")
             if shock.kind == "plague":
                 plague_mult = plague_mortality_multiplier(shock.magnitude)
                 self.chronicle.note_shock(
@@ -474,7 +486,21 @@ class World:
             dom, _ = self.registry.dominant(self.meta[npc.name].ancestry)
             counts[dom] = counts.get(dom, 0) + 1
         self.lineage_history.append(counts)
+        # Capture AFTER the step has fully settled. Read-only, so the RNG
+        # stream is untouched and a default world stays bit-for-bit.
+        self.snapshots.append(snapshot_capture(self))
         return row
+
+    # -- timeline events --------------------------------------------------
+
+    def log_event(self, kind: str, label: str) -> None:
+        """Record a notable moment for the timeline scrubber's markers."""
+        self.event_log.append({"tick": int(self.tick), "kind": kind,
+                               "label": label})
+
+    def frame_at(self, tick: Optional[int] = None) -> Optional[dict]:
+        """Snapshot for `tick`, or the live frame when `tick` is None."""
+        return self.snapshots.at(tick)
 
     # -- shock scheduling (called by the dashboard) ---------------------
 

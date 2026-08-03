@@ -22,10 +22,12 @@ from .world import World, PersonMeta
 from .events import Shock, Scenario, SCENARIOS, scenario_list, SHOCK_KINDS
 from .community import fst, expected_fst, deme_label
 from .chronicle import Chronicle, GLOSSARY
+from .snapshots import MAX_FRAMES, SnapshotBuffer, capture
 
 __all__ = [
     "World", "PersonMeta", "DemographyParams",
     "Shock", "Scenario", "SCENARIOS", "scenario_list", "SHOCK_KINDS",
     "fst", "expected_fst", "deme_label",
     "Chronicle", "GLOSSARY",
+    "SnapshotBuffer", "MAX_FRAMES", "capture",
 ]
