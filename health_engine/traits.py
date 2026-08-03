@@ -648,14 +648,26 @@ def genotypic_value(arch: TraitArchitecture, dosage: np.ndarray,
 def liability(arch: TraitArchitecture, dosage: np.ndarray,
               dev: EnvironmentalDeviates,
               expression: Optional[np.ndarray] = None,
-              imprint: Optional["ImprintState"] = None) -> float:
+              imprint: Optional["ImprintState"] = None,
+              canalization: float = 1.0) -> float:
     """Standardised liability z = G + I + GxE + E.
 
     Imprinting (#4) enters through the genotypic value only. The epistatic
     and GxE terms are built from raw dosages on purpose: those components
     were calibrated against the biallelic dosage distribution, and routing
     a parent-of-origin effect through them would decalibrate V_I and V_GxE
-    for a mechanism that acts on transcription, not on interaction."""
+    for a mechanism that acts on transcription, not on interaction.
+
+    `canalization` is the developmental-buffering factor k (#14b,
+    canalize.py), 1.0 by default and therefore inert. It multiplies the
+    GENETIC terms only -- G and the epistatic I -- so that stress releases
+    cryptic genetic variation while leaving the environmental residual
+    alone. Both terms are mean-centred by construction (genotypic_value
+    subtracts E[G]; the epistatic products use centred dosages), so scaling
+    them changes variance without moving the population mean. V_GxE is
+    deliberately not scaled: it already carries an environmental response,
+    and scaling it too would confound two mechanisms the engine models
+    separately."""
     t = arch.spec.name
     z = genotypic_value(arch, dosage, expression, imprint)
 
@@ -663,6 +675,9 @@ def liability(arch: TraitArchitecture, dosage: np.ndarray,
         xi = dosage[arch.epi_i] - 2.0 * ALT_FREQ[arch.epi_i]
         xj = dosage[arch.epi_j] - 2.0 * ALT_FREQ[arch.epi_j]
         z += float(np.sum(arch.epi_w * xi * xj))
+
+    if canalization != 1.0:
+        z *= canalization          # G and I only; E and GxE are added below
 
     if arch.gxe_w.size and arch.spec.v_gxe > 0:
         x = dosage[arch.idx] - 2.0 * arch.p
@@ -686,18 +701,25 @@ def express(arch: TraitArchitecture, z: float):
 
 def phenotype(dosage: np.ndarray, dev: EnvironmentalDeviates,
               expression: Optional[np.ndarray] = None,
-              imprint: Optional["ImprintState"] = None) -> Dict[str, object]:
+              imprint: Optional["ImprintState"] = None,
+              canalization: Optional[Dict[str, float]] = None
+              ) -> Dict[str, object]:
     """Full genotype -> phenotype pass across every trait."""
     out: Dict[str, object] = {}
     for name, arch in ARCHITECTURE.items():
-        out[name] = express(arch, liability(arch, dosage, dev, expression, imprint))
+        k = 1.0 if canalization is None else canalization.get(name, 1.0)
+        out[name] = express(arch, liability(arch, dosage, dev, expression,
+                                            imprint, k))
     return out
 
 
 def liabilities(dosage: np.ndarray, dev: EnvironmentalDeviates,
                 expression: Optional[np.ndarray] = None,
-                imprint: Optional["ImprintState"] = None) -> Dict[str, float]:
-    return {n: liability(a, dosage, dev, expression, imprint)
+                imprint: Optional["ImprintState"] = None,
+                canalization: Optional[Dict[str, float]] = None
+                ) -> Dict[str, float]:
+    return {n: liability(a, dosage, dev, expression, imprint,
+                         1.0 if canalization is None else canalization.get(n, 1.0))
             for n, a in ARCHITECTURE.items()}
 
 

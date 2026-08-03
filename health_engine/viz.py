@@ -790,3 +790,107 @@ def plot_imprinting(out_path: str, symbol: str = "IGF2",
         f"{_HAPN[spec.expressed_from]} copy only (DeChiara 1991)", fontsize=11)
     fig.tight_layout(rect=(0, 0, 1, 0.93))
     return _save(fig, out_path)
+
+
+def plot_canalization(out_path: str, trait: str = "height_cm",
+                      n: int = 3000, seed: int = 20260814) -> str:
+    """
+    Canalization (#14b): the buffer, and what happens when it breaks.
+
+    Left: phenotypic variance as stress rises. Flat below the buffering
+    threshold -- that is the buffer holding, and it is exactly why the
+    engine's calibrated heritabilities are undisturbed -- then rising once
+    stress overwhelms it. The dashed curve is k^2 V_gen + V_env, predicted
+    from the BASELINE decomposition alone.
+
+    Middle: the released genetic fraction against its closed form
+    h2(k) = k^2 h2_0 / (k^2 h2_0 + 1 - h2_0).
+
+    Right: the two distributions. Same genotypes, same environmental draws,
+    same mean -- a wider spread. Cryptic variation made visible, which is
+    Waddington's claim in one picture.
+    """
+    from .canalize import (CANALIZATION_THRESHOLD, canalization_factor,
+                           expected_heritability)
+    from .npc import random_founder
+    from .traits import liability
+
+    rng = np.random.default_rng(seed)
+    arch = ARCHITECTURE[trait]
+    tspec = TRAIT_TABLE[trait]
+
+    pop = [random_founder(f"c{i}", rng) for i in range(n)]
+    imp = [p.imprint_state() for p in pop]
+
+    def _z(k):
+        return np.array([liability(arch, p.genome.dosage, p.deviates,
+                                   p.expression, m, k)
+                         for p, m in zip(pop, imp)])
+
+    z0 = _z(1.0)
+    genetic = None
+    stresses = np.linspace(0.0, 3.0, 25)
+    obs_var, pred_var, obs_h2, pred_h2 = [], [], [], []
+    for s in stresses:
+        k = canalization_factor(s, trait)
+        z = _z(k)
+        if genetic is None and k > 1.0:
+            genetic = (z - z0) / (k - 1.0)
+    v_gen = float(genetic.var())
+    v_env = float(z0.var()) - v_gen
+    h2_0 = v_gen / float(z0.var())
+
+    for s in stresses:
+        k = canalization_factor(s, trait)
+        z = _z(k)
+        obs_var.append(float(z.var()))
+        pred_var.append(k * k * v_gen + v_env)
+        obs_h2.append((k * k * v_gen) / float(z.var()))
+        pred_h2.append(expected_heritability(h2_0, k))
+
+    fig, (axL, axM, axR) = plt.subplots(1, 3, figsize=(15, 4.6))
+
+    axL.plot(stresses, obs_var, "o", color="#c0504d", ms=4, label="simulated")
+    axL.plot(stresses, pred_var, "--", color="#2c6fa8", lw=2,
+             label=r"$k^2 V_{gen} + V_{env}$")
+    axL.axvline(CANALIZATION_THRESHOLD, color="#5a6570", ls=":", lw=1.2)
+    axL.annotate("buffer holds", xy=(0.35, min(obs_var) + 0.02),
+                 fontsize=8, color="#5a6570")
+    axL.annotate("buffer breaks\n(cryptic variation released)",
+                 xy=(1.65, max(obs_var) * 0.80), fontsize=8, color="#c0504d")
+    axL.set_xlabel("developmental stress")
+    axL.set_ylabel("phenotypic variance (liability)")
+    axL.set_title("Canalization: variance vs stress", fontsize=10)
+    axL.legend(fontsize=8, frameon=False, loc="upper left")
+    axL.grid(alpha=0.25)
+
+    axM.plot(stresses, obs_h2, "o", color="#c0504d", ms=4, label="simulated")
+    axM.plot(stresses, pred_h2, "--", color="#2c6fa8", lw=2,
+             label=r"$k^2h^2_0/(k^2h^2_0+1-h^2_0)$")
+    axM.axvline(CANALIZATION_THRESHOLD, color="#5a6570", ls=":", lw=1.2)
+    axM.set_xlabel("developmental stress")
+    axM.set_ylabel("genetic fraction of variance")
+    axM.set_title("Released heritability", fontsize=10)
+    axM.legend(fontsize=8, frameon=False, loc="lower right")
+    axM.grid(alpha=0.25)
+
+    k_hi = canalization_factor(2.0, trait)
+    zc = tspec.mean + tspec.sd * z0
+    zs = tspec.mean + tspec.sd * _z(k_hi)
+    bins = np.linspace(min(zc.min(), zs.min()), max(zc.max(), zs.max()), 55)
+    axR.hist(zc, bins=bins, color="#9aa5b1", alpha=0.75, label="buffered (neutral)")
+    axR.hist(zs, bins=bins, histtype="step", color="#c0504d", lw=1.8,
+             label="decanalized (stress 2.0)")
+    axR.axvline(zc.mean(), color="#5a6570", ls="--", lw=1)
+    axR.axvline(zs.mean(), color="#c0504d", ls=":", lw=1.4)
+    axR.set_xlabel(tspec.unit or trait)
+    axR.set_ylabel("individuals")
+    axR.set_title(f"Same genotypes, same mean, wider spread\n"
+                  f"mean {zc.mean():.2f} -> {zs.mean():.2f}   "
+                  f"sd {zc.std():.3f} -> {zs.std():.3f}", fontsize=9)
+    axR.legend(fontsize=8, frameon=False)
+
+    fig.suptitle("Canalization and cryptic genetic variation (#14b) -- "
+                 "Waddington 1942; Rutherford & Lindquist 1998", fontsize=11)
+    fig.tight_layout(rect=(0, 0, 1, 0.93))
+    return _save(fig, out_path)

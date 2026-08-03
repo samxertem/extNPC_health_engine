@@ -756,6 +756,30 @@ def full_report(rng: np.random.Generator,
         f"d={r.dominance:.2f})")
     add(f"    -> {'PASS' if imp_pass else 'FAIL'}")
 
+    # 8. Canalization (roadmap #14b)
+    add("\n[8] Canalization   Var(z) = k^2 V_gen + V_env  (Waddington 1942)")
+    add("    Development is buffered, so genetic variation stays cryptic until")
+    add("    stress overwhelms the buffer. One cohort of genotypes read twice --")
+    add("    neutral vs stressed -- with the stressed variance PREDICTED from the")
+    add("    baseline decomposition. The mean must not move: only variance is")
+    add("    released, and only the genetic part of it.")
+    add(f"    {'trait':<20}{'k':>6}{'V_gen':>8}{'observed':>11}{'predicted':>11}"
+        f"{'h2 base':>9}{'h2 stress':>11}")
+    can_pass = True
+    for t in ("height_cm", "neuroticism"):
+        c = canalization_release(trait=t, stress=2.0,
+                                 n=1200 if fast else 4000, rng=rng)
+        can_pass = can_pass and c.passes()
+        add(f"    {t:<20}{c.k:>6.2f}{c.v_genetic:>8.3f}"
+            f"{c.observed_var_stressed:>11.4f}{c.predicted_var_stressed:>11.4f}"
+            f"{c.genetic_fraction_baseline:>9.3f}{c.genetic_fraction_stressed:>11.3f}")
+    add(f"    population mean shift: {c.mean_shift:+.5f}  (predicted 0)")
+    add(f"    -> {'PASS' if can_pass else 'FAIL'}")
+    add("\n    NOTE: the buffering CAPACITY is an uncalibrated engineering")
+    add("    constant -- no human decanalization coefficient exists. What is")
+    add("    tested is Waddington's qualitative claim plus internal k^2")
+    add("    consistency, not the magnitude. See canalize.py.")
+
     return "\n".join(out)
 
 
@@ -1001,4 +1025,99 @@ def imprinting_reciprocal_cross(trait: str = "height_cm",
         expected_gap=2.0 * spec.strength * a_eff,
         mean_shift=float(with_imp.mean() - without.mean()),
         dominance=d_eff,
+    )
+
+
+# ======================================================================
+# Canalization / cryptic variation (roadmap #14b)
+# ======================================================================
+
+@dataclass
+class CanalizationResult:
+    """
+    Waddington's claim, made quantitative.
+
+    Below the buffering threshold, genetic variation is held cryptic. Above
+    it the buffer fails and that variation becomes visible. Because the
+    liability is LINEAR in the expressivity factor k,
+
+        z(k) = k*(G + I) + GxE + E
+
+    the genetic part can be recovered exactly from two evaluations of the
+    same individuals:  G + I = (z(k) - z(1)) / (k - 1).  That makes the
+    prediction non-circular: measure V_gen and V_env at baseline, then
+    predict the stressed variance as
+
+        Var(z(k)) = k^2 * V_gen + V_env
+
+    and compare to what the stressed cohort actually shows. Nothing in the
+    trait layer computes that expression.
+    """
+    trait: str
+    stress: float
+    k: float
+    v_genetic: float               # V(G + I), recovered
+    v_environmental: float         # everything else
+    observed_var_stressed: float
+    predicted_var_stressed: float  # k^2 V_gen + V_env
+    genetic_fraction_baseline: float
+    genetic_fraction_stressed: float
+    predicted_fraction_stressed: float   # closed form from canalize.py
+    mean_shift: float
+
+    def passes(self, var_tol: float = 0.02, mean_tol: float = 0.02) -> bool:
+        var_ok = (abs(self.observed_var_stressed - self.predicted_var_stressed)
+                  <= var_tol * self.predicted_var_stressed)
+        frac_ok = (abs(self.genetic_fraction_stressed
+                       - self.predicted_fraction_stressed) <= 0.02)
+        # buffering must RELEASE variance, not merely change it
+        released = self.observed_var_stressed > 1.0
+        return var_ok and frac_ok and released and abs(self.mean_shift) <= mean_tol
+
+
+def canalization_release(trait: str = "height_cm",
+                         stress: float = 2.0,
+                         n: int = 4000,
+                         rng: Optional[np.random.Generator] = None
+                         ) -> CanalizationResult:
+    """
+    Take one cohort of genotypes and read it twice -- once as though it had
+    developed in a neutral environment, once under `stress`. Identical
+    genomes, identical environmental draws: the ONLY difference is whether
+    the developmental buffer held.
+    """
+    from .canalize import canalization_factor, expected_heritability
+    from .npc import random_founder
+    from .traits import ARCHITECTURE, liability
+
+    rng = np.random.default_rng(20260814) if rng is None else rng
+    arch = ARCHITECTURE[trait]
+    k = canalization_factor(stress, trait)
+    if k <= 1.0:
+        raise ValueError(f"stress={stress} does not exceed the buffering threshold")
+
+    pop = [random_founder(f"c{i}", rng) for i in range(n)]
+    z0 = np.array([liability(arch, p.genome.dosage, p.deviates, p.expression,
+                             p.imprint_state(), 1.0) for p in pop])
+    zk = np.array([liability(arch, p.genome.dosage, p.deviates, p.expression,
+                             p.imprint_state(), k) for p in pop])
+
+    genetic = (zk - z0) / (k - 1.0)          # exactly G + I
+    v_gen = float(genetic.var())
+    v_tot0 = float(z0.var())
+    v_env = v_tot0 - v_gen
+
+    h2_0 = v_gen / v_tot0
+    return CanalizationResult(
+        trait=trait,
+        stress=stress,
+        k=k,
+        v_genetic=v_gen,
+        v_environmental=v_env,
+        observed_var_stressed=float(zk.var()),
+        predicted_var_stressed=k * k * v_gen + v_env,
+        genetic_fraction_baseline=h2_0,
+        genetic_fraction_stressed=(k * k * v_gen) / float(zk.var()),
+        predicted_fraction_stressed=expected_heritability(h2_0, k),
+        mean_shift=float(zk.mean() - z0.mean()),
     )

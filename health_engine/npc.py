@@ -209,10 +209,23 @@ class NPC:
             self._phenotype_cache = {
                 name: express(arch, liability(arch, self.genome.dosage,
                                               self.deviates, self.expression,
-                                              imp))
+                                              imp, self.canalization(name)))
                 for name, arch in ARCHITECTURE.items()
             }
         return self._phenotype_cache
+
+    def canalization(self, trait: str) -> float:
+        """
+        Developmental-buffering factor k for one trait (roadmap #14b).
+
+        Keyed off `birth_environment`, not any current environment: Waddington's
+        buffer operates DURING development, so it is the environment an
+        individual developed in that decides how much cryptic genetic variation
+        it expresses. Returns exactly 1.0 in any environment at or below the
+        buffering threshold, which includes every calibrated setting.
+        """
+        from .canalize import canalization_factor
+        return canalization_factor(self.birth_environment.stress, trait)
 
     def imprint_state(self):
         """
@@ -233,7 +246,8 @@ class NPC:
 
     def liability(self, trait: str) -> float:
         return liability(ARCHITECTURE[trait], self.genome.dosage,
-                         self.deviates, self.expression, self.imprint_state())
+                         self.deviates, self.expression, self.imprint_state(),
+                         self.canalization(trait))
 
     def breeding_value(self, trait: str) -> float:
         """Additive genetic value: the heritable half of this NPC's trait."""

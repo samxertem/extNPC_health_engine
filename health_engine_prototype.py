@@ -420,6 +420,8 @@ def main() -> None:
         viz.plot_mito_inheritance(os.path.join(out, "mito_inheritance.png")),
         viz.plot_imprinting(os.path.join(out, "imprinting.png"),
                             n=1200 if FAST else 4000),
+        viz.plot_canalization(os.path.join(out, "canalization.png"),
+                              n=1000 if FAST else 3000),
     ]
     for p in paths:
         print(f"  {p}")
