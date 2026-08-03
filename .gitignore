@@ -43,6 +43,11 @@ Desktop.ini
 # ---------------------------------------------------------------------
 .playwright-mcp/
 
+# Dev-server stdout/stderr captured while verifying the dashboard.
+dash_out.log
+dash_err.log
+*.log
+
 # ---------------------------------------------------------------------
 # NOTE ON `outputs/`
 # ---------------------------------------------------------------------
