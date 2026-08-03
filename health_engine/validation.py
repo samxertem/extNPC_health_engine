@@ -739,6 +739,23 @@ def full_report(rng: np.random.Generator,
     add("    cost of not knowing in advance which variants matter -- the same")
     add("    cost real GWAS pays, and the reason PGS need clumping/thresholding.")
 
+    # 7. Imprinting (roadmap #4)
+    add("\n[7] Genomic imprinting   reciprocal-heterozygote gap = 2*s*a")
+    add("    Two individuals, SAME genotype at an imprinted locus, differing only")
+    add("    in which parent supplied the alternate allele. Mendel predicts they")
+    add("    are identical. Under monoallelic expression the gap is closed-form,")
+    add("    and the dominance term cancels out of it exactly.")
+    add(f"    {'trait':<18}{'locus':>8}{'s':>6}{'a':>9}{'observed':>11}{'2*s*a':>11}")
+    imp_pass = True
+    for t in ("height_cm", "adiposity"):
+        r = imprinting_reciprocal_cross(trait=t, n=400 if fast else 1500, rng=rng)
+        imp_pass = imp_pass and r.passes()
+        add(f"    {t:<18}{r.symbol:>8}{r.strength:>6.2f}{r.additive_effect:>9.4f}"
+            f"{r.observed_gap:>11.5f}{r.expected_gap:>11.5f}")
+    add(f"    population mean shift: {r.mean_shift:+.5f}  (predicted 0 at d=0, "
+        f"d={r.dominance:.2f})")
+    add(f"    -> {'PASS' if imp_pass else 'FAIL'}")
+
     return "\n".join(out)
 
 
@@ -868,3 +885,120 @@ def mito_is_strictly_maternal(n: int, rng: np.random.Generator) -> bool:
         if not (0.2 <= child_a.heteroplasmy <= 1.0):
             ok = False
     return ok
+
+
+# ======================================================================
+# Genomic imprinting (roadmap #4)
+# ======================================================================
+
+@dataclass
+class ImprintingResult:
+    """
+    The reciprocal-heterozygote law.
+
+    Take two individuals who are heterozygous at an imprinted locus and
+    identical everywhere else, differing ONLY in which parent supplied the
+    alternate allele. Mendel says their genotypic values are identical.
+    Under monoallelic expression they are not, and the gap is closed-form.
+
+    With silencing strength s, additive effect a and dominance deviation d
+    at that locus, the genotypic contribution is
+
+        alt from the EXPRESSED parent:   (1-s)*d + s*(+a)
+        alt from the SILENCED parent:    (1-s)*d + s*(-a)
+        ------------------------------------------------------
+        difference                    =  2 * s * a
+
+    The dominance term cancels exactly, so the prediction is 2sa whatever
+    d happens to be -- and it is a genuine prediction: nothing in the trait
+    layer computes it. `expected_gap` is that formula; `observed_gap` is
+    measured by building the two individuals and reading their liabilities.
+    """
+    trait: str
+    symbol: str
+    strength: float
+    additive_effect: float         # a at this locus, in liability units
+    observed_gap: float            # measured, in liability units
+    expected_gap: float            # 2 * s * a
+    mean_shift: float              # population mean with imprinting - without
+    dominance: float               # d at this locus
+
+    def passes(self, tol: float = 1e-9, mean_tol: float = 0.02) -> bool:
+        gap_ok = abs(self.observed_gap - self.expected_gap) <= tol
+        # With d = 0 the population mean is provably unchanged (see below);
+        # with d != 0 it shifts by -s*2pq*d and this check does not apply.
+        mean_ok = (abs(self.mean_shift) <= mean_tol) if self.dominance == 0.0 else True
+        return gap_ok and mean_ok
+
+
+def imprinting_reciprocal_cross(trait: str = "height_cm",
+                                symbol: str = "IGF2",
+                                n: int = 2000,
+                                rng: Optional[np.random.Generator] = None
+                                ) -> ImprintingResult:
+    """
+    Roadmap #4's benchmark, as a law rather than an anecdote.
+
+    Builds a reciprocal heterozygote pair at `symbol` -- same genotype,
+    opposite parent of origin -- and compares the measured liability gap to
+    the closed form 2*s*a. Also measures the population-mean shift caused by
+    imprinting, which is provably zero when the locus is purely additive:
+
+        E[val_biallelic]  = a(p-q) + 2pq*d
+        E[val_monoallelic] = p*(+a) + q*(-a) = a(p-q)
+
+    so the difference is -s*2pq*d, which vanishes at d = 0. IGF2 is coded
+    with dominance_ratio 0.0, so this predicts NO mean shift -- imprinting
+    moves variance and individual values, not the population average.
+    """
+    from .genome import Genome
+    from .imprint import IMPRINTED, MATERNAL, PATERNAL
+    from .loci import LOCUS_BY_SYMBOL
+    from .npc import NPC, random_founder
+    from .traits import ARCHITECTURE, liability
+
+    rng = np.random.default_rng(20260803) if rng is None else rng
+    arch = ARCHITECTURE[trait]
+    locus = LOCUS_BY_SYMBOL[symbol]
+    spec = IMPRINTED[symbol]
+    i = locus.index
+    if i not in set(arch.idx.tolist()):
+        raise ValueError(f"{symbol} carries no weight on {trait}")
+    j = arch.idx.tolist().index(i)
+    a_eff = float(arch.a[j])
+    d_eff = float(arch.d[j])
+
+    # --- the reciprocal pair --------------------------------------------
+    base = random_founder("base", rng)
+    expressed, silenced = spec.expressed_from, 1 - spec.expressed_from
+
+    h_expr = base.genome.haplotypes.copy()
+    h_expr[expressed, i] = 1          # alternate allele from the ACTIVE parent
+    h_expr[silenced, i] = 0
+    h_sil = base.genome.haplotypes.copy()
+    h_sil[expressed, i] = 0
+    h_sil[silenced, i] = 1            # alternate allele from the SILENCED parent
+
+    lo = NPC(name="alt_from_silenced", genome=Genome(h_sil), deviates=base.deviates)
+    hi = NPC(name="alt_from_expressed", genome=Genome(h_expr), deviates=base.deviates)
+    assert lo.genome.dosage[i] == hi.genome.dosage[i] == 1, "must be reciprocal heterozygotes"
+
+    observed = hi.liability(trait) - lo.liability(trait)
+
+    # --- population mean shift -------------------------------------------
+    pop = [random_founder(f"p{k}", rng) for k in range(n)]
+    with_imp = np.array([liability(arch, p.genome.dosage, p.deviates,
+                                   p.expression, p.imprint_state()) for p in pop])
+    without = np.array([liability(arch, p.genome.dosage, p.deviates,
+                                  p.expression, None) for p in pop])
+
+    return ImprintingResult(
+        trait=trait,
+        symbol=symbol,
+        strength=spec.strength,
+        additive_effect=a_eff,
+        observed_gap=float(observed),
+        expected_gap=2.0 * spec.strength * a_eff,
+        mean_shift=float(with_imp.mean() - without.mean()),
+        dominance=d_eff,
+    )

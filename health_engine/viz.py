@@ -656,3 +656,137 @@ def plot_mito_inheritance(out_path: str, seed: int = 20240724) -> str:
                  "bottleneck (roadmap #3)", fontsize=13, fontweight="bold")
     fig.tight_layout()
     return _save(fig, out_path)
+
+
+def plot_imprinting(out_path: str, symbol: str = "IGF2",
+                    trait: str = "height_cm", n: int = 4000,
+                    seed: int = 20260803) -> str:
+    """
+    Genomic imprinting (#4): parent-of-origin effects, three ways.
+
+    Left: the reciprocal-heterozygote experiment. Two individuals with the
+    IDENTICAL genotype at an imprinted locus -- one carrying the alternate
+    allele from its father, one from its mother -- plotted against the
+    biallelic (non-imprinted) expectation they would share under Mendel.
+    The split is the whole phenomenon.
+
+    Middle: the law. Measured gap vs the closed form 2*s*a as silencing
+    strength s is swept from 0 (biallelic) to 1 (fully monoallelic). The
+    points sit on the line because nothing computes the line.
+
+    Right: what imprinting does to a population. The trait distribution
+    with and without imprinting at the same genotypes -- the mean is
+    unmoved (IGF2 is purely additive, so the algebra predicts no shift)
+    while the variance rises. Same lesson as the epigenome and GRN layers:
+    these mechanisms move variance, not the average.
+    """
+    from .genome import Genome
+    from .imprint import (IMPRINTED, expressed_haplotype_vector,
+                          imprint_state, imprint_strength_vector, relax_imprint)
+    from .loci import LOCUS_BY_SYMBOL
+    from .npc import NPC, random_founder
+    from .traits import liability
+
+    _HAPN = {0: "maternal", 1: "paternal"}
+
+    rng = np.random.default_rng(seed)
+    arch = ARCHITECTURE[trait]
+    spec = IMPRINTED[symbol]
+    i = LOCUS_BY_SYMBOL[symbol].index
+    idx = arch.idx.tolist()
+    a_eff = float(arch.a[idx.index(i)])
+    hap = expressed_haplotype_vector()
+    tspec = TRAIT_TABLE[trait]
+
+    base = random_founder("base", rng)
+    expressed, silenced = spec.expressed_from, 1 - spec.expressed_from
+
+    def _make(alt_on):
+        h = base.genome.haplotypes.copy()
+        h[alt_on, i] = 1
+        h[1 - alt_on, i] = 0
+        return NPC(name="x", genome=Genome(h), deviates=base.deviates)
+
+    hi, lo = _make(expressed), _make(silenced)
+
+    fig, (axL, axM, axR) = plt.subplots(1, 3, figsize=(15, 4.6))
+
+    # ---- left: the reciprocal pair -------------------------------------
+    def _pheno(npc, strength):
+        z = liability(arch, npc.genome.dosage, npc.deviates, npc.expression,
+                      imprint_state(npc.genome, strength, hap))
+        return tspec.mean + tspec.sd * z
+
+    off = np.zeros(N_LOCI)
+    mendel = _pheno(hi, off)                       # identical for both
+    vals = [_pheno(lo, imprint_strength_vector()),
+            mendel,
+            _pheno(hi, imprint_strength_vector())]
+    labels = [f"alt from\n{spec.silenced_parent}\n(silenced)",
+              "Mendel:\nboth identical\n(biallelic)",
+              f"alt from\n{_HAPN[spec.expressed_from]}\n(expressed)"]
+    colors = ["#2c6fa8", "#9aa5b1", "#c0504d"]
+    axL.bar(range(3), vals, color=colors, width=0.62)
+    axL.set_xticks(range(3))
+    axL.set_xticklabels(labels, fontsize=8)
+    axL.set_ylabel(tspec.unit or trait)
+    lo_v, hi_v = min(vals), max(vals)
+    pad = max(hi_v - lo_v, 1e-6)
+    axL.set_ylim(lo_v - 1.6 * pad, hi_v + 0.8 * pad)
+    axL.axhline(mendel, color="#9aa5b1", ls=":", lw=1)
+    axL.set_title(f"Same genotype at {symbol} (dosage 1)\ndifferent parent of origin",
+                  fontsize=10)
+    axL.annotate("", xy=(2, vals[2]), xytext=(0, vals[0]),
+                 arrowprops=dict(arrowstyle="<->", color="#333", lw=1.2))
+    axL.text(1.0, (vals[0] + vals[2]) / 2, f"  gap = 2sa\n  = {vals[2]-vals[0]:.2f}",
+             fontsize=8, va="center")
+
+    # ---- middle: the law ------------------------------------------------
+    ss = np.linspace(0.0, 1.0, 11)
+    obs, pred = [], []
+    for s_scale in ss:
+        sv = relax_imprint(s_scale / spec.strength) if spec.strength else off
+        sv = np.clip(sv, 0.0, 1.0)
+        g = (liability(arch, hi.genome.dosage, hi.deviates, hi.expression,
+                       imprint_state(hi.genome, sv, hap))
+             - liability(arch, lo.genome.dosage, lo.deviates, lo.expression,
+                         imprint_state(lo.genome, sv, hap)))
+        obs.append(g)
+        pred.append(2.0 * s_scale * a_eff)
+    axM.plot(ss, pred, "-", color="#2c6fa8", lw=2,
+             label=r"closed form  $2\cdot s\cdot a$")
+    axM.plot(ss, obs, "o", color="#c0504d", ms=5, label="simulated")
+    axM.set_xlabel("silencing strength $s$")
+    axM.set_ylabel("reciprocal gap (liability SD)")
+    axM.set_title("The law\n$s=0$ biallelic  ...  $s=1$ monoallelic", fontsize=10)
+    axM.legend(fontsize=8, frameon=False)
+    axM.grid(alpha=0.25)
+
+    # ---- right: population effect ---------------------------------------
+    pop = [random_founder(f"p{k}", rng) for k in range(n)]
+    sv = imprint_strength_vector()
+    with_i = np.array([tspec.mean + tspec.sd *
+                       liability(arch, p.genome.dosage, p.deviates, p.expression,
+                                 imprint_state(p.genome, sv, hap)) for p in pop])
+    without = np.array([tspec.mean + tspec.sd *
+                        liability(arch, p.genome.dosage, p.deviates,
+                                  p.expression, None) for p in pop])
+    bins = np.linspace(min(with_i.min(), without.min()),
+                       max(with_i.max(), without.max()), 60)
+    axR.hist(without, bins=bins, color="#9aa5b1", alpha=0.75, label="biallelic")
+    axR.hist(with_i, bins=bins, histtype="step", color="#c0504d", lw=1.8,
+             label=f"{symbol} imprinted")
+    axR.axvline(without.mean(), color="#5a6570", ls="--", lw=1)
+    axR.axvline(with_i.mean(), color="#c0504d", ls=":", lw=1.4)
+    axR.set_xlabel(tspec.unit or trait)
+    axR.set_ylabel("individuals")
+    axR.set_title(f"Population, n={n}\n"
+                  f"mean {without.mean():.2f} -> {with_i.mean():.2f}   "
+                  f"sd {without.std():.3f} -> {with_i.std():.3f}", fontsize=9)
+    axR.legend(fontsize=8, frameon=False)
+
+    fig.suptitle(
+        f"Genomic imprinting (#4): {symbol} is expressed from the "
+        f"{_HAPN[spec.expressed_from]} copy only (DeChiara 1991)", fontsize=11)
+    fig.tight_layout(rect=(0, 0, 1, 0.93))
+    return _save(fig, out_path)

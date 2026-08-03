@@ -93,6 +93,10 @@ class NPC:
     mito: Optional["MitoGenome"] = None
 
     _phenotype_cache: Optional[Dict[str, object]] = field(default=None, repr=False)
+    # Parent-of-origin state (roadmap #4). Derived from the genome, so it is
+    # built once on first use and never invalidated -- the genome is fixed at
+    # conception. Not a constructor argument: nothing should set it directly.
+    _imprint_cache: Optional[object] = field(default=None, repr=False)
 
     # -------------------- phenotype --------------------
 
@@ -201,16 +205,35 @@ class NPC:
         flipped every time an observer looks.
         """
         if self._phenotype_cache is None:
+            imp = self.imprint_state()
             self._phenotype_cache = {
                 name: express(arch, liability(arch, self.genome.dosage,
-                                              self.deviates, self.expression))
+                                              self.deviates, self.expression,
+                                              imp))
                 for name, arch in ARCHITECTURE.items()
             }
         return self._phenotype_cache
 
+    def imprint_state(self):
+        """
+        Parent-of-origin state for this genome (roadmap #4). Cached, because
+        it is a pure function of the genome and the genome never changes
+        after conception.
+
+        Nothing is stored across generations and no random numbers are drawn:
+        `Genome.haplotypes[0]` is maternal and `[1]` paternal by construction,
+        so germline erasure and re-establishment of imprints -- every egg
+        maternally marked, every sperm paternally marked -- is exact and
+        automatic. See imprint.py.
+        """
+        from .imprint import imprint_state
+        if self._imprint_cache is None:
+            self._imprint_cache = imprint_state(self.genome)
+        return self._imprint_cache
+
     def liability(self, trait: str) -> float:
         return liability(ARCHITECTURE[trait], self.genome.dosage,
-                         self.deviates, self.expression)
+                         self.deviates, self.expression, self.imprint_state())
 
     def breeding_value(self, trait: str) -> float:
         """Additive genetic value: the heritable half of this NPC's trait."""

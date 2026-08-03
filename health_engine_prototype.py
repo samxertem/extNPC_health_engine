@@ -54,13 +54,17 @@ and maternal mitochondrial inheritance with a heteroplasmy bottleneck
 (#3, `mito.py`). Stage 3 has Gale-Shapley stable matching (#30), which
 lives in the population layer at `simulation/demography.py`.
 
+Stage 2 also has genomic imprinting (#4, `imprint.py`): IGF2 is
+paternally expressed, so reciprocal heterozygotes -- same genotype,
+opposite parent of origin -- differ by exactly 2*s*a.
+
 WHAT IS STILL MISSING
 ---------------------
-Stage 2: genomic imprinting (#4 -- IGF2 is positioned and flagged but
-not yet parent-of-origin silenced) and the developmental trajectory /
-life-stage expression gating (#13). Stage 3: inbreeding depression (#31)
-is partial -- the kinship guard rejects close pairs, but no explicit
-fitness load scales with F.
+Stage 2: the developmental trajectory / life-stage expression gating
+(#13), and the canalization half of #14 (reaction norms are in, Waddington
+buffering is not). Stage 3: inbreeding depression (#31) is partial -- the
+kinship guard rejects close pairs, but no explicit fitness load scales
+with F. #12 models point mutations but not structural variants.
 
 Run:  python health_engine_prototype.py [--fast]
 
@@ -414,6 +418,8 @@ def main() -> None:
         viz.plot_sex_linked_inheritance(os.path.join(out, "sex_linked.png"),
                                         n=8000 if FAST else 30000),
         viz.plot_mito_inheritance(os.path.join(out, "mito_inheritance.png")),
+        viz.plot_imprinting(os.path.join(out, "imprinting.png"),
+                            n=1200 if FAST else 4000),
     ]
     for p in paths:
         print(f"  {p}")

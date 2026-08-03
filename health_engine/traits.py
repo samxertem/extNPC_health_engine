@@ -83,10 +83,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 from scipy.stats import norm
+
+if TYPE_CHECKING:                      # avoids an import cycle at runtime
+    from .imprint import ImprintState
 
 from .loci import ALT_FREQ, DOMINANCE_RATIO, LOCI, N_LOCI
 
@@ -601,7 +604,8 @@ class EnvironmentalDeviates:
 # ======================================================================
 
 def genotypic_value(arch: TraitArchitecture, dosage: np.ndarray,
-                    expression: Optional[np.ndarray] = None) -> float:
+                    expression: Optional[np.ndarray] = None,
+                    imprint: Optional["ImprintState"] = None) -> float:
     """
     G = sum_j m_j * [ +a_j if AA, d_j if Aa, -a_j if aa ]  -  E[G]
 
@@ -609,9 +613,33 @@ def genotypic_value(arch: TraitArchitecture, dosage: np.ndarray,
     (roadmap #16). Default 1.0 everywhere. A silenced locus contributes
     nothing, which shifts the mean as well as the variance -- that is the
     biologically correct behaviour and we deliberately do not re-centre.
+
+    `imprint` is the parent-of-origin layer (roadmap #4, imprint.py), None
+    by default. At an imprinted locus only one parental copy is
+    transcribed, so the genotype term is blended toward the value the
+    individual would have if it were homozygous for the ACTIVE copy:
+
+        val = (1 - s) * val_biallelic  +  s * val_monoallelic
+
+    with s the silencing strength. At s = 0 this is exactly the line above
+    it, which is why a world with no imprinted loci is untouched. At s = 1
+    the heterozygote's dominance deviation `d` disappears entirely --
+    correct, because monoallelic expression admits no heterozygote
+    intermediate: you get the phenotype of whichever copy is on.
+
+    Note the ORDER. Imprinting decides *which allele is transcribed*; the
+    epigenome/GRN multiplier then scales the locus's total output. Applying
+    imprinting first and expression second is the biologically meaningful
+    composition, and it means a locus that is both imprinted and silenced
+    still contributes nothing.
     """
     g = dosage[arch.idx]
     val = np.where(g == 2, arch.a, np.where(g == 1, arch.d, -arch.a))
+    if imprint is not None:
+        s = imprint.strength[arch.idx]
+        if np.any(s > 0.0):
+            gm = imprint.mono_dosage[arch.idx]
+            val = (1.0 - s) * val + s * np.where(gm == 2, arch.a, -arch.a)
     if expression is not None:
         val = val * expression[arch.idx]
     return float(val.sum() - arch.mean_g)
@@ -619,10 +647,17 @@ def genotypic_value(arch: TraitArchitecture, dosage: np.ndarray,
 
 def liability(arch: TraitArchitecture, dosage: np.ndarray,
               dev: EnvironmentalDeviates,
-              expression: Optional[np.ndarray] = None) -> float:
-    """Standardised liability z = G + I + GxE + E."""
+              expression: Optional[np.ndarray] = None,
+              imprint: Optional["ImprintState"] = None) -> float:
+    """Standardised liability z = G + I + GxE + E.
+
+    Imprinting (#4) enters through the genotypic value only. The epistatic
+    and GxE terms are built from raw dosages on purpose: those components
+    were calibrated against the biallelic dosage distribution, and routing
+    a parent-of-origin effect through them would decalibrate V_I and V_GxE
+    for a mechanism that acts on transcription, not on interaction."""
     t = arch.spec.name
-    z = genotypic_value(arch, dosage, expression)
+    z = genotypic_value(arch, dosage, expression, imprint)
 
     if arch.epi_w.size:
         xi = dosage[arch.epi_i] - 2.0 * ALT_FREQ[arch.epi_i]
@@ -650,17 +685,20 @@ def express(arch: TraitArchitecture, z: float):
 
 
 def phenotype(dosage: np.ndarray, dev: EnvironmentalDeviates,
-              expression: Optional[np.ndarray] = None) -> Dict[str, object]:
+              expression: Optional[np.ndarray] = None,
+              imprint: Optional["ImprintState"] = None) -> Dict[str, object]:
     """Full genotype -> phenotype pass across every trait."""
     out: Dict[str, object] = {}
     for name, arch in ARCHITECTURE.items():
-        out[name] = express(arch, liability(arch, dosage, dev, expression))
+        out[name] = express(arch, liability(arch, dosage, dev, expression, imprint))
     return out
 
 
 def liabilities(dosage: np.ndarray, dev: EnvironmentalDeviates,
-                expression: Optional[np.ndarray] = None) -> Dict[str, float]:
-    return {n: liability(a, dosage, dev, expression) for n, a in ARCHITECTURE.items()}
+                expression: Optional[np.ndarray] = None,
+                imprint: Optional["ImprintState"] = None) -> Dict[str, float]:
+    return {n: liability(a, dosage, dev, expression, imprint)
+            for n, a in ARCHITECTURE.items()}
 
 
 # ----------------------------------------------------------------------

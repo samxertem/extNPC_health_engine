@@ -165,8 +165,11 @@ _CORE_GENES = [
     ("ZBTB38", 3, 141.5, 0.45, 0.0, {"height_cm": 0.30}, ""),
     ("IGF1", 12, 102.4, 0.38, 0.0, {"height_cm": 0.25, "adiposity": 0.10}, ""),
     ("IGF2", 11, 2.1, 0.40, 0.0, {"height_cm": 0.20, "adiposity": 0.15},
-     "IMPRINTED (paternally expressed) -- roadmap #4, not yet implemented. "
-     "Also the Dutch Hunger Winter methylation locus (Heijmans 2008), roadmap #19."),
+     "IMPRINTED (paternally expressed; DeChiara 1991) -- roadmap #4, "
+     "implemented in imprint.py: the maternal copy is silenced, so reciprocal "
+     "heterozygotes differ by 2*s*a. Also the Dutch Hunger Winter methylation "
+     "locus (Heijmans 2008), roadmap #19; famine exposure is a partial LOSS of "
+     "imprinting, see imprint.relax_imprint()."),
 
     # --- metabolic / organ function (#11) ------------------------------
     ("FTO", 16, 53.8, 0.42, 0.0, {"adiposity": 0.60, "bmi": 0.60, "insulin_sensitivity": -0.20},
