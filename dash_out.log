@@ -1,0 +1,8 @@
+
+  extNPC Living Population  ->  http://127.0.0.1:8050
+  Press Play, then click any dot to inspect that individual.
+
+Dash is running on http://127.0.0.1:8050/
+
+ * Serving Flask app 'dashboard.app'
+ * Debug mode: off

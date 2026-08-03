@@ -29,7 +29,7 @@ from dash import (ALL, Dash, dcc, html, Input, Output, State, ctx, no_update,
 
 from simulation import (World, DemographyParams, SCENARIOS, scenario_list,
                         SHOCK_KINDS, GLOSSARY)
-from . import inspector, panels
+from . import genetics_panels as gpanels, inspector, panels
 
 # ---------------------------------------------------------------------
 # One long-lived world, mutated by the interval callback.
@@ -106,8 +106,18 @@ def labelled(label, comp, width="160px", tip=None):
 
 
 def graph(id_, fig=None):
-    return dcc.Graph(id=id_, config={"displayModeBar": False},
-                     figure=fig or {})
+    """
+    A chart that actually fits its grid cell.
+
+    `responsive: True` is not optional here. Without it Plotly falls back to
+    its built-in 700 px default width, which was invisible while the panels
+    were full-page but overlaps badly now that the split-screen puts three
+    charts in ~245 px cells. The width:100% style alone does not help — the
+    SVG is sized by Plotly, not by CSS — so the config flag is what makes the
+    chart re-measure its container on every resize.
+    """
+    return dcc.Graph(id=id_, config={"displayModeBar": False, "responsive": True},
+                     style={"width": "100%"}, figure=fig or {})
 
 
 # update_title=None stops Dash flashing "Updating…" in the tab on every tick.
@@ -248,7 +258,7 @@ def char_info(name):
     parents = (" × ".join(p.split("-")[0] for p in npc.parents)
                if npc.parents else "founder (no parents)")
     return html.Div(style={"display": "grid",
-                           "gridTemplateColumns": "1fr 1fr", "gap": "10px"}, children=[
+                           "gridTemplateColumns": "repeat(2, minmax(0, 1fr))", "gap": "10px"}, children=[
         _section("IDENTITY", [
             _row("name", name.split("-")[0]), _row("sex", npc.sex),
             _row("age", f"{npc.age} yrs"), _row("generation", npc.generation),
@@ -277,7 +287,7 @@ def char_genetics(name):
     mito = npc.mito_phenotype()
     xl = npc.x_linked_phenotype()
     return html.Div(style={"display": "grid",
-                           "gridTemplateColumns": "1fr 1fr", "gap": "10px"}, children=[
+                           "gridTemplateColumns": "repeat(2, minmax(0, 1fr))", "gap": "10px"}, children=[
         _section("GENOME", [
             _row("heterozygosity", f"{npc.heterozygosity():.3f}"),
             _row("de novo mutations", npc.de_novo_mutations),
@@ -319,7 +329,7 @@ def char_health(name):
                           style={"color": GOOD, "fontSize": "13px"})]
     accel = npc.epigenetic_age_acceleration
     return html.Div(style={"display": "grid",
-                           "gridTemplateColumns": "1fr 1fr", "gap": "10px"}, children=[
+                           "gridTemplateColumns": "repeat(2, minmax(0, 1fr))", "gap": "10px"}, children=[
         _section(f"CONDITIONS ({len(conds)})", clist),
         _section("BIOLOGICAL AGEING", [
             _row("chronological age", f"{npc.age} yrs"),
@@ -549,9 +559,9 @@ def guide_content():
                  "the population evolves. Nothing is scripted; the patterns emerge.",
                  style={"color": MUTED, "fontSize": "13px", "marginBottom": "14px"}),
 
-        html.Div(style={"display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "12px"},
+        html.Div(style={"display": "grid", "gridTemplateColumns": "repeat(2, minmax(0, 1fr))", "gap": "12px"},
                  children=[
-            _g("① Get started", _steps([
+            _g("1 · Get started", _steps([
                 "Press ▶ Play (top-left) to run time. Use ⏭ Step for one year, "
                 "⟲ Reset to restart with the current settings.",
                 "Set speed, random seed and founder count in the transport bar. "
@@ -559,7 +569,7 @@ def guide_content():
                 "Click any person — on the World Map or the Overview genetic map — "
                 "to open their full profile in the Individual tab.",
             ])),
-            _g("② Read the KPI strip", [
+            _g("2 · Read the KPI strip", [
                 "The eight tiles under the transport bar track the population at a "
                 "glance; hover any tile for its definition and citation. The arrow "
                 "shows the 10-year trend. Watch ", html.B("Diversity H"),
@@ -567,21 +577,29 @@ def guide_content():
                 " rise as communities isolate, and ", html.B("Kinship"),
                 " climb when unrelated mates run out.",
             ]),
-            _g("③ The tabs", [
-                html.Div([html.B("🗺 World Map — "),
+            _g("3 · The tabs", [
+                html.Div([html.B("World Map — "),
                           "settlements, territories and people in space; migration "
-                          "routes show gene flow. Click a unit to inspect it."]),
-                html.Div([html.B("🧬 Genetics — "),
-                          "trait evolution, a diversity threshold, a per-decade "
-                          "volatility candlestick and a population phenotype radar."]),
-                html.Div([html.B("🌍 Community — "),
+                          "routes show gene flow. Click a unit to inspect it. The "
+                          "layer selector swaps in bloodline-dominance and "
+                          "physiological-stress overlays."]),
+                html.Div([html.B("Genetics — "),
+                          "thirteen charts in three bands: population-wide variation "
+                          "(trait evolution, allele-frequency spectrum, "
+                          "heterozygosity, phenotype distributions); selection, drift "
+                          "and structure (volatility, reproductive skew, age "
+                          "structure, mutational load); and the parallel inheritance "
+                          "layers (imprinting, X-linked, mitochondrial, the "
+                          "epigenetic clock)."]),
+                html.Div([html.B("Community — "),
                           "F_ST, per-deme headcount, a history spiral, bloodlines "
                           "and couple-kinship: the island model made visible."]),
-                html.Div([html.B("👤 Individual — "),
+                html.Div([html.B("Individual — "),
                           "one person's profile, their fingerprint vs the population, "
-                          "and their family tree."]),
+                          "their family tree, and Compare mode for reading two "
+                          "individuals side by side with their genomic relatedness."]),
             ]),
-            _g("④ Drive evolution (Controls)", [
+            _g("4 · Drive evolution (Controls)", [
                 "Every slider is live — drag it and the next tick obeys. ",
                 html.B("Selection pressure"), " culls the frail; ",
                 html.B("assortative mating"), " pairs like with like; ",
@@ -592,7 +610,7 @@ def guide_content():
                 "epigenome. Fire ", html.B("shocks"),
                 " (plague, famine, bottleneck) for one-off history.",
             ]),
-            _g("⑤ What to look for (the science)", [
+            _g("5 · What to look for (the science)", [
                 html.Div("• Genetic drift: diversity H sags as a small closed "
                          "population descends from a few founders."),
                 html.Div("• Lineage dominance & extinction: a few bloodlines take "
@@ -602,7 +620,7 @@ def guide_content():
                 html.Div("• The breeder's equation: turn up selection and watch "
                          "the trait means move."),
             ]),
-            _g("⑥ Presets to try", [
+            _g("6 · Presets to try", [
                 html.Div("Load a scenario in Controls, then Play:"),
                 html.Div("• Isolated islands → F_ST climbs, demes diverge."),
                 html.Div("• Melting pot → heavy migration keeps F_ST ≈ 0."),
@@ -655,6 +673,22 @@ SPLIT = {"display": "grid",
 
 # Drawer instances, one per host tab. Every fan-out callback iterates this.
 DRAWERS = ["overview", "map", "genetics"]
+
+# Two equal chart columns. `minmax(0, 1fr)` rather than plain `1fr` matters:
+# a bare 1fr track has min-width:auto, so a chart wider than its share pushes
+# the track open instead of shrinking, which is exactly how the Genetics charts
+# ended up overlapping.
+GRID2 = {"display": "grid", "gridTemplateColumns": "repeat(2, minmax(0, 1fr))",
+         "gap": "12px", "marginBottom": "12px"}
+
+
+def _band(title: str):
+    """A section heading that groups related charts."""
+    return html.Div(title, style={
+        "color": ACCENT, "fontSize": "10px", "fontWeight": 800,
+        "letterSpacing": "0.16em", "textTransform": "uppercase",
+        "margin": "4px 0 8px", "paddingBottom": "6px",
+        "borderBottom": f"1px solid {GRID}"})
 
 
 app.layout = html.Div(style={
@@ -760,7 +794,7 @@ app.layout = html.Div(style={
                          children=[graph("g-scatter",
                                          panels.scatter_figure(WORLD))]),
                 html.Div(style={"display": "grid",
-                                "gridTemplateColumns": "1fr 1fr 1fr",
+                                "gridTemplateColumns": "repeat(3, minmax(0, 1fr))",
                                 "gap": "12px", "marginBottom": "12px"}, children=[
                     html.Div(style=CARD, children=[graph("g-pop")]),
                     html.Div(style=CARD, children=[graph("g-bd")]),
@@ -839,21 +873,46 @@ app.layout = html.Div(style={
     ]),
 
     # ---- GENETICS ----------------------------------------------------
+    # Grouped into three labelled bands so the tab reads as an argument
+    # (variation -> structure -> the parallel inheritance layers) rather than
+    # as a wall of charts. Two columns, not three: at the split-screen width
+    # three charts per row leaves each too narrow to read.
     panel("panel-genetics", children=[
         html.Div(style=SPLIT, children=[
             html.Div(style={"minWidth": 0}, children=[
-                html.Div(style={"display": "grid",
-                                "gridTemplateColumns": "1.4fr 1fr",
-                                "gap": "12px", "marginBottom": "12px"}, children=[
+
+                _band("POPULATION-WIDE VARIATION"),
+                html.Div(style=GRID2, children=[
                     html.Div(style=CARD, children=[graph("g-traits")]),
                     html.Div(style=CARD, children=[graph("g-pop-radar")]),
                 ]),
-                html.Div(style={"display": "grid",
-                                "gridTemplateColumns": "1fr 1fr 1fr",
-                                "gap": "12px"}, children=[
+                html.Div(style=GRID2, children=[
+                    html.Div(style=CARD, children=[graph("g-spectrum")]),
+                    html.Div(style=CARD, children=[graph("g-het-hist")]),
+                ]),
+                html.Div(style=GRID2, children=[
+                    html.Div(style=CARD, children=[graph("g-trait-dist")]),
                     html.Div(style=CARD, children=[graph("g-div-g")]),
+                ]),
+
+                _band("SELECTION, DRIFT & STRUCTURE"),
+                html.Div(style=GRID2, children=[
                     html.Div(style=CARD, children=[graph("g-cand")]),
                     html.Div(style=CARD, children=[graph("g-skew")]),
+                ]),
+                html.Div(style=GRID2, children=[
+                    html.Div(style=CARD, children=[graph("g-pyramid")]),
+                    html.Div(style=CARD, children=[graph("g-mutload")]),
+                ]),
+
+                _band("PARALLEL INHERITANCE LAYERS"),
+                html.Div(style=GRID2, children=[
+                    html.Div(style=CARD, children=[graph("g-imprint")]),
+                    html.Div(style=CARD, children=[graph("g-sexlink")]),
+                ]),
+                html.Div(style=GRID2, children=[
+                    html.Div(style=CARD, children=[graph("g-mito")]),
+                    html.Div(style=CARD, children=[graph("g-epiage")]),
                 ]),
             ]),
             inspector_column("genetics"),
@@ -862,12 +921,12 @@ app.layout = html.Div(style={
 
     # ---- COMMUNITY ---------------------------------------------------
     panel("panel-community", children=[
-        html.Div(style={"display": "grid", "gridTemplateColumns": "1fr 1fr",
+        html.Div(style={"display": "grid", "gridTemplateColumns": "repeat(2, minmax(0, 1fr))",
                         "gap": "12px", "marginBottom": "12px"}, children=[
             html.Div(style=CARD, children=[graph("g-fst")]),
             html.Div(style=CARD, children=[graph("g-deme")]),
         ]),
-        html.Div(style={"display": "grid", "gridTemplateColumns": "1fr 1fr 1fr",
+        html.Div(style={"display": "grid", "gridTemplateColumns": "repeat(3, minmax(0, 1fr))",
                         "gap": "12px"}, children=[
             html.Div(style=CARD, children=[graph("g-spiral")]),
             html.Div(style=CARD, children=[graph("g-lin")]),
@@ -877,7 +936,7 @@ app.layout = html.Div(style={
 
     # ---- CONTROLS ----------------------------------------------------
     panel("panel-controls", children=[
-        html.Div(style={"display": "grid", "gridTemplateColumns": "1fr 1fr 1fr",
+        html.Div(style={"display": "grid", "gridTemplateColumns": "repeat(3, minmax(0, 1fr))",
                         "gap": "12px", "marginBottom": "12px"}, children=[
             html.Div(style=CARD, children=[
                 html.Div("POPULATION", style={**LBL, "color": ACCENT, "marginBottom": "8px"}),
@@ -989,7 +1048,7 @@ app.layout = html.Div(style={
         html.Div(id="cpanel-genetics", style={"display": "none"}),
         html.Div(id="cpanel-health", style={"display": "none"}),
         html.Div(id="cpanel-mind", style={"display": "none"}, children=[
-            html.Div(style={"display": "grid", "gridTemplateColumns": "1.2fr 1fr",
+            html.Div(style={"display": "grid", "gridTemplateColumns": "minmax(0, 1.2fr) minmax(0, 1fr)",
                             "gap": "10px"}, children=[
                 html.Div(id="char-mind"),
                 html.Div(style=CARD, children=[graph("g-indiv-radar")]),
@@ -1247,17 +1306,42 @@ app.clientside_callback(
     Output("g-traits", "figure"), Output("g-pop-radar", "figure"),
     Output("g-div-g", "figure"), Output("g-cand", "figure"),
     Output("g-skew", "figure"),
+    Output("g-spectrum", "figure"), Output("g-het-hist", "figure"),
+    Output("g-trait-dist", "figure"), Output("g-pyramid", "figure"),
+    Output("g-mutload", "figure"), Output("g-imprint", "figure"),
+    Output("g-sexlink", "figure"), Output("g-mito", "figure"),
+    Output("g-epiage", "figure"),
     Input("tick", "data"), Input("active-tab", "data"), Input("timeline", "data"),
 )
 def render_genetics(_tick, active, scrub):
+    """
+    Thirteen figures, five from the history buffer and eight measured off the
+    living population.
+
+    The distribution panels have no historical counterpart: the snapshot buffer
+    keeps ~12 scalars per person, not genomes, so an allele spectrum or an
+    imprinting breakdown for a past year cannot be reconstructed. Under time
+    travel the time-series charts rewind and the distributions keep showing the
+    live population, which is the honest behaviour -- the alternative is
+    inventing data or blanking half the tab.
+    """
     if active != "genetics":
-        return (no_update,) * 5
+        return (no_update,) * 14
     cols = panels.history_columns_upto(WORLD, scrub)
     return (panels.traits_figure(cols),
             panels.population_radar_figure(WORLD),
             panels.diversity_figure(cols),
             panels.candlestick_figure(cols),
-            panels.skew_figure(cols))
+            panels.skew_figure(cols),
+            gpanels.allele_spectrum_figure(WORLD),
+            gpanels.heterozygosity_hist_figure(WORLD),
+            gpanels.trait_distribution_figure(WORLD, "height_cm"),
+            gpanels.age_pyramid_figure(WORLD),
+            gpanels.mutation_load_figure(WORLD),
+            gpanels.imprinting_figure(WORLD),
+            gpanels.sex_linked_figure(WORLD),
+            gpanels.mito_haplogroup_figure(WORLD),
+            gpanels.epigenetic_age_figure(WORLD))
 
 
 @app.callback(

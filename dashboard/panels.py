@@ -20,6 +20,7 @@ import numpy as np
 import plotly.graph_objects as go
 
 from simulation import metrics as M
+from health_engine.traits import TRAIT_TABLE
 
 # ---- dark palette (validated dataviz defaults, dark steps) ----------------
 SURFACE = "#1a1a19"
@@ -53,6 +54,10 @@ def _style(fig: go.Figure, title: str = "", height: int = 260,
         font=dict(color=INK2, family='system-ui, "Segoe UI", sans-serif', size=11),
         margin=dict(l=48, r=16, t=34 if title else 12, b=32),
         height=height,
+        # Height stays fixed (the grid rows depend on it) but the width must
+        # come from the container, or Plotly uses its 700px default and the
+        # chart overflows its cell.
+        autosize=True,
         showlegend=legend,
         legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color=INK2, size=10),
                     orientation="h", yanchor="bottom", y=1.0, x=0),
@@ -186,22 +191,42 @@ def pyramid_figure(world) -> go.Figure:
 
 
 def traits_figure(cols: Dict[str, List[float]]) -> go.Figure:
-    """Trait means indexed to their generation-0 value (% change) so several
-    incomparable scales share one axis honestly."""
+    """
+    Trait means as change from their founding value, in phenotypic SD units.
+
+    This used to plot PERCENT change, which is unusable for half these traits.
+    Several of them are liability-scale with a population mean near zero
+    (insulin_sensitivity, immune_reactivity, neuroticism), so dividing by that
+    mean produced swings of +2000% / -1000% from a movement of a hundredth of
+    a unit, and the readable traits were flattened against the axis.
+
+    Standardising by each trait's phenotypic SD fixes both problems at once:
+    the scale cannot blow up on a near-zero denominator, and a move of 0.2
+    means the same thing -- a fifth of a standard deviation -- whether the
+    trait is measured in centimetres or in liability units. That also makes
+    the chart directly readable against the breeder's equation, where response
+    is conventionally quoted in SD.
+    """
     fig = go.Figure()
     if cols:
         t = cols["tick"]
         for i, trait in enumerate(M.TRACKED_TRAITS):
             y = np.array(cols[f"trait_{trait}"], dtype=float)
-            base = y[0] if y[0] != 0 else (y[y != 0][0] if np.any(y != 0) else 1.0)
-            pct = 100.0 * (y - base) / abs(base)
-            fig.add_trace(go.Scatter(x=t, y=pct, mode="lines",
+            if y.size == 0:
+                continue
+            spec = TRAIT_TABLE.get(trait)
+            sd = float(getattr(spec, "sd", 1.0) or 1.0)
+            delta = (y - y[0]) / sd
+            fig.add_trace(go.Scatter(x=t, y=delta, mode="lines",
                                      line=dict(color=CAT[i % len(CAT)], width=1.9,
                                                shape="spline", smoothing=0.6),
                                      name=trait,
-                                     hovertemplate=trait + " %{y:.2f}%<extra></extra>"))
-    _style(fig, "Trait evolution (% change from founding mean)", height=260, legend=True)
-    fig.update_yaxes(title="% Δ", ticksuffix="%")
+                                     hovertemplate=trait +
+                                     " %{y:+.3f} SD<extra></extra>"))
+        fig.add_hline(y=0.0, line=dict(color=AXIS, width=1))
+    _style(fig, "Trait evolution — change from founding mean (SD units)",
+           height=260, legend=True)
+    fig.update_yaxes(title="Δ (phenotypic SD)")
     return fig
 
 
