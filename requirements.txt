@@ -1,0 +1,39 @@
+# extNPC Health Engine — pinned dependencies
+#
+# Versions are the ones the 133-test suite was last verified green against
+# (2026-08-03, Python 3.14.5, Windows 11). Pinned exactly rather than with
+# `>=` on purpose: this project's central claim is that a seeded run is
+# reproducible, and numpy in particular has changed RNG and floating-point
+# reduction behaviour across minor versions before. A reviewer re-running the
+# validation harness should get the same numbers, not merely similar ones.
+#
+#   python -m pip install -r requirements.txt
+#
+# Verified with:
+#   python -m pytest tests/ -q          -> 133 passed
+#   python health_engine_prototype.py   -> writes outputs/*.png
+
+# --- engine core (health_engine/, simulation/) ------------------------
+numpy==2.4.4          # genomes, meiosis, every trait computation
+scipy==1.17.1         # traits.py (liability-threshold traits), validation.py (regression, chi-square)
+networkx==3.6.1       # simulation/pedigree.py — pedigree graph + kinship traversal
+
+# --- figures (health_engine/viz.py, the prototype demo) ---------------
+matplotlib==3.11.0
+
+# --- live dashboard (dashboard/, run_dashboard.py) --------------------
+# Not needed to run the engine or the tests; only for `python run_dashboard.py`.
+dash==4.4.1
+plotly==6.9.0
+
+# --- tests ------------------------------------------------------------
+pytest==9.1.1
+
+# --- optional, authoring only -----------------------------------------
+# Pillow is used solely by dashboard/assets/sprites/make_villager.py, the
+# one-off script that draws the villager sprite sheet. The generated
+# villager.png is committed, so you never need this to run anything.
+# pillow==12.3.0
+#
+# NOTE: pandas is present in the dev environment but is imported nowhere in
+# this codebase, so it is deliberately not listed here.

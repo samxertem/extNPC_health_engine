@@ -1,0 +1,11 @@
+# Normalise line endings so a checkout on Linux/macOS produces byte-identical
+# source to this Windows working copy. This matters more than usual here: the
+# engine's guarantee is that a seeded run is reproducible, and a reviewer
+# re-running it on another OS should get the same bytes in, not just the same
+# characters.
+* text=auto eol=lf
+
+# Binary assets — never touch these.
+*.png binary
+*.pdf binary
+*.ico binary
