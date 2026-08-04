@@ -1,0 +1,35 @@
+IGSR: The International Genome Sample Resource  {
+    "https://www.internationalgenome.org/"
+}
+
+Genome Aggregation Database gnomAD  {
+    "https://gnomad.broadinstitute.org/"
+}
+
+Human Genome Diversity Project  {
+    https://www.internationalgenome.org/data-portal/data-collection/HGDP
+}
+
+National Health and Nutrition Examination Survey   {
+
+    "https://www.cdc.gov/nchs/nhanes/index.html"
+}
+
+ Health research data for the world {
+
+    "https://www.ukbiobank.ac.uk/"
+ }
+
+ Human Mortality Database  {
+
+    "https://www.mortality.org/"
+ }
+
+ World Population Prospects 2024  {
+
+    "https://population.un.org/wpp/"
+ }
+
+ deCODE GENETICS  {
+    "https://www.decode.com/"
+ }
