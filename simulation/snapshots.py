@@ -59,6 +59,7 @@ def _person_rows(world) -> List[dict]:
     translate between a live frame and a historical one.
     """
     rows = []
+    ped = world.pedigree()          # cached; one memo shared by this whole loop
     for npc in world.living:
         meta = world.meta[npc.name]
         dom, purity = world.registry.dominant(meta.ancestry)
@@ -82,6 +83,18 @@ def _person_rows(world) -> List[dict]:
             "epi_accel": round(float(npc.epigenetic_age_acceleration), 2),
             "aerobic": round(float(npc.effective_aerobic_capacity()), 3),
             "conditions": len(npc.medical_conditions),
+            # Session-11 layers. Cheap scalars, so time travel keeps them:
+            # pedigree F (#31), relative viability (#31 + #12) and the number
+            # of copy-number variants carried (#12). Note what is NOT here --
+            # the load genotypes themselves, for the same reason genomes are
+            # not: they would dominate the frame size.
+            "pedigree_f": round(float(ped.inbreeding(npc.name)), 4),
+            "viability": round(float(npc.relative_viability()), 3),
+            "cnv": len(npc.cnv_variants()),
+            # Height AS EXPRESSED AT THIS AGE (#13), not the mature value.
+            # A child in a historical frame must not be drawn adult-sized.
+            "height": round(float(npc.height_at_age()), 1),
+            "life_stage": npc.life_stage(),
         })
     return rows
 

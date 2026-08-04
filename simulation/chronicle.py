@@ -217,8 +217,48 @@ GLOSSARY: Dict[str, Dict[str, str]] = {
         "text": "How much of the total genetic variance sits BETWEEN demes "
                 "rather than within them. 0 = one homogeneous pool; higher = "
                 "isolated, divergent communities. At migration–drift balance "
-                "F_ST ≈ 1/(4·N_e·m+1).",
+                "F_ST ≈ 1/(4·N_e·m+1). Estimated by Weir & Cockerham's θ, "
+                "which corrects for finite sample size — so it can read "
+                "slightly NEGATIVE when there is no real structure, and that "
+                "is the estimator working, not an error.",
         "cite": "Wright 1931; Weir & Cockerham 1984",
+    },
+    "mean_inbreeding": {
+        "title": "Mean pedigree inbreeding (F)",
+        "text": "Average of Wright's F over the living: the probability that "
+                "an individual's two alleles at a locus are identical by "
+                "descent, walked over the full pedigree (Malécot). F = 1/16 "
+                "is a first-cousin child, 1/4 a full-sib child. It is an "
+                "EXPECTATION over meioses — an individual's realised "
+                "homozygosity scatters around it.",
+        "cite": "Wright 1922; Malécot 1948",
+    },
+    "pct_inbred": {
+        "title": "Consanguineous share",
+        "text": "Fraction of the living whose parents were second cousins or "
+                "closer (F ≥ 1/64) — the threshold consanguinity studies "
+                "conventionally count from. Roughly 10% of marriages "
+                "worldwide are consanguineous, and 20–50% in parts of North "
+                "Africa, the Middle East and South Asia.",
+        "cite": "Bittles & Black 2010",
+    },
+    "mean_viability": {
+        "title": "Relative viability",
+        "text": "Mean juvenile survival relative to an average outbred "
+                "individual, from each newborn's realised recessive "
+                "deleterious load. 1.0 = no cost. Falls as inbreeding makes "
+                "rare recessive alleles homozygous — the engine is "
+                "calibrated to 1.4 lethal equivalents per gamete, so a "
+                "first-cousin child carries ~8% excess mortality.",
+        "cite": "Morton, Crow & Muller 1956; Charlesworth & Willis 2009",
+    },
+    "load_carried": {
+        "title": "Hidden recessive load",
+        "text": "Deleterious alleles the average individual carries "
+                "HETEROZYGOUS — invisible in their own phenotype, and the "
+                "reservoir inbreeding draws on. Everyone carries some; that "
+                "is why consanguinity is a risk rather than a certainty.",
+        "cite": "Charlesworth & Willis 2009; Haldane 1937",
     },
     "mean_relatedness": {
         "title": "Mean couple relatedness",

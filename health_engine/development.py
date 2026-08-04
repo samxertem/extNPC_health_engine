@@ -115,6 +115,7 @@ expression.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Dict, Optional, Tuple
 
 import numpy as np
@@ -199,12 +200,20 @@ def stature_fraction(age: float, sex: str = "female") -> float:
                  + (f2 - BIRTH_STATURE_FRACTION) * shape)
 
 
+@lru_cache(maxsize=8)
 def peak_height_velocity_age(sex: str = "female",
                              lo: float = 8.0, hi: float = 18.0) -> float:
     """
     Age of maximum growth rate, found numerically from the fitted curve.
     Not a parameter -- if it comes out at the right age that is the curve
     agreeing with Tanner, not the curve being told.
+
+    CACHED, and not as a micro-optimisation. This is a 4000-point search over
+    a pure function of `sex`, so it has exactly two distinct answers; calling
+    it uncached from `NPC.life_stage` cost ~2.7 million `stature_fraction`
+    evaluations per simulated year and made it 85% of the world's step time.
+    The curve parameters are module constants, so the cache can never go
+    stale -- if `STATURE_CURVE` is ever made mutable, clear it.
     """
     t = np.linspace(lo, hi, 4000)
     f = np.array([stature_fraction(x, sex) for x in t])

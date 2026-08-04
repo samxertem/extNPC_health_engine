@@ -345,8 +345,18 @@ class NPC:
                 for name, value in mature.items()}
 
     def height_at_age(self, age: Optional[float] = None) -> float:
-        """Stature at a given age -- the trait the growth curve is fitted to."""
-        return float(self.phenotype_at_age(age)["height_cm"])
+        """
+        Stature at a given age -- the trait the growth curve is fitted to.
+
+        Goes straight to the one trait rather than through
+        `phenotype_at_age`, which would build and discard the whole ~30-trait
+        dict. This is called per person per tick by the snapshot buffer.
+        """
+        from .development import express_at_age
+
+        a = self.age if age is None else age
+        return float(express_at_age("height_cm", self.phenotype()["height_cm"],
+                                    a, self.sex))
 
     def life_stage(self, age: Optional[float] = None) -> str:
         """

@@ -377,8 +377,96 @@ def kpi_data(cols: Dict[str, List[float]], params) -> List[dict]:
         dict(key="epi_accel", label="EPI-AGE ACCEL",
              value=f"{_last(cols,'epi_accel'):+.1f}y", delta=delta("epi_accel"),
              fmt="f1", accent=CAT[3], glossary=GLOSSARY["epi_accel"]["text"]),
+        # #31. Mean F is the headline, but the consanguineous SHARE is the
+        # number epidemiology actually reports, so both are on the deck.
+        dict(key="mean_inbreeding", label="INBREEDING F",
+             value=f"{_last(cols,'mean_inbreeding'):.4f}",
+             delta=delta("mean_inbreeding"), fmt="f3", accent=CRIT,
+             glossary=GLOSSARY["mean_inbreeding"]["text"]),
+        dict(key="pct_inbred", label="CONSANGUINEOUS",
+             value=f"{_last(cols,'pct_inbred') * 100:.0f}%",
+             delta=delta("pct_inbred"), fmt="f2", accent=WARN,
+             glossary=GLOSSARY["pct_inbred"]["text"]),
+        dict(key="mean_viability", label="VIABILITY",
+             value=f"{_last(cols,'mean_viability', 1.0):.3f}",
+             delta=delta("mean_viability"), fmt="f3", accent=CAT[0],
+             glossary=GLOSSARY["mean_viability"]["text"]),
     ]
     return tiles
+
+
+def inbreeding_figure(cols: Dict[str, List[float]]) -> go.Figure:
+    """
+    Inbreeding and its cost over time (#31).
+
+    Mean and maximum pedigree F on the left axis against the standard mating
+    thresholds, and the resulting juvenile survival on the right. The two
+    together are the whole of Morton's law made visible: as F rises, survival
+    falls, and the slope between them is the lethal-equivalent count.
+    """
+    fig = go.Figure()
+    if not cols or not cols.get("tick"):
+        fig.add_annotation(text="no history yet", showarrow=False,
+                           font=dict(color=MUTED, size=12))
+        _style(fig, "Inbreeding", height=260)
+        return fig
+
+    t = cols["tick"]
+    mean_f = cols.get("mean_inbreeding", []) or [0.0]
+    max_f = cols.get("max_inbreeding", []) or [0.0]
+    viab = cols.get("mean_viability", []) or [1.0]
+    peak = max(max(mean_f), max(max_f), 1e-4)
+
+    # Reference lines for the matings that produce each coefficient -- without
+    # them an F axis is an uninterpretable decimal. But ONLY those within
+    # reach of the data: an `add_hline` at the full-sib coefficient of 0.25
+    # forces the axis to include it, and when the population is running at
+    # F ~ 0.03 that squashes every real value into the bottom fifth of the
+    # panel. The reference is worth less than the resolution it costs.
+    for y, label in ((0.015625, "second cousins"),
+                     (0.0625, "first cousins"),
+                     (0.125, "double first cousins"),
+                     (0.25, "full sibs")):
+        if y <= peak * 1.35:
+            fig.add_hline(y=y, line=dict(color=MUTED, width=1, dash="dot"),
+                          annotation_text=label,
+                          annotation_position="top left",
+                          annotation_font=dict(color=MUTED, size=9))
+
+    fig.add_trace(go.Scatter(
+        x=t, y=max_f, mode="lines",
+        line=dict(color=WARN, width=1.2, dash="dot"), name="max F",
+        hovertemplate="year %{x}<br>max F %{y:.4f}<extra></extra>"))
+    fig.add_trace(go.Scatter(
+        x=t, y=mean_f, mode="lines",
+        line=dict(color=CRIT, width=2.4, shape="spline", smoothing=0.6),
+        fill="tozeroy", fillcolor="rgba(200,66,66,0.12)", name="mean F",
+        hovertemplate="year %{x}<br>mean F %{y:.4f}<extra></extra>"))
+    fig.add_trace(go.Scatter(
+        x=t, y=viab, mode="lines", yaxis="y2",
+        line=dict(color=CAT[0], width=1.8), name="viability (right axis)",
+        hovertemplate="year %{x}<br>viability %{y:.3f}<extra></extra>"))
+
+    _style(fig, "Inbreeding and its cost  ·  ln S(F) = ln S₀ − B·F  "
+                "·  Morton, Crow & Muller 1956", height=260)
+    # Scale to the DATA, with headroom, rather than to whichever reference
+    # line happens to be furthest away.
+    fig.update_yaxes(title="pedigree F", range=[0, peak * 1.45])
+    # `title=dict(text=..., font=...)`, NOT the old `titlefont=` shorthand --
+    # Plotly removed that alias, and it raises rather than warning.
+    # Bracket the ACTUAL data. Relative viability is measured against the
+    # outbred mean, so a lightly loaded cohort legitimately sits above 1.0 --
+    # a hard 1.01 ceiling chopped the line into fragments.
+    lo, hi = min(min(viab), 0.99), max(max(viab), 1.0)
+    fig.update_layout(
+        yaxis2=dict(title=dict(text="relative viability",
+                               font=dict(color=AXIS, size=10)),
+                    overlaying="y", side="right", showgrid=False,
+                    range=[lo - 0.01, hi + 0.01], tickformat=".2f",
+                    tickfont=dict(color=AXIS, size=9)),
+        legend=dict(orientation="h", y=1.02, yanchor="bottom", x=0,
+                    font=dict(color=MUTED, size=9)))
+    return fig
 
 
 def fst_figure(cols: Dict[str, List[float]], n_demes: int) -> go.Figure:
@@ -391,18 +479,32 @@ def fst_figure(cols: Dict[str, List[float]], n_demes: int) -> go.Figure:
         fig.add_hline(y=0.05, line=dict(color=MUTED, width=1, dash="dot"),
                       annotation_text="moderate structure",
                       annotation_font=dict(color=MUTED, size=9))
+        # Zero line, because the estimator can legitimately go below it.
+        fig.add_hline(y=0.0, line=dict(color=GRID, width=1))
         fig.add_trace(go.Scatter(
             x=t, y=cols["fst"], mode="lines",
             line=dict(color=CAT[6], width=2.4, shape="spline", smoothing=0.6),
             fill="tozeroy", fillcolor="rgba(213,81,129,0.12)", name="F_ST",
-            hovertemplate="year %{x}<br>F_ST %{y:.3f}<extra></extra>"))
+            hovertemplate="year %{x}<br>F_ST %{y:.4f}<extra></extra>"))
     else:
         fig.add_annotation(text="single deme — no differentiation to measure<br>"
                                 "(raise 'demes' in Controls, then Reset)",
                            showarrow=False, font=dict(color=MUTED, size=12))
-    _style(fig, "Population structure  F_ST  =  (H_T − H_S) / H_T   ·  Wright 1931",
+    _style(fig, "Population structure  F_ST  ·  Weir & Cockerham 1984 estimator",
            height=240)
-    fig.update_yaxes(rangemode="tozero", title="F_ST")
+    if not (cols and n_demes > 1):
+        # An empty panel should not display a fully drawn -1..6 axis pair
+        # with no data on it -- that reads as "the value is zero everywhere",
+        # which is a different claim from "there is nothing to measure".
+        fig.update_xaxes(visible=False)
+        fig.update_yaxes(visible=False)
+        return fig
+    # NOT rangemode="tozero". Weir & Cockerham is unbiased, so on a population
+    # with no real structure it scatters either side of zero, and clamping the
+    # axis at 0 would hide exactly the half of that scatter which shows the
+    # estimator is behaving. The engine used Nei's G_ST until session 11,
+    # which could not go negative because it was biased upward.
+    fig.update_yaxes(title="F_ST  (Weir & Cockerham θ)")
     return fig
 
 

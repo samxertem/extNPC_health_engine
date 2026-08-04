@@ -92,6 +92,72 @@ def _norm(value, lo, hi):
     return max(0.0, min(1.0, (float(value) - lo) / (hi - lo)))
 
 
+# Pedigree F is meaningless to most readers as a bare number, so every place
+# it appears is labelled with the mating that produces it. Values are Wright's
+# coefficients; the label is the CLOSEST standard relationship at or below the
+# observed F, so it reads as "at least this close".
+_F_LABELS: List[Tuple[float, str]] = [
+    (0.25, "full sib / parent–offspring"),
+    (0.125, "uncle–niece / double first cousin"),
+    (0.0625, "first cousins"),
+    (0.03125, "first cousins once removed"),
+    (0.015625, "second cousins"),
+]
+
+
+def relationship_label(F: float) -> str:
+    """Plain-language reading of a pedigree inbreeding coefficient."""
+    for threshold, label in _F_LABELS:
+        if F >= threshold - 1e-9:
+            return label
+    return "outbred" if F <= 1e-9 else "distant kin"
+
+
+def _fmt_f(F: float) -> str:
+    return f"{F:.4f}" if F else "0"
+
+
+def _f_color(F: float) -> str:
+    if F >= 0.0625:
+        return CRIT
+    if F >= 0.015625:
+        return WARN
+    return INK
+
+
+def _inbreeding_rows(F: float, npc, cnvs: List[dict]) -> List:
+    """
+    The #31/#12 block: pedigree F, what it means, the realised value, the
+    hidden recessive load, and any copy-number variants.
+
+    Pedigree F and realised F are both shown on purpose. The pedigree value is
+    an EXPECTATION over meioses; the realised value is what this individual's
+    genome actually got, and the two differ because meiosis is a lottery.
+    Showing only one of them would hide the engine's own point.
+    """
+    rows = [
+        _kv("pedigree F", _fmt_f(F), _f_color(F)),
+    ]
+    if F > 1e-9:
+        rows.append(_kv("parents were", relationship_label(F), _f_color(F),
+                        small=True))
+    rows.append(_kv("realised F", f"{npc.realised_inbreeding():+.4f}",
+                    _f_color(max(npc.realised_inbreeding(), 0.0))))
+    rows.append(_kv("viability", f"{npc.relative_viability():.3f}",
+                    CRIT if npc.relative_viability() < 0.9 else INK))
+    if npc.load is not None:
+        rows.append(_kv("hidden load", f"{npc.load.n_carried} alleles",
+                        small=True))
+        if npc.load.n_homozygous:
+            rows.append(_kv("expressed load", f"{npc.load.n_homozygous} loci",
+                            CRIT))
+    for v in cnvs:
+        rows.append(_kv(f"CNV {v['region']}",
+                        f"{v['kind']} ({v['copies']} copies, {v['parent_of_origin']})",
+                        WARN))
+    return rows
+
+
 def _frame_person(frame: Optional[dict], name: str) -> Optional[dict]:
     if not frame:
         return None
@@ -187,8 +253,20 @@ def summary_card(world, name: Optional[str],
         npc = world.people[name]
         ph = npc.phenotype()
         meta = world.meta[name]
+        # Height AS EXPRESSED AT THIS AGE (#13). `phenotype()` returns the
+        # MATURE value, so before this the drawer showed a five-year-old at
+        # adult stature. The mature figure is still worth seeing -- it is the
+        # genetic endpoint the child is growing toward -- so both are shown
+        # while the individual is still growing.
+        h_now = npc.height_at_age()
+        growing = abs(h_now - ph["height_cm"]) > 0.05
+        F = world.inbreeding_of(name)
+        cnvs = npc.cnv_variants()
+
         stats = [
-            _kv("height", f"{ph['height_cm']:.1f} cm"),
+            _kv("height", (f"{h_now:.1f} cm  → {ph['height_cm']:.0f} adult"
+                           if growing else f"{h_now:.1f} cm")),
+            _kv("life stage", npc.life_stage()),
             _kv("BMI", f"{ph['bmi']:.1f}"),
             _kv("VO₂ (mito-gated)", f"{npc.effective_aerobic_capacity():.2f}"),
             _kv("epigenetic age", f"{npc.epigenome.epigenetic_age:.1f}",
@@ -202,6 +280,7 @@ def summary_card(world, name: Optional[str],
             _kv("partner", (meta.partner or "—").split("-")[0]),
             _kv("children", meta.n_children),
         ]
+        stats.extend(_inbreeding_rows(F, npc, cnvs))
         meters = [
             _meter("heterozygosity", _norm(npc.heterozygosity(), 0.0, 0.6),
                    CAT[1], f"{npc.heterozygosity():.3f}"),
@@ -210,12 +289,20 @@ def summary_card(world, name: Optional[str],
         ]
     else:
         stats = [
+            _kv("height", f"{row.get('height', 0):.1f} cm"),
+            _kv("life stage", row.get("life_stage", "—")),
             _kv("stress", f"{row['stress']:+.2f}"),
             _kv("VO₂", f"{row['aerobic']:.2f}"),
             _kv("age acceleration", f"{row['epi_accel']:+.1f} y"),
             _kv("conditions", row["conditions"]),
             _kv("children", row["children"]),
+            _kv("pedigree F", _fmt_f(row.get("pedigree_f", 0.0)),
+                _f_color(row.get("pedigree_f", 0.0))),
+            _kv("viability", f"{row.get('viability', 1.0):.3f}",
+                CRIT if row.get("viability", 1.0) < 0.9 else INK),
         ]
+        if row.get("cnv"):
+            stats.append(_kv("CNVs", row["cnv"], WARN))
         meters = [_meter("stress load", _norm(row["stress"], -1.5, 2.5), CRIT,
                          f"{row['stress']:+.2f}")]
 
@@ -254,6 +341,11 @@ BOARDS: List[Tuple[str, str, str, str, bool]] = [
     ("stressed", "Highest stress load", "stress", "{:+.2f}", True),
     ("ill", "Most conditions", "conditions", "{:.0f}", True),
     ("prolific", "Most children", "children", "{:.0f}", True),
+    # #31: the two ends of the genetic-load axis. "Most inbred" is the one
+    # worth hunting for -- it is where consanguinity actually shows up in a
+    # population, long before the mean moves.
+    ("inbred", "Most inbred (pedigree F)", "pedigree_f", "{:.4f}", True),
+    ("frail", "Lowest viability", "viability", "{:.3f}", False),
 ]
 
 
@@ -266,7 +358,8 @@ def leaderboard_entries(frame: Optional[dict], key: str,
     if spec is None:
         return []
     _, _, field, _, reverse = spec
-    rows = sorted(frame["people"], key=lambda p: p[field], reverse=reverse)
+    rows = sorted(frame["people"], key=lambda p: p.get(field, 0),
+                  reverse=reverse)
     return rows[:top]
 
 
@@ -304,7 +397,7 @@ def leaderboard_view(frame: Optional[dict], selected: Optional[str] = None) -> L
                     html.Span(p["name"].split("-")[0],
                               style={"marginLeft": "7px", "fontWeight": 600,
                                      "color": INK, "fontSize": "12px"}),
-                    html.Span(fmt.format(p[field]),
+                    html.Span(fmt.format(p.get(field, 0)),
                               style={"float": "right", "color": INK2,
                                      "fontSize": "12px",
                                      "fontVariantNumeric": "tabular-nums"}),
@@ -349,7 +442,22 @@ SORT_FIELDS = [
     {"label": "conditions", "value": "conditions"},
     {"label": "children", "value": "children"},
     {"label": "generation", "value": "generation"},
+    {"label": "pedigree F", "value": "pedigree_f"},
+    {"label": "viability", "value": "viability"},
+    {"label": "height", "value": "height"},
 ]
+
+
+def _sort_value_text(value, field: str) -> str:
+    """
+    Format the sorted-on column. Pedigree F needs four decimals -- at two, a
+    first-cousin child (0.0625) and a second-cousin child (0.0156) both round
+    to something uninformative, and telling them apart is the entire point of
+    sorting by it.
+    """
+    if not isinstance(value, float):
+        return str(value)
+    return f"{value:.4f}" if field == "pedigree_f" else f"{value:.2f}"
 
 
 def directory_rows(frame: Optional[dict], query: str = "",
@@ -372,7 +480,10 @@ def directory_rows(frame: Optional[dict], query: str = "",
         rows = [p for p in rows if p["sex"] == sex]
 
     field = sort_by if sort_by in {f["value"] for f in SORT_FIELDS} else "age"
-    rows = sorted(rows, key=lambda p: p[field], reverse=True)[:limit]
+    # `.get` with a default because the snapshot buffer is capped, not
+    # versioned: frames captured before a field existed are still in the ring
+    # and must not crash the directory when the user sorts by it.
+    rows = sorted(rows, key=lambda p: p.get(field, 0), reverse=True)[:limit]
 
     if not rows:
         return [html.Div("Nothing matches that filter.",
@@ -391,8 +502,7 @@ def directory_rows(frame: Optional[dict], query: str = "",
                       f"{deme_label(p['deme'])}",
                       style={"marginLeft": "8px", "color": MUTED,
                              "fontSize": "11px"}),
-            html.Span(f"{p[field]:.2f}" if isinstance(p[field], float)
-                      else f"{p[field]}",
+            html.Span(_sort_value_text(p.get(field, 0), field),
                       style={"float": "right", "color": INK2, "fontSize": "12px",
                              "fontVariantNumeric": "tabular-nums"}),
         ], id={"type": "dir-pick", "name": p["name"]}, n_clicks=0,
@@ -441,6 +551,9 @@ def compare_table(world, a: Optional[str], b: Optional[str]) -> List:
     na, nb = world.people[a], world.people[b]
     pa, pb = na.phenotype(), nb.phenotype()
     r = genomic_relatedness(na, nb)
+    # Wright's coefficient of relationship from the pedigree, 2f (#31) --
+    # the expectation the measured value scatters around.
+    ped_r = world.pedigree().relationship(a, b)
 
     # relatedness interpretation, using the standard thresholds the engine's
     # own kinship guard works with
@@ -490,8 +603,21 @@ def compare_table(world, a: Optional[str], b: Optional[str]) -> List:
 
     rows = [
         _crow("age", na.age, nb.age, "{:.0f}"),
+        _crow("life stage", na.life_stage(), nb.life_stage(), "{}"),
         _crow("generation", na.generation, nb.generation, "{:.0f}"),
         _crow("community", world.meta[a].deme, world.meta[b].deme, "{:.0f}"),
+        _crow("height now", na.height_at_age(), nb.height_at_age(), "{:.1f}"),
+        _crow("height at maturity", pa["height_cm"], pb["height_cm"], "{:.1f}"),
+        _crow("pedigree F", world.inbreeding_of(a), world.inbreeding_of(b),
+              "{:.4f}"),
+        _crow("realised F", na.realised_inbreeding(),
+              nb.realised_inbreeding(), "{:+.4f}"),
+        _crow("viability", na.relative_viability(),
+              nb.relative_viability(), "{:.3f}"),
+        _crow("hidden load (alleles)",
+              na.load.n_carried if na.load else 0,
+              nb.load.n_carried if nb.load else 0, "{:.0f}"),
+        _crow("CNVs", len(na.cnv_variants()), len(nb.cnv_variants()), "{:.0f}"),
         _crow("heterozygosity", na.heterozygosity(), nb.heterozygosity(), "{:.3f}"),
         _crow("epigenetic age", na.epigenome.epigenetic_age,
               nb.epigenome.epigenetic_age, "{:.1f}"),
@@ -518,8 +644,18 @@ def compare_table(world, a: Optional[str], b: Optional[str]) -> List:
             html.Span(f"  {rel}", style={"color": INK2, "fontSize": "12px",
                                          "marginLeft": "10px"}),
         ]),
-        html.Div("Realised GCTA relatedness across all 500 loci — the actual "
-                 "shared fraction, not a pedigree expectation.",
+        html.Div([
+            html.Span("pedigree expects ", style={"color": MUTED}),
+            html.Span(f"{ped_r:+.3f}", style={"color": INK, "fontWeight": 700,
+                                              "fontVariantNumeric": "tabular-nums"}),
+            html.Span(f"  ·  measured {r:+.3f}  ·  difference "
+                      f"{r - ped_r:+.3f}", style={"color": MUTED}),
+        ], style={"fontSize": "11px", "marginTop": "6px"}),
+        html.Div("Two different quantities, deliberately shown together. The "
+                 "pedigree coefficient (2f, Malécot) is an EXPECTATION over "
+                 "meioses; the GCTA figure is the fraction these two genomes "
+                 "actually share. Full sibs all have a pedigree 0.5 and "
+                 "scatter around it in reality, because meiosis is a lottery.",
                  style={"color": MUTED, "fontSize": "11px", "marginTop": "6px",
                         "lineHeight": "1.5"}),
     ])

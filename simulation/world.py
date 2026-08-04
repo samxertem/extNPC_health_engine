@@ -105,6 +105,12 @@ class World:
 
         self.people: Dict[str, NPC] = {}       # name -> NPC (all, alive+dead)
         self.living: List[NPC] = []
+        # Full-pedigree Malecot kinship (#31), rebuilt lazily. Invalidated on
+        # birth rather than updated in place: `Pedigree.add` drops its memo
+        # tables, so adding one child at a time would clear the cache once per
+        # birth and recompute every coefficient from scratch. Rebuilding once
+        # per tick means all of that tick's F queries share one memo.
+        self._pedigree = None
         self.meta: Dict[str, PersonMeta] = {}
         self.history: List[Dict[str, float]] = []
         # per-tick living headcount by dominant founder lineage
@@ -254,7 +260,8 @@ class World:
         self._reposition()
 
         # 7. metrics + narration
-        row = self._record(n_births=n_births, n_deaths=n_deaths)
+        row = self._record(n_births=n_births, n_deaths=n_deaths,
+                           n_infant_deaths=n_infant_deaths)
         self.chronicle.observe(self)
         return row
 
@@ -469,6 +476,7 @@ class World:
                           deme=self.meta[mother.name].deme)
         meta.color = self.registry.color_hex(ancestry, alive=True)
         self.meta[name] = meta
+        self.invalidate_pedigree()      # a birth changes the parent map (#31)
         return child
 
     # -- layout & metrics ------------------------------------------------
@@ -481,6 +489,35 @@ class World:
         xy = self.pca.transform(dos)
         for npc, pos in zip(self.living, xy):
             self.meta[npc.name].xy = (float(pos[0]), float(pos[1]))
+
+    # -- pedigree (#31) ---------------------------------------------------
+
+    def pedigree(self):
+        """
+        Malecot kinship over everyone who has ever lived here (#31).
+
+        Cached; call `invalidate_pedigree()` after adding people. Founders are
+        treated as unrelated, which is exactly true in this engine because
+        `sample_founder_genome` draws every founder haplotype independently --
+        a luxury real pedigree analysis does not have.
+        """
+        if self._pedigree is None:
+            from health_engine.inbreeding import Pedigree
+            self._pedigree = Pedigree.from_npcs(self.people.values())
+        return self._pedigree
+
+    def invalidate_pedigree(self) -> None:
+        self._pedigree = None
+
+    def inbreeding_of(self, name: str) -> float:
+        """Wright's F for one individual, 0.0 for anyone not in the pedigree."""
+        if name not in self.people:
+            return 0.0
+        return self.pedigree().inbreeding(name)
+
+    def living_inbreeding(self) -> List[float]:
+        ped = self.pedigree()
+        return [ped.inbreeding(n.name) for n in self.living]
 
     def _mean_couple_relatedness(self) -> float:
         rels = []
@@ -507,14 +544,17 @@ class World:
                 if n.age >= self.params.pairing_age]
         return M.gini(vals)
 
-    def _record(self, n_births: int, n_deaths: int) -> Dict[str, float]:
+    def _record(self, n_births: int, n_deaths: int,
+                n_infant_deaths: int = 0) -> Dict[str, float]:
         n_couples = sum(1 for n in self.living
                         if self.meta[n.name].partner is not None) // 2
         row = M.snapshot(self.tick, self.living, n_births, n_deaths,
                          n_couples, self._mean_couple_relatedness(),
                          fst=self._fst(),
                          reproductive_skew=self._reproductive_skew(),
-                         n_migrations=self._last_migrations)
+                         n_migrations=self._last_migrations,
+                         inbreeding=self.living_inbreeding(),
+                         n_infant_deaths=n_infant_deaths)
         self.history.append(row)
         counts: Dict[str, int] = {}
         for npc in self.living:

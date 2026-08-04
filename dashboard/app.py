@@ -44,8 +44,15 @@ DEFAULTS = dict(seed=7, n_founders=10, carrying_capacity=150,
 
 
 def params_from_controls(K, birth, mort, sel, mut, recomb, assort, inbreed,
-                         n_demes, migr, equity, smoke, stress, prenat
-                         ) -> DemographyParams:
+                         n_demes, migr, equity, smoke, stress, prenat,
+                         depression=1.0) -> DemographyParams:
+    """
+    Map the control row onto `DemographyParams`.
+
+    `depression` is last and defaults to 1.0 (the calibrated strength) so that
+    any caller written before roadmap #31 landed still produces the same
+    params it always did.
+    """
     return DemographyParams(
         carrying_capacity=int(K), birth_rate=float(birth),
         mortality_scale=float(mort), selection_pressure=float(sel),
@@ -53,7 +60,8 @@ def params_from_controls(K, birth, mort, sel, mut, recomb, assort, inbreed,
         assortative_strength=float(assort), inbreeding_threshold=float(inbreed),
         n_demes=int(n_demes), migration_rate=float(migr),
         resource_equity=float(equity), exposure_smoking=float(smoke),
-        exposure_stress=float(stress), exposure_prenatal_nutrition=float(prenat))
+        exposure_stress=float(stress), exposure_prenatal_nutrition=float(prenat),
+        inbreeding_depression=float(depression))
 
 
 def build_world(seed, n_founders, params: DemographyParams) -> World:
@@ -272,13 +280,48 @@ def char_info(name):
             _row("parents", parents),
             _row("partner", meta.partner.split("-")[0] if meta.partner else "—"),
             _row("children", meta.n_children)]),
+        # Height AS EXPRESSED AT THIS AGE (#13). `phenotype()` is age-blind by
+        # design -- that is what keeps the calibration safe -- so the sheet
+        # has to ask for the developmental value explicitly, and shows the
+        # mature endpoint beside it while the individual is still growing.
         _section("APPEARANCE", [
-            _row("height", f"{npc.phenotype()['height_cm']:.1f} cm"),
+            _row("height", f"{npc.height_at_age():.1f} cm"),
+            _row("adult height", f"{npc.phenotype()['height_cm']:.1f} cm",
+                 MUTED if npc.life_stage() in ("adult", "midlife") else WARN),
+            _row("life stage", npc.life_stage()),
             _row("BMI", f"{npc.phenotype()['bmi']:.1f}"),
             _row("eye colour", npc.phenotype().get("eye_color", "?")),
             _row("skin tone", f"{npc.phenotype()['skin_tone']:+.2f}"),
             _row("handedness", npc.phenotype().get("handedness", "?"))]),
     ])
+
+
+def _inbreeding_section(name, npc):
+    """Rows for the character sheet's inbreeding / genetic-load block (#31, #12)."""
+    from .inspector import relationship_label
+
+    F = WORLD.inbreeding_of(name)
+    rows = [
+        _row("pedigree F", f"{F:.4f}", CRIT if F >= 0.0625 else
+             (WARN if F >= 0.015625 else INK)),
+        _row("parents were", relationship_label(F) if F > 1e-9 else "unrelated"),
+        _row("realised F", f"{npc.realised_inbreeding():+.4f}"),
+        _row("relative viability", f"{npc.relative_viability():.3f}",
+             CRIT if npc.relative_viability() < 0.9 else GOOD),
+    ]
+    if npc.load is not None:
+        rows.append(_row("hidden recessive load", f"{npc.load.n_carried} alleles"))
+        rows.append(_row("expressed (homozygous)", npc.load.n_homozygous,
+                         CRIT if npc.load.n_homozygous else INK))
+    variants = npc.cnv_variants()
+    if variants:
+        for v in variants:
+            rows.append(_row(f"CNV {v['region']}",
+                             f"{v['kind']} · {v['copies']} copies · "
+                             f"{v['parent_of_origin']}", WARN))
+    else:
+        rows.append(_row("copy-number variants", "none"))
+    return rows
 
 
 def char_genetics(name):
@@ -294,6 +337,10 @@ def char_genetics(name):
             _row("mito haplogroup", mito.get("haplogroup", "—")),
             _row("mtDNA heteroplasmy", f"{mito.get('heteroplasmy', 0):.2f}"),
             _row("OXPHOS capacity", f"{mito.get('oxphos_capacity', 1):.2f}")]),
+        # #31 + #12. Pedigree F and realised F are both shown because they are
+        # different quantities: an expectation over meioses versus what this
+        # genome actually got.
+        _section("INBREEDING & LOAD", _inbreeding_section(name, npc)),
         _section("SEX-LINKED (X)", [
             _row("colour vision", xl.get("color_vision", "—")),
             _row("G6PD activity", f"{xl.get('g6pd_activity', 1):.2f}"),
@@ -662,7 +709,8 @@ def panel(id_, children, visible=False):
 
 
 CTRL_INPUTS = ["K", "birth", "mort", "sel", "mut", "recomb", "assort",
-               "inbreed", "ndemes", "migr", "equity", "smoke", "stress", "prenat"]
+               "inbreed", "ndemes", "migr", "equity", "smoke", "stress",
+               "prenat", "depress"]
 
 # The split-screen: main content, then the persistent inspector drawer.
 # `minmax(0, …)` on the first column stops wide Plotly figures from forcing
@@ -926,11 +974,15 @@ app.layout = html.Div(style={
             html.Div(style=CARD, children=[graph("g-fst")]),
             html.Div(style=CARD, children=[graph("g-deme")]),
         ]),
-        html.Div(style={"display": "grid", "gridTemplateColumns": "repeat(3, minmax(0, 1fr))",
+        html.Div(style={"display": "grid", "gridTemplateColumns": "repeat(2, minmax(0, 1fr))",
+                        "gap": "12px", "marginBottom": "12px"}, children=[
+            html.Div(style=CARD, children=[graph("g-inbreed")]),
+            html.Div(style=CARD, children=[graph("g-rel")]),
+        ]),
+        html.Div(style={"display": "grid", "gridTemplateColumns": "repeat(2, minmax(0, 1fr))",
                         "gap": "12px"}, children=[
             html.Div(style=CARD, children=[graph("g-spiral")]),
             html.Div(style=CARD, children=[graph("g-lin")]),
-            html.Div(style=CARD, children=[graph("g-rel")]),
         ]),
     ]),
 
@@ -958,6 +1010,12 @@ app.layout = html.Div(style={
                 labelled("inbreeding avoidance (max r)", slider("inbreed", 0.0625, 0.5, 0.0625, 0.5,
                          {0.0625: "cousins", 0.25: "half-sib", 0.5: "sib"}), "auto",
                          "reject pairs above this genomic relatedness (Wright 1922)"),
+                labelled("inbreeding depression ×", slider("depress", 0.0, 2.0, 0.1, 1.0,
+                         {0.0: "off", 1.0: "1.4 LE", 2.0: "2×"}), "auto",
+                         "cost of homozygous recessive load at birth. 1.0 = the "
+                         "calibrated 1.4 lethal equivalents per gamete "
+                         "(Charlesworth & Willis 2009); 0 turns the fitness "
+                         "cost off for an A/B run"),
             ]),
             html.Div(style=CARD, children=[
                 html.Div("COMMUNITY & RESOURCES", style={**LBL, "color": ACCENT, "marginBottom": "8px"}),
@@ -1217,7 +1275,8 @@ def apply_preset(*_clicks):
             p.selection_pressure, p.mutation_rate_scale, p.recombination_scale,
             p.assortative_strength, p.inbreeding_threshold, p.n_demes,
             p.migration_rate, p.resource_equity, p.exposure_smoking,
-            p.exposure_stress, p.exposure_prenatal_nutrition]
+            p.exposure_stress, p.exposure_prenatal_nutrition,
+            p.inbreeding_depression]
     return vals + [DEFAULTS["seed"], scen.n_founders, WORLD.tick, None,
                    f"“{scen.title}” — {scen.blurb}"]
 
@@ -1346,16 +1405,18 @@ def render_genetics(_tick, active, scrub):
 
 @app.callback(
     Output("g-fst", "figure"), Output("g-deme", "figure"),
+    Output("g-inbreed", "figure"),
     Output("g-spiral", "figure"), Output("g-lin", "figure"),
     Output("g-rel", "figure"),
     Input("tick", "data"), Input("active-tab", "data"), Input("timeline", "data"),
 )
 def render_community(_tick, active, scrub):
     if active != "community":
-        return (no_update,) * 5
+        return (no_update,) * 6
     cols = panels.history_columns_upto(WORLD, scrub)
     return (panels.fst_figure(cols, WORLD.params.n_demes),
             panels.deme_bar_figure(WORLD),
+            panels.inbreeding_figure(cols),
             panels.spiral_figure(cols),
             panels.lineage_figure(WORLD),
             panels.relatedness_figure(cols))
