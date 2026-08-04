@@ -992,3 +992,209 @@ def plot_inbreeding_depression(out_path: str, n: int = 3000,
                  "(Charlesworth & Willis 2009)", fontsize=11)
     fig.tight_layout(rect=(0, 0, 1, 0.93))
     return _save(fig, out_path)
+
+
+def plot_cnv_dosage(out_path: str, region: str = "15q11-q13",
+                    n: int = 2500, seed: int = 20261001) -> str:
+    """
+    Copy-number dosage (#12): the mirror-image signature.
+
+    Left: mean liability against copy number for every trait the region
+    touches. Straight lines through the diploid point, because a dosage
+    multiplier is linear in copy number -- and crucially SYMMETRIC, so the
+    deletion and duplication arms are equal and opposite. That symmetry is
+    what Jacquemont et al. 2011 used to argue the 16p11.2 BMI effect is
+    driven by gene dosage rather than by a disrupted single gene.
+
+    Middle: observed against predicted. Two predictions, not one -- the
+    catalogue closed form (statistical, because the cohort's realised allele
+    frequencies differ from the catalogue's) and the same algebra at the
+    cohort's own frequencies (exact to floating point).
+
+    Right: mutation-selection balance. The carrier frequency and the >90%
+    sporadic fraction are consequences of a de novo rate and a fitness cost,
+    not settings -- which is what makes the ~1/4000 birth prevalence of
+    22q11.2 a prediction rather than a parameter.
+    """
+    from .cnv import (REGIONS, birth_prevalence, equilibrium_frequency,
+                      expected_de_novo_fraction)
+    from .validation import cnv_dosage_response
+
+    from .loci import LOCUS_BY_SYMBOL
+
+    traits = sorted({t for sym in REGIONS[region].genes
+                     if sym in LOCUS_BY_SYMBOL
+                     for t in LOCUS_BY_SYMBOL[sym].weights})
+    traits = [t for t in traits if t in ARCHITECTURE][:4]
+
+    results = [cnv_dosage_response(trait=t, region=region, n=n,
+                                   rng=np.random.default_rng(seed))
+               for t in traits]
+
+    fig, (axL, axM, axR) = plt.subplots(1, 3, figsize=(15, 4.6))
+    colours = ["#c0504d", "#2c6fa8", "#7a9a3b", "#8a6bab"]
+
+    for r, colour in zip(results, colours):
+        axL.plot(r.copies, r.observed_shift, "o-", color=colour, ms=6, lw=1.8,
+                 label=r.trait)
+    axL.axhline(0.0, color="#5a6570", lw=0.8)
+    axL.axvline(2, color="#5a6570", ls=":", lw=1.0)
+    axL.annotate("normal diploid\n(multiplier exactly 1.0)", xy=(2, 0),
+                 xytext=(-4, 22), textcoords="offset points", fontsize=7.5,
+                 ha="center", color="#5a6570")
+    axL.set_xticks([1, 2, 3])
+    axL.set_xticklabels(["1\ndeletion", "2\nnormal", "3\nduplication"])
+    axL.set_xlabel(f"copies of {region}")
+    axL.set_ylabel("mean liability shift (SD)")
+    axL.set_title("Dosage response is linear and mirror-symmetric", fontsize=10)
+    axL.legend(fontsize=8, frameon=False)
+    axL.grid(alpha=0.25)
+
+    for r, colour in zip(results, colours):
+        axM.errorbar(r.predicted_shift, r.observed_shift,
+                     xerr=r.catalogue_stderr, fmt="o", color=colour, ms=6,
+                     capsize=3, lw=1.2, label=f"{r.trait} (catalogue p)")
+        axM.plot(r.sample_shift, r.observed_shift, "x", color=colour, ms=9,
+                 mew=1.8)
+    lim = max(abs(v) for r in results for v in r.observed_shift) * 1.25
+    axM.plot([-lim, lim], [-lim, lim], "--", color="#5a6570", lw=1.2)
+    axM.set_xlim(-lim, lim)
+    axM.set_ylim(-lim, lim)
+    axM.set_xlabel("predicted shift  (o = catalogue p,  x = realised p)")
+    axM.set_ylabel("observed shift")
+    axM.set_title("Closed form vs measurement\ncrosses land exactly on the line",
+                  fontsize=10)
+    axM.legend(fontsize=7.5, frameon=False, loc="upper left")
+    axM.grid(alpha=0.25)
+
+    # Prevalence PER 100,000 births, not "1 in N": bar length has to grow
+    # with the quantity it encodes, and 1/N runs the other way -- it would
+    # draw the rarer variant as the longer bar.
+    names = list(REGIONS)
+    per_100k = [birth_prevalence(nm) * 1e5 for nm in names]
+    y = np.arange(len(names))
+    axR.barh(y, per_100k, height=0.5, color="#9aa5b1")
+    for yi, v, nm in zip(y, per_100k, names):
+        axR.annotate(f"{v:.0f} per 100,000  (1 in {1 / birth_prevalence(nm):,.0f})",
+                     xy=(v, yi), xytext=(6, 4), textcoords="offset points",
+                     fontsize=8, color="#3b4148")
+        axR.annotate(f"{expected_de_novo_fraction(nm) * 100:.0f}% de novo, "
+                     f"q = {equilibrium_frequency(nm):.1e}",
+                     xy=(v, yi), xytext=(6, -11), textcoords="offset points",
+                     fontsize=7.5, color="#7a2f2c")
+    axR.set_yticks(y)
+    axR.set_yticklabels(names)
+    axR.set_xlim(0, max(per_100k) * 2.9)
+    axR.set_xlabel("deletion carriers per 100,000 births")
+    axR.set_title("Emergent mutation-selection balance\n"
+                  r"$q = \mu/s$;  de novo fraction $= s$", fontsize=10)
+    axR.grid(alpha=0.25, axis="x")
+
+    fig.suptitle("Copy-number variation (#12) -- dosage multiplier on the "
+                 "expression seam; mirror symmetry after Jacquemont et al. 2011",
+                 fontsize=11)
+    fig.tight_layout(rect=(0, 0, 1, 0.93))
+    return _save(fig, out_path)
+
+
+def plot_development(out_path: str, n: int = 12, seed: int = 20261101) -> str:
+    """
+    Developmental trajectory (#13).
+
+    Left: individual growth curves. Every NPC travels the same normalised
+    Preece-Baines curve toward its own genetically determined adult stature,
+    which is both the model's content and its main limitation -- real growth
+    varies in TIMING as well as endpoint, and there is no heritable tempo
+    parameter here.
+
+    Middle: the fitted curve against the landmark fractions of adult stature
+    it was fitted to, with the two sexes' growth-velocity curves beneath. The
+    velocity peaks are not parameters; they are read off the fitted curves.
+
+    Right: the whole schedule, and the point the item turns on -- every
+    profile passes exactly through 1.0 at the calibration age, so the
+    engine's heritabilities cannot drift.
+    """
+    from .development import (DRIFT_REFERENCE_AGE, GROWTH, MATURATION,
+                              REFERENCE_AGE, growth_factor, maturation_offset,
+                              peak_height_velocity_age, stature_fraction)
+    from .npc import random_founder
+    from .validation import _STATURE_LANDMARKS
+
+    rng = np.random.default_rng(seed)
+    people = [random_founder(f"g{i}", rng) for i in range(n)]
+    ages = np.linspace(0, 80, 400)
+
+    fig, (axL, axM, axR) = plt.subplots(1, 3, figsize=(15, 4.8))
+
+    for p in people:
+        colour = "#c0504d" if p.sex == "female" else "#2c6fa8"
+        axL.plot(ages, [p.height_at_age(a) for a in ages],
+                 color=colour, lw=1.1, alpha=0.75)
+    axL.axvline(REFERENCE_AGE, color="#5a6570", ls=":", lw=1.2)
+    axL.annotate("calibration age\n(schedule = identity)",
+                 xy=(REFERENCE_AGE, 60), xytext=(4, 0),
+                 textcoords="offset points", fontsize=7.5, color="#5a6570")
+    axL.plot([], [], color="#c0504d", lw=1.4, label="female")
+    axL.plot([], [], color="#2c6fa8", lw=1.4, label="male")
+    axL.set_xlabel("age (years)")
+    axL.set_ylabel("stature (cm)")
+    axL.set_title("Individual growth to a genetic endpoint", fontsize=10)
+    axL.legend(fontsize=8, frameon=False, loc="lower right")
+    axL.grid(alpha=0.25)
+
+    child = np.linspace(0, 20, 400)
+    # Velocity is drawn from age 3 only. Infant growth velocity is several
+    # times the pubertal peak -- true, and it would flatten the spurt this
+    # panel exists to show.
+    vel_mask = child >= 3.0
+    for sex, colour, y_lab in (("female", "#c0504d", 52.0),
+                               ("male", "#2c6fa8", 46.0)):
+        f = np.array([stature_fraction(a, sex) for a in child])
+        axM.plot(child, f * 100, color=colour, lw=1.9, label=f"{sex} (fitted)")
+        pts = _STATURE_LANDMARKS[sex]
+        axM.plot(list(pts), [v * 100 for v in pts.values()], "o",
+                 color=colour, ms=5, mfc="white", mew=1.4)
+        v = np.gradient(f, child)
+        axM.plot(child[vel_mask], 26 + v[vel_mask] * 320, color=colour,
+                 lw=1.0, ls="--", alpha=0.85)
+        phv = peak_height_velocity_age(sex)
+        axM.axvline(phv, color=colour, ls=":", lw=1.0)
+        axM.annotate(f"PHV {phv:.1f}", xy=(phv, y_lab), xytext=(4, 0),
+                     textcoords="offset points", fontsize=7.5, color=colour)
+    axM.annotate("growth velocity, age 3+\n(dashed, offset scale)",
+                 xy=(3.2, 55), fontsize=7.5, color="#5a6570")
+    axM.set_ylim(24, 104)
+    axM.set_xlabel("age (years)")
+    axM.set_ylabel("% of adult stature")
+    axM.set_title("Preece-Baines 1978 vs Tanner landmarks\n"
+                  "(rings = fitted targets)", fontsize=10)
+    axM.legend(fontsize=8, frameon=False, loc="lower right")
+    axM.grid(alpha=0.25)
+
+    for trait, colour in zip(GROWTH, ["#c0504d", "#2c6fa8", "#7a9a3b"]):
+        axR.plot(ages, [growth_factor(trait, a) for a in ages],
+                 color=colour, lw=1.8, label=trait)
+    for trait, colour in zip(MATURATION, ["#8a6bab", "#c98b28", "#4f9d9d"]):
+        axR.plot(ages, [1.0 + maturation_offset(trait, a) for a in ages],
+                 color=colour, lw=1.4, ls="--", label=f"{trait} (1 + offset)")
+    axR.axhline(1.0, color="#5a6570", lw=0.9)
+    axR.axvline(REFERENCE_AGE, color="#5a6570", ls=":", lw=1.2)
+    axR.axvline(DRIFT_REFERENCE_AGE, color="#5a6570", ls=":", lw=1.0)
+    axR.annotate("every growth profile passes\n"
+                 "through exactly 1.0 at age 20\n"
+                 "— so h² cannot drift",
+                 xy=(1.5, 1.60), fontsize=7.5, color="#3b4148",
+                 ha="left", va="top")
+    axR.set_ylim(0.0, 1.68)
+    axR.set_xlabel("age (years)")
+    axR.set_ylabel("factor on mature value  /  1 + liability offset")
+    axR.set_title("The schedule, and the identity it guarantees", fontsize=10)
+    axR.legend(fontsize=7, frameon=False, loc="lower left", ncol=2)
+    axR.grid(alpha=0.25)
+
+    fig.suptitle("Developmental trajectory (#13) -- Preece & Baines 1978; "
+                 "Tanner 1962; senescence from Sorkin 1999 and Fleg 2005",
+                 fontsize=11)
+    fig.tight_layout(rect=(0, 0, 1, 0.93))
+    return _save(fig, out_path)

@@ -84,42 +84,125 @@ def assign_founder_demes(n_founders: int, n_demes: int,
 
 def fst(dosage_by_deme: Sequence[np.ndarray], min_deme: int = 2) -> float:
     """
-    Wright's fixation index F_ST from per-deme genotype dosages.
+    F_ST by the Weir & Cockerham 1984 estimator (their theta-hat).
 
     `dosage_by_deme[i]` is an (n_i, L) int array of alternate-allele dosages
-    (0/1/2) for the living members of deme i. Returns a single genome-wide
-    F_ST in [0, 1]:
+    (0/1/2) for the living members of deme i.
 
-        p_i   = alt-allele frequency in deme i           (dosage/2 averaged)
-        H_S   = mean over demes of 2 p_i (1 - p_i)        (within-deme het.)
-        H_T   = 2 p_bar (1 - p_bar), p_bar = mean p_i     (total het.)
-        F_ST  = (H_T - H_S) / H_T
+    WHY NOT THE OBVIOUS FORMULA. The intuitive definition,
 
-    Combined across loci as a **ratio of sums** (sum of numerators over sum of
-    denominators), the estimator Bhatia et al. 2013 recommend over averaging
-    per-locus ratios, which is unstable at near-monomorphic loci.
+        F_ST = (H_T - H_S) / H_T                          (Nei's G_ST)
 
-    Returns 0.0 when fewer than `min_deme` demes have members (no subdivision
-    to measure -- a single deme is by definition undifferentiated).
+    is a statement about *populations*, and applying it to *samples* biases it
+    upward: two samples drawn from one identical population differ by sampling
+    alone, and that difference is read as differentiation. The bias is of order
+    1/(2n) per deme, which is not small at the deme sizes this engine
+    simulates. Measured on this codebase before the fix: four demes drawn from
+    a single shared allele-frequency vector, so true F_ST = 0, returned
+    **0.019 at n=20 per deme and 0.038 at n=10**. Session 8's melting-pot
+    figure of ~0.025 was not meaningfully above that floor.
+
+    Weir & Cockerham's estimator exists precisely to remove that term. It
+    decomposes the total variance in allele frequency into among-deme (a),
+    among-individual-within-deme (b) and within-individual (c) components,
+    each corrected for finite sample size, and forms
+
+        theta = a / (a + b + c)
+
+    Per locus, with r demes of sizes n_i, frequencies p_i and observed
+    heterozygote proportions h_i:
+
+        n_bar = mean(n_i)
+        n_c   = (r n_bar - sum(n_i^2)/(r n_bar)) / (r - 1)
+        p_bar = sum(n_i p_i) / (r n_bar)
+        s2    = sum(n_i (p_i - p_bar)^2) / ((r - 1) n_bar)
+        h_bar = sum(n_i h_i) / (r n_bar)
+
+    `h_i` is why the estimator needs GENOTYPES and not just frequencies: the
+    within-individual component c cannot be recovered from allele frequencies
+    alone. That is also why the old signature happened to be adequate for
+    G_ST and is not adequate here.
+
+    Combined across loci as a **ratio of sums**, sum(a) / sum(a+b+c), which is
+    what Bhatia et al. 2013 recommend over averaging per-locus ratios --
+    per-locus theta is wildly unstable at near-monomorphic loci.
+
+    NOT CLIPPED AT ZERO, deliberately. An unbiased estimator of a quantity
+    that is truly zero must be able to come out negative; clipping would
+    reintroduce exactly the upward bias this function exists to remove. A
+    small negative value means "no detectable differentiation", not an error.
+
+    Returns 0.0 when fewer than `min_deme` demes have members.
+    """
+    n_i, p_i, h_i = [], [], []
+    for d in dosage_by_deme:
+        arr = np.asarray(d)
+        if arr.size == 0:
+            continue
+        n_i.append(arr.shape[0])
+        p_i.append(arr.mean(axis=0) / 2.0)             # (L,) alt freq
+        h_i.append((arr == 1).mean(axis=0))            # (L,) heterozygote frac
+    r = len(n_i)
+    if r < min_deme:
+        return 0.0
+
+    n = np.asarray(n_i, dtype=float)[:, None]          # (r, 1)
+    P = np.vstack(p_i)                                 # (r, L)
+    H = np.vstack(h_i)                                 # (r, L)
+
+    n_bar = float(n.mean())
+    if n_bar <= 1.0:
+        return 0.0
+    n_c = (r * n_bar - float(np.sum(n ** 2)) / (r * n_bar)) / (r - 1.0)
+
+    p_bar = (n * P).sum(axis=0) / (r * n_bar)          # (L,)
+    s2 = (n * (P - p_bar) ** 2).sum(axis=0) / ((r - 1.0) * n_bar)
+    h_bar = (n * H).sum(axis=0) / (r * n_bar)
+
+    pq = p_bar * (1.0 - p_bar)
+    common = pq - ((r - 1.0) / r) * s2
+
+    a = (n_bar / n_c) * (s2 - (common - h_bar / 4.0) / (n_bar - 1.0))
+    b = (n_bar / (n_bar - 1.0)) * (common
+                                   - ((2.0 * n_bar - 1.0) / (4.0 * n_bar)) * h_bar)
+    c = h_bar / 2.0
+
+    num = float(np.sum(a))
+    den = float(np.sum(a + b + c))
+    if den == 0.0:
+        return 0.0
+    return float(num / den)
+
+
+def fst_gst(dosage_by_deme: Sequence[np.ndarray], min_deme: int = 2) -> float:
+    """
+    Nei's G_ST from sample frequencies -- the estimator this module used
+    until the session-11 fix, kept so the bias can be demonstrated rather
+    than merely asserted.
+
+        F_ST = (H_T - H_S) / H_T
+
+    Correct as a statement about populations, upward-biased as a statistic
+    computed on samples. `test_community` compares the two on an
+    independent-sample null where the true value is zero.
     """
     freqs = []
     for d in dosage_by_deme:
         arr = np.asarray(d, dtype=float)
         if arr.size == 0:
             continue
-        freqs.append(arr.mean(axis=0) / 2.0)     # (L,) alt-allele freq
+        freqs.append(arr.mean(axis=0) / 2.0)
     if len(freqs) < min_deme:
         return 0.0
 
-    P = np.vstack(freqs)                          # (n_demes, L)
-    p_bar = P.mean(axis=0)                         # (L,)
-    H_S = (2.0 * P * (1.0 - P)).mean(axis=0)       # (L,) within-deme
-    H_T = 2.0 * p_bar * (1.0 - p_bar)              # (L,) total
-    num = float(np.sum(H_T - H_S))
+    P = np.vstack(freqs)
+    p_bar = P.mean(axis=0)
+    H_S = (2.0 * P * (1.0 - P)).mean(axis=0)
+    H_T = 2.0 * p_bar * (1.0 - p_bar)
     den = float(np.sum(H_T))
     if den <= 0.0:
         return 0.0
-    return float(np.clip(num / den, 0.0, 1.0))
+    return float(np.clip(float(np.sum(H_T - H_S)) / den, 0.0, 1.0))
 
 
 def expected_fst(effective_size: float, migration_rate: float) -> float:

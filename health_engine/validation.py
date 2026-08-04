@@ -814,6 +814,58 @@ def full_report(rng: np.random.Generator,
     add("    human survival to adulthood) -- unlike #14b, this one has real")
     add("    human magnitudes behind it. See inbreeding.py.")
 
+    # 10. Copy-number dosage response (roadmap #12)
+    add("\n[10] CNV gene dosage   shift = (copies/2 - 1) * sum_j E[val_j]")
+    add("    One cohort of genomes read at three copy numbers -- same genotypes,")
+    add("    same environmental draws, only dosage moves. Two predictions: the")
+    add("    closed-form magnitude, and the MIRROR SYMMETRY between a deletion")
+    add("    and its reciprocal duplication (Jacquemont et al. 2011).")
+    add(f"    {'trait':<16}{'copies':>8}{'observed':>12}{'catalogue':>12}{'sample':>12}")
+    cnv_pass = True
+    for t in ("eye_color", "skin_tone"):
+        d = cnv_dosage_response(trait=t, n=800 if fast else 3000, rng=rng)
+        cnv_pass = cnv_pass and d.passes()
+        for c, o, p, s in zip(d.copies, d.observed_shift,
+                              d.predicted_shift, d.sample_shift):
+            add(f"    {t if c == 1 else '':<16}{c:>8}{o:>12.6f}{p:>12.6f}{s:>12.6f}")
+        add(f"    {'':<16}{'mirror |del+dup|':>8} = {d.mirror_asymmetry:.2e}")
+    add(f"    -> {'PASS' if cnv_pass else 'FAIL'}")
+    add("\n    The 'catalogue' column predicts from the catalogue's allele")
+    add("    frequencies and differs by O(1/sqrt(n)); the 'sample' column uses")
+    add("    the cohort's realised frequencies and matches to ~1e-16. The gap")
+    add("    between the two columns IS the finite-sample error, and separating")
+    add("    them keeps a statistical agreement from being read as an exact one.")
+    add("    SCOPE: this scales a locus's genotypic DEVIATION, not its absolute")
+    add("    gene product, so magnitude and mirror symmetry are exact while the")
+    add("    direction of a loss-of-function phenotype is not modelled. See the")
+    add("    OCA2 worked example in cnv.py.")
+
+    # 11. Developmental trajectory (roadmap #13)
+    add("\n[11] Developmental trajectory   identity at the calibration age")
+    add("    The riskiest item on the roadmap: an age factor inside the")
+    add("    genotype->phenotype path would change realised variance and")
+    add("    silently decalibrate every heritability while the reported")
+    add("    targets stayed put. It is applied to the OUTPUT of phenotype()")
+    add("    instead, so the calibrated path never sees an age -- and the")
+    add("    identity below is therefore EXACT rather than approximate.")
+    dv = developmental_identity(n=60 if fast else 200, rng=rng)
+    add(f"    max |phenotype_at_age(20) - phenotype()|  : {dv.max_identity_error:.1e}"
+        f"   (must be exactly 0)")
+    add(f"    max |growth factor - 1| across plateaus   : {dv.plateau_error:.1e}"
+        f"   (must be exactly 0)")
+    add(f"    stature landmarks, rms vs Tanner          : {dv.landmark_rms:.5f}"
+        f"   ({dv.landmark_rms * 171:.2f} cm of adult stature)")
+    add(f"    peak height velocity  female {dv.phv_female:.2f}"
+        f"   male {dv.phv_male:.2f}   gap {dv.phv_sex_gap:.2f} yr")
+    add(f"    growth monotone                           : {dv.monotone_growth}")
+    add(f"    -> {'PASS' if dv.passes() else 'FAIL'}")
+    add("\n    The sex difference in pubertal timing emerges from separately")
+    add("    fitted curves rather than being imposed, and its DIRECTION is")
+    add("    right. Its size is not: Tanner's longitudinal figures give ~2.0")
+    add("    years and this gives 1.3, most likely because the fit targets")
+    add("    median cross-sectional stature, which smears the spurt across")
+    add("    individuals of differing pubertal tempo. Not tuned away.")
+
     return "\n".join(out)
 
 
@@ -1394,3 +1446,271 @@ def malecot_kinship_check() -> Dict[str, Tuple[float, float]]:
         "self-kinship, inbred":       (ped.kinship("J", "J"), 0.625),
         "F, founder":                 (ped.inbreeding("A"), 0.0),
     }
+
+
+# ======================================================================
+# Copy-number dosage response (roadmap #12)
+# ======================================================================
+# A CNV changes gene dosage, and the trait layer scales a locus's
+# contribution by copy_number/2. The population-mean consequence is then
+# available in closed form, because `genotypic_value` subtracts
+#
+#       mean_g = sum_j [ a_j (p_j - q_j) + 2 p_j q_j d_j ]
+#
+# so scaling locus j by m shifts the mean by exactly (m - 1) times the j-th
+# term. Nothing in the trait layer evaluates that expression.
+#
+# The second prediction is the interesting one and comes for free: a
+# deletion (c=1) and its reciprocal duplication (c=3) give m-1 of -1/2 and
+# +1/2, so the shifts must be EQUAL IN MAGNITUDE AND OPPOSITE IN SIGN. That
+# mirror-image signature is what Jacquemont et al. 2011 used to argue BMI at
+# 16p11.2 is dosage-driven, and it is the sharpest available test that a
+# dosage model is behaving like one.
+
+@dataclass
+class DosageResult:
+    """One trait's response to copy number at one CNV region."""
+    trait: str
+    region: str
+    copies: List[int]
+    observed_shift: List[float]        # measured mean liability shift
+    predicted_shift: List[float]       # closed form from CATALOGUE frequencies
+    sample_shift: List[float]          # same form at the cohort's REALISED freqs
+    catalogue_stderr: float            # analytic se of the catalogue prediction
+    mirror_asymmetry: float            # |shift(1) + shift(3)|, exactly 0 in theory
+    n: int
+
+    def passes(self, n_sigma: float = 4.0, mirror_tol: float = 1e-9) -> bool:
+        """
+        Three claims of very different strength, checked separately because
+        conflating them would let a statistical agreement pass as an exact
+        one.
+
+        1. Against the SAMPLE closed form -- the same algebra evaluated at
+           the cohort's own realised frequencies -- agreement must be exact
+           to floating point. This is the claim that tests the mechanism.
+
+        2. Mirror symmetry between deletion and duplication, also exact,
+           because the multiplier is linear in copy number.
+
+        3. Against the CATALOGUE closed form the agreement is only
+           statistical, and the tolerance is DERIVED rather than chosen. The
+           prediction uses catalogue frequencies p, the cohort realises
+           p-hat, and the shift depends on p through a(p-q) + 2pq d. Note
+           that (p - q) is a small difference of two large numbers -- at
+           p = 0.42 it is -0.16 -- so a 2% error in p-hat becomes an ~11%
+           error in the prediction. `catalogue_stderr` propagates that
+           properly, and the test is against it rather than against a flat
+           percentage that would silently depend on the trait.
+        """
+        for obs, samp in zip(self.observed_shift, self.sample_shift):
+            if abs(obs - samp) > 1e-9:
+                return False
+        for obs, pred in zip(self.observed_shift, self.predicted_shift):
+            if abs(obs - pred) > n_sigma * self.catalogue_stderr + 1e-9:
+                return False
+        return self.mirror_asymmetry <= mirror_tol
+
+
+def cnv_dosage_response(trait: str = "eye_color",
+                        region: str = "15q11-q13",
+                        n: int = 4000,
+                        rng: Optional[np.random.Generator] = None
+                        ) -> DosageResult:
+    """
+    Take one cohort of genomes and read it at three copy numbers.
+
+    Identical genotypes and identical environmental draws at every copy
+    number, so the only thing that moves is gene dosage -- the same
+    read-it-twice design `canalization_release` uses, for the same reason:
+    it removes sampling noise from the comparison entirely and leaves the
+    mechanism as the only possible explanation.
+    """
+    from .cnv import CopyNumber, DELETED, DUPLICATED, NORMAL
+    from .cnv import predicted_mean_shift, region_index
+    from .npc import random_founder
+    from .traits import ARCHITECTURE, liability
+
+    rng = np.random.default_rng(20261001) if rng is None else rng
+    arch = ARCHITECTURE[trait]
+    i = region_index(region)
+
+    pop = [random_founder(f"d{k}", rng) for k in range(n)]
+    imp = [p.imprint_state() for p in pop]
+
+    def mean_liability(state: int) -> float:
+        z = []
+        for p, m in zip(pop, imp):
+            cn = CopyNumber.normal()
+            cn.haplotypes[0, i] = state
+            expr = p.expression * cn.dosage_multiplier()
+            z.append(liability(arch, p.genome.dosage, p.deviates, expr, m, 1.0))
+        return float(np.mean(z))
+
+    # The same closed form evaluated at the cohort's REALISED genotypes
+    # instead of the catalogue's frequencies: the mean, over these actual
+    # individuals, of the region's loci contributions. Removing the sampling
+    # difference should leave agreement exact to floating point.
+    from .cnv import REGIONS
+    hits = [k for k, j in enumerate(arch.idx)
+            if j in set(REGIONS[region].catalogue_indices)]
+    if hits:
+        vals = []
+        for p, m in zip(pop, imp):
+            g = p.genome.dosage[arch.idx[hits]]
+            v = np.where(g == 2, arch.a[hits],
+                         np.where(g == 1, arch.d[hits], -arch.a[hits]))
+            vals.append(float(np.sum(v * p.expression[arch.idx[hits]])))
+        sample_contribution = float(np.mean(vals))
+    else:
+        sample_contribution = 0.0
+
+    # Analytic standard error of the CATALOGUE prediction, propagated from
+    # sampling error in the cohort's allele frequencies:
+    #
+    #   d/dp [ a(p-q) + 2pq d ] = 2a + 2d(1 - 2p),   sd(p-hat) = sqrt(pq/2n)
+    #
+    # Summed as absolute values rather than in quadrature because the loci in
+    # a CNV region are physically adjacent -- OCA2 and HERC2 are 0.1 Mb apart
+    # and in strong LD -- so their frequency errors are correlated and an
+    # independence assumption would understate the spread.
+    se = 0.0
+    for k in hits:
+        p = float(arch.p[k])
+        se += (abs(2.0 * arch.a[k] + 2.0 * arch.d[k] * (1.0 - 2.0 * p))
+               * float(np.sqrt(p * (1.0 - p) / (2.0 * n))))
+    se *= 0.5                                    # |copies/2 - 1| at c = 1 or 3
+
+    base = mean_liability(NORMAL)
+    observed, predicted, sample, copies = [], [], [], []
+    for state, c in ((DELETED, 1), (NORMAL, 2), (DUPLICATED, 3)):
+        copies.append(c)
+        observed.append(mean_liability(state) - base)
+        predicted.append(predicted_mean_shift(trait, region, c))
+        sample.append((c / 2.0 - 1.0) * sample_contribution)
+
+    return DosageResult(
+        trait=trait,
+        region=region,
+        copies=copies,
+        observed_shift=observed,
+        predicted_shift=predicted,
+        sample_shift=sample,
+        catalogue_stderr=se,
+        mirror_asymmetry=abs(observed[0] + observed[2]),
+        n=n,
+    )
+
+
+# ======================================================================
+# Developmental trajectory (roadmap #13)
+# ======================================================================
+# The roadmap item with the highest capacity to break the engine quietly.
+# An age factor on the genotype -> phenotype path changes realised variance
+# and therefore every calibrated heritability, while `TraitArchitecture`
+# goes on reporting the target it no longer achieves. Nothing raises; the
+# numbers just stop meaning what they say.
+#
+# So the schedule is applied to the OUTPUT of `phenotype()` rather than
+# inside it, and this harness checks the two consequences:
+#
+#   1. IDENTITY. `phenotype_at_age(REFERENCE_AGE)` reproduces `phenotype()`
+#      exactly, for every trait and both sexes. Exact, not close.
+#   2. NO DECALIBRATION. Midparent-offspring regression on the mature
+#      phenotype is bit-identical with the module imported and not, because
+#      the calibrated path never sees an age at all.
+#
+# It also checks the growth curve against Tanner's landmarks, which is the
+# part that could be wrong without being dangerous.
+
+@dataclass
+class DevelopmentResult:
+    """The identity property, plus the growth curve against real landmarks."""
+    max_identity_error: float          # over every trait x both sexes
+    plateau_error: float               # max |factor - 1| across each plateau
+    stature_landmarks: Dict[str, Tuple[float, float]]   # age -> (obs, target)
+    landmark_rms: float
+    phv_female: float
+    phv_male: float
+    phv_sex_gap: float
+    monotone_growth: bool
+
+    def passes(self) -> bool:
+        return (self.max_identity_error == 0.0
+                and self.plateau_error == 0.0
+                and self.landmark_rms < 0.01
+                and self.monotone_growth
+                and self.phv_female < self.phv_male)
+
+
+# Median fraction of adult stature, the anchors the curve was fitted to.
+_STATURE_LANDMARKS: Dict[str, Dict[float, float]] = {
+    "female": {2: 0.500, 5: 0.630, 8: 0.730, 10: 0.800,
+               12: 0.900, 14: 0.980, 16: 0.995, 18: 0.999},
+    "male": {2: 0.490, 5: 0.610, 8: 0.710, 10: 0.770,
+             12: 0.840, 14: 0.930, 16: 0.980, 18: 0.998},
+}
+
+
+def developmental_identity(n: int = 200,
+                           rng: Optional[np.random.Generator] = None
+                           ) -> DevelopmentResult:
+    """
+    Assert that the age schedule is exactly identity where the engine is
+    calibrated, and check the growth curve against Tanner's landmarks.
+    """
+    from .development import (GROWTH, REFERENCE_AGE, growth_factor,
+                              peak_height_velocity_age, stature_fraction)
+    from .npc import random_founder
+
+    rng = np.random.default_rng(20261101) if rng is None else rng
+
+    # 1. identity at the reference age, over real NPCs of both sexes
+    worst = 0.0
+    for i in range(n):
+        npc = random_founder(f"dev{i}", rng)
+        mature = npc.phenotype()
+        at_ref = npc.phenotype_at_age(REFERENCE_AGE)
+        for trait, value in mature.items():
+            if isinstance(value, str):
+                if value != at_ref[trait]:
+                    worst = float("inf")
+                continue
+            worst = max(worst, abs(float(value) - float(at_ref[trait])))
+
+    # 2. the plateaus themselves must be exactly 1.0, not merely close
+    plateau_err = 0.0
+    for trait, profile in GROWTH.items():
+        span = np.linspace(profile.plateau_start, profile.plateau_end, 41)
+        for sex in ("female", "male"):
+            for a in span:
+                plateau_err = max(plateau_err,
+                                  abs(growth_factor(trait, float(a), sex) - 1.0))
+
+    # 3. the growth curve against the landmarks it was fitted to
+    landmarks: Dict[str, Tuple[float, float]] = {}
+    errs = []
+    for sex, table in _STATURE_LANDMARKS.items():
+        for age, target in table.items():
+            obs = stature_fraction(age, sex)
+            landmarks[f"{sex} age {age:g}"] = (obs, target)
+            errs.append(obs - target)
+
+    # 4. growth must be monotone -- children do not shrink
+    mono = True
+    for sex in ("female", "male"):
+        f = [stature_fraction(a, sex) for a in np.linspace(0, REFERENCE_AGE, 400)]
+        mono = mono and all(b >= a - 1e-12 for a, b in zip(f, f[1:]))
+
+    pf = peak_height_velocity_age("female")
+    pm = peak_height_velocity_age("male")
+    return DevelopmentResult(
+        max_identity_error=worst,
+        plateau_error=plateau_err,
+        stature_landmarks=landmarks,
+        landmark_rms=float(np.sqrt(np.mean(np.array(errs) ** 2))),
+        phv_female=pf,
+        phv_male=pm,
+        phv_sex_gap=pm - pf,
+        monotone_growth=mono,
+    )

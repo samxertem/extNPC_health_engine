@@ -16,9 +16,19 @@ X-inactivation in females, no X-Y recombination outside the pseudo-autosomal
 region -- and the X assorts INDEPENDENTLY of every autosome, so nothing about
 autosomal linkage is lost by modelling it alongside rather than inside the
 (2, L) array. Keeping it parallel leaves the calibrated autosomal genetics
-bit-for-bit untouched (the same design choice used for the epigenome,
-physiology and population layers) while letting the sex-linked layer be
-built and validated on its own terms.
+untouched (the same design choice used for the epigenome, physiology and
+population layers) while letting the sex-linked layer be built and validated
+on its own terms.
+
+The precise strength of "untouched", because the loose version was corrected
+by the session-9 audit: this layer draws from the CALLER'S generator at the
+tail of `random_founder`, so a given founder is bit-for-bit what it was
+before this module existed, but the extra draws advance the shared stream and
+therefore shift every SUBSEQUENT founder in a loop. The invariant here is
+per-individual, not per-sequence. `inbreeding.derived_rng` shows the stronger
+version -- spawn a sub-generator and the caller's stream is untouched
+entirely -- and would retrofit onto this module in one line, at the cost of
+regenerating every figure and expectation seeded through it.
 
 What is modelled
 ----------------

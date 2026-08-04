@@ -136,21 +136,48 @@ these laws; they are measured from emergent output and compared to theory.
 | mtDNA bottleneck | offspring heteroplasmy variance = h(1−h)/N_e | Wallace 1999 |
 | Reciprocal-heterozygote gap | imprinted-locus parent-of-origin effect = 2·s·a | DeChiara et al. 1991 |
 | Cryptic-variation release | Var(z) = k²·V_gen + V_env past the buffering threshold | Waddington 1942 |
-| Wright's F_ST | between-deme differentiation vs migration | Wright 1931 |
+| Wright's F_ST | between-deme differentiation vs migration | Wright 1931; Weir & Cockerham 1984 |
+| Lethal equivalents | ln S(F) = ln S₀ − B·F, B recovered by regression | Morton, Crow & Muller 1956 |
+| Malécot kinship | pedigree coefficients to machine precision | Malécot 1948; Wright 1922 |
+| CNV dosage response | shift = (copies/2 − 1)·Σⱼ E[valⱼ]; deletion/duplication mirror | Jacquemont et al. 2011 |
+| Developmental identity | age schedule is *exactly* 1.0 at the calibration age | — |
+| Growth curve | fraction of adult stature vs age, rms 0.0014 | Preece & Baines 1978; Tanner 1962 |
 
 ### The invariant that holds it together
 
 Every layer added after the Stage-0 foundation either draws from its **own**
 RNG or draws strictly **after** all autosomal draws. A default world is
-therefore bit-for-bit identical to the one the original heritabilities were
-calibrated against. This is why 113 pre-existing tests survived the large
-session-8 additions unchanged, and it is the first thing to preserve when
-adding anything new.
+therefore identical to the one the original heritabilities were calibrated
+against. This is why 113 pre-existing tests survived the large session-8
+additions unchanged, and it is the first thing to preserve when adding
+anything new.
 
 In a stochastic simulator the RNG stream is effectively a global variable:
 inserting one `rng.uniform()` upstream shifts every downstream draw and silently
 decalibrates the model. Append-only draws plus private generators per feature is
 the discipline that prevents it.
+
+**Two strengths of that claim, and the difference matters.** The tail-draw
+layers — sex chromosomes (#2) and mitochondria (#3) — consume from the
+*caller's* generator. Founder #0 is then byte-identical, but the extra draws
+advance the shared stream, so founder #1 onward is not. Their invariant is
+therefore **per-individual, not per-sequence**: any loop drawing N founders
+from a single generator drifted when those layers landed, which is why seven
+committed figures changed on regeneration in session 9. Statistically
+harmless — the founders are still drawn from the same distribution — but the
+claim has to be stated at the strength it actually holds, and a thesis
+methods section should say "per individual".
+
+The layers added in session 11 — the recessive load (#31) and copy number
+(#12) — do not carry that caveat. They draw from a **spawned sub-generator**
+(`inbreeding.derived_rng`): `numpy.random.Generator.spawn` advances the
+parent's *seed sequence* while leaving its bit-generator state alone, so the
+caller's stream is byte-identical and the invariant holds **per sequence**.
+All 175 pre-existing tests passed unchanged when those two layers were added,
+with no expected value touched. The same one-line change would retrofit onto
+#2 and #3; it has not been applied there, because doing so would rewrite
+every figure and expectation seeded through them to fix a drift that is
+harmless.
 
 ---
 
@@ -158,15 +185,20 @@ the discipline that prevents it.
 
 Kept deliberately visible, per the project's scientific-honesty standard.
 
-- **F_ST is biased upward at current deme sizes.** `simulation/community.py`
-  uses Nei's G_ST, which does not correct for finite sample size. Measured
-  against a null of four demes drawn from one shared allele-frequency vector
-  (true F_ST = 0), the estimator returns ≈0.019 at 20 individuals per deme and
-  ≈0.038 at 10. The isolated-islands result (≈0.10–0.14) is well clear of that
-  floor, but the melting-pot figure (≈0.025) is not meaningfully above it.
-  Weir & Cockerham's (1984) corrected estimator is the fix. Until then F_ST is
-  validated by **ordering**, not by value, and the reported contrast between
-  presets should be read as directional only.
+- ~~**F_ST is biased upward at current deme sizes.**~~ **Fixed in session 11.**
+  `simulation/community.fst` now implements the Weir & Cockerham (1984)
+  estimator it had been citing while actually computing Nei's G_ST. Against a
+  null of four demes drawn independently from one shared allele-frequency
+  vector (true F_ST = 0), the old estimator returned ≈0.038 at 10 individuals
+  per deme and ≈0.019 at 20; the new one returns 0.000 ± 0.002 at every size
+  tested, and recovers a Balding–Nichols target of 0.05 to within 0.001. The
+  correction matters: under the fixed estimator the melting-pot preset falls
+  from ≈0.025–0.058 to **0.010** (negative on some seeds, as an unbiased
+  estimator should be when there is nothing to find) while isolated islands
+  hold at **0.095**, so the contrast between presets is *larger* than it
+  looked, not smaller. F_ST is no longer clipped at zero — clipping would
+  reintroduce the bias. The old estimator is retained as `fst_gst` so the
+  comparison is checked by a test rather than remembered.
 - **PGS do not transfer across ancestries.** Allele frequencies here are
   neutral placeholders, not ancestry-specific; nothing in this model licenses
   cross-population comparison.
@@ -193,8 +225,33 @@ Kept deliberately visible, per the project's scientific-honesty standard.
   cannot evolve: buffering capacity is a per-trait constant, not a heritable
   modifier, which is precisely what Waddington's selection experiments were
   about.
-- **Inbreeding depression is not fully modelled** — the kinship guard rejects
-  close pairs, but no explicit fitness load scales with F.
+- **Inbreeding costs viability but not stature.** The fitness half of #31 is
+  modelled (1.4 lethal equivalents per gamete, recovered by regression), but
+  real inbreeding also *shortens* people — Joshi et al. 2015 measured ~1.2 cm
+  of height and ~137 ml of FEV1 lost per 10% increase in F. That requires
+  **directional** dominance, and `loci.py` draws dominance ratios N(0, 0.15),
+  random in sign, so the catalogue's expected trait depression is ~0.
+  `inbreeding.directional_dominance()` measures and reports the gap. Fixing it
+  means re-signing every dominance ratio and re-solving every additive scale.
+- **The load spectrum does not evolve.** A world that inbreeds heavily for
+  many generations should *purge* some of its recessive load (Crnokrak &
+  Barrett 2002). Transmitted genotypes drift, but `SPECTRUM.q` — and hence the
+  predicted B — stays at its founding value throughout.
+- **CNVs model dosage, not loss of function.** The copy-number multiplier
+  (#12) scales a locus's genotypic *deviation*, not its absolute gene product,
+  so the magnitude of a dosage effect and the mirror symmetry between a
+  deletion and its reciprocal duplication are exact, while the *direction* of
+  a loss-of-function phenotype is not modelled. The worked example is in
+  `cnv.py`: 15q11–q13 deletion patients are hypopigmented, and the engine
+  gets that sign wrong for exactly this reason. There is also no hemizygous
+  unmasking of the allele opposite a deletion.
+- **Development varies in endpoint, not in tempo.** Every NPC travels the same
+  normalised growth curve (#13) toward its own genetic adult stature, so the
+  model cannot produce early and late maturers — and therefore cannot show the
+  variance spike during puberty that makes adolescent height so dispersed. The
+  developmental schedule is also applied to the *output* of `phenotype()`
+  rather than inside it; that is what makes the calibration structurally safe,
+  but it means age never feeds back into the genotype→phenotype map.
 - **The physiological state vector has never been connected to a live LLM.** It
   emits `to_prompt()` and `action_distribution()`, validated by KL divergence
   between states, but nothing consumes them yet.
@@ -210,12 +267,21 @@ Per-session detail is in `reads/REPORT.md`.
 |---|---|---|
 | **0** — foundation | 1, 7, 9, 10, 29, 32 | complete |
 | **1** — headline requests | 15–20, 21–27, 8 | complete |
-| **2** — structural realism | 2, 3, 4, 5, 6, 11, 14 done · 12 partial · **13 open** | in progress |
-| **3** — algorithms + validation | 29, 30, 32 done · **31 partial** | in progress |
+| **2** — structural realism | 2, 3, 4, 5, 6, 11, 12, 13, 14 | complete |
+| **3** — algorithms + validation | 29, 30, 31, 32 | complete |
 
-**Open:** #13 developmental trajectory (life-stage gating of expression), #31
-inbreeding depression (guard only, no fitness load), #12 structural
-variants/CNVs (point mutations and the paternal-age effect are done).
+**The roadmap is closed.** Session 11 landed the last three items: #31
+inbreeding depression (`inbreeding.py`), #12 structural variants
+(`cnv.py`) and #13 developmental trajectory (`development.py`).
+
+What remains is not roadmap work. It is the scientific debt listed under
+[Known limitations](#known-limitations) — chiefly the absence of directional
+dominance, which is why inbreeding here costs viability but not stature — and
+the one genuinely open question: **`PhysiologicalState` has never driven a
+live LLM.** `to_prompt()` and `action_distribution()` are validated by KL
+divergence between states, but nothing consumes them. That is the gap between
+"a genetics simulator" and "a genetics simulator that demonstrably changes how
+an agent behaves."
 
 ---
 
@@ -237,6 +303,9 @@ Regenerated by `python health_engine_prototype.py` into `outputs/`.
 | `mito_inheritance.png` | OXPHOS threshold, mtDNA bottleneck vs closed form |
 | `imprinting.png` | Reciprocal heterozygotes, the 2·s·a law, and the population effect |
 | `canalization.png` | Variance flat while the buffer holds, then released; same mean, wider spread |
+| `inbreeding_depression.png` | ln S vs pedigree F recovering B; realised vs expected F; hidden load exposed |
+| `cnv_dosage.png` | Linear mirror-symmetric dosage response; emergent mutation–selection balance |
+| `development.png` | Individual growth to a genetic endpoint; Preece–Baines vs Tanner; the identity at age 20 |
 
 The `dashboard_*.png` files are captures of the live dashboard, not engine
 output, and are not regenerated by the demo.

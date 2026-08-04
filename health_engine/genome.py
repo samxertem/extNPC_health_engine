@@ -227,10 +227,13 @@ def mutate_gamete(gamete: np.ndarray, rng: np.random.Generator,
     2012). We reproduce both the 4:1 baseline bias and the paternal-age
     slope.
 
-    LIMITATION: only point mutations. Copy-number and structural variants
-    (Sebat et al. 2007) are not modelled -- a real CNV can delete or
-    duplicate whole gene regions, which our fixed-length allele array
-    cannot express.
+    Only point mutations here, and that is now a division of labour rather
+    than a gap. Copy-number variants (Sebat et al. 2007) live in `cnv.py`,
+    which reaches the phenotype through the expression multiplier as
+    copy_number/2 instead of through this allele array -- a fixed-length
+    array still cannot express a deletion, and rebuilding it after Stage 0
+    would invalidate every calibrated heritability. See that module for what
+    the dosage model does and does not capture.
     """
     if parent_sex == "male":
         eff = rate * 2.0 * PATERNAL_MUTATION_FRACTION

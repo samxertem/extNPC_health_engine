@@ -19,6 +19,8 @@ Layout
     imprint.py       genomic imprinting: parent-of-origin silencing (#4)
     canalize.py      developmental buffering / cryptic variation (#14b)
     inbreeding.py    Malecot pedigree kinship + inbreeding depression (#31)
+    cnv.py           copy-number variants as a gene-dosage multiplier (#12)
+    development.py   life-stage-dependent expression: growth, senescence (#13)
     physiology.py    physiological state vector, hormones, action bias
     medical.py       acquired, non-heritable conditions
     mating.py        life-partner selection
@@ -26,12 +28,14 @@ Layout
     validation.py    Hardy-Weinberg, Haldane, h^2, breeder's equation, PGS
     viz.py           figures
 
-Roadmap status: Stage 0 complete (#1, #7, #9, #10, #29, #32; #12 mostly).
-Stage 1 COMPLETE: epigenetics (#15-#20), physiological state vector
-(#21-#27), gene-regulatory / omnigenic network (#8, grn.py). Stage 2 in
-progress: sex chromosomes (#2, sexchrom.py), mitochondria (#3, mito.py)
-and genomic imprinting (#4, imprint.py) done; #13 pending.
-See reads/REPORT.md.
+Roadmap status: THE ENGINE ROADMAP IS CLOSED as of session 11.
+Stage 0 (#1, #7, #9, #10, #29, #32), Stage 1 (epigenetics #15-#20,
+physiological state vector #21-#27, gene-regulatory network #8),
+Stage 2 (sex chromosomes #2, mitochondria #3, imprinting #4,
+canalization #14b, structural variants #12, developmental trajectory #13)
+and Stage 3 (stable matching #30, inbreeding depression #31) are all done.
+What remains is scientific debt and the LLM harness, not roadmap items --
+see reads/REPORT.md.
 """
 
 from .epigenome import (DEFAULT_GERMLINE_POLICY, Epigenome, GermlineResetPolicy,
@@ -43,6 +47,13 @@ from .imprint import (IMPRINTED, ImprintedLocus, ImprintState, imprint_state,
                       parent_of_origin_report, relax_imprint)
 from .canalize import (CANALIZATION_THRESHOLD, canalization_factor,
                        expected_heritability, is_decanalizing)
+from .cnv import (REGIONS, CNVRegion, CopyNumber, birth_prevalence,
+                  equilibrium_frequency, expected_de_novo_fraction, induce,
+                  predicted_mean_shift, sample_founder_copy_number,
+                  transmit_copy_number)
+from .development import (GROWTH, MATURATION, REFERENCE_AGE, growth_factor,
+                          maturation_offset, peak_height_velocity_age,
+                          schedule_summary, stature_fraction)
 from .inbreeding import (SPECTRUM, DeleteriousLoad, LoadSpectrum, Pedigree,
                          excess_mortality, first_cousin_excess_mortality,
                          lethal_equivalents, realised_inbreeding,
@@ -84,6 +95,13 @@ __all__ = [
     "SPECTRUM", "DeleteriousLoad", "LoadSpectrum", "Pedigree",
     "excess_mortality", "first_cousin_excess_mortality", "lethal_equivalents",
     "realised_inbreeding", "sample_founder_load", "transmit_load",
+    "REGIONS", "CNVRegion", "CopyNumber", "birth_prevalence",
+    "equilibrium_frequency", "expected_de_novo_fraction", "induce",
+    "predicted_mean_shift", "sample_founder_copy_number",
+    "transmit_copy_number",
+    "GROWTH", "MATURATION", "REFERENCE_AGE", "growth_factor",
+    "maturation_offset", "peak_height_velocity_age", "schedule_summary",
+    "stature_fraction",
     "ARCHITECTURE", "TRAIT_TABLE", "Environment", "OCEAN_TRAITS",
     "CONTINUOUS_TRAITS", "CATEGORICAL_TRAITS",
     "architecture_summary", "loci_for_trait", "traits_touched_by",

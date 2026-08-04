@@ -22,6 +22,7 @@ import pytest
 from dataclasses import replace
 
 from simulation import World, DemographyParams, SCENARIOS, expected_fst, fst
+from simulation.community import fst_gst
 from simulation.metrics import gini
 from simulation.community import (assign_founder_demes, choose_migration,
                                   deme_layout, territory_radius,
@@ -51,10 +52,68 @@ def test_default_world_is_deterministic_and_unchanged():
 # F_ST metric
 # ----------------------------------------------------------------------
 
-def test_fst_zero_for_identical_demes():
-    rng = np.random.default_rng(0)
-    block = rng.integers(0, 3, size=(40, 60))
-    assert fst([block, block.copy()]) == pytest.approx(0.0, abs=1e-9)
+def _null_demes(n_per_deme, n_demes=4, n_loci=400, rng=None):
+    """
+    INDEPENDENT samples from ONE population -- the null where true F_ST = 0.
+
+    This is the test the old `fst([block, block.copy()])` could not be. A
+    block and its own copy have zero sampling variance between them, so that
+    comparison cannot detect a sampling-variance bias no matter how large the
+    bias is. It passed against an estimator that returned 0.038 on a genuine
+    null, which is how the bias survived eight sessions.
+    """
+    rng = np.random.default_rng(0) if rng is None else rng
+    p = rng.uniform(0.05, 0.95, n_loci)          # one shared frequency vector
+    return [(rng.random((n_per_deme, 2, n_loci)) < p).sum(axis=1)
+            for _ in range(n_demes)]
+
+
+def test_fst_is_unbiased_on_an_independent_sample_null():
+    """
+    Weir & Cockerham 1984 exists to remove the finite-sample term, so on a
+    true null it must sit at zero rather than merely small.
+    """
+    rng = np.random.default_rng(11)
+    for n in (10, 20, 50):
+        vals = [fst(_null_demes(n, rng=rng)) for _ in range(12)]
+        assert abs(float(np.mean(vals))) < 0.004, (n, np.mean(vals))
+
+
+def test_naive_gst_is_biased_upward_and_weir_cockerham_is_not():
+    """
+    Pins the reason for the session-11 fix. Nei's G_ST on samples reads
+    sampling noise as differentiation: ~0.038 at n=10 per deme and ~0.019 at
+    n=20 when the true value is 0. Those are the session-9 audit's numbers,
+    reproduced here so the claim is checked rather than remembered.
+    """
+    rng = np.random.default_rng(12)
+    for n, floor in ((10, 0.025), (20, 0.012)):
+        demes = [_null_demes(n, rng=rng) for _ in range(8)]
+        gst = float(np.mean([fst_gst(d) for d in demes]))
+        wc = float(np.mean([fst(d) for d in demes]))
+        assert gst > floor, (n, gst)
+        assert abs(wc) < gst / 4.0, (n, wc, gst)
+
+
+def test_fst_recovers_a_known_nonzero_value():
+    """
+    Balding-Nichols: draw each deme's allele frequency from Beta with the
+    moments a target F_ST implies, then sample genotypes. The estimator must
+    recover the target it was never told, at every sample size -- being
+    unbiased at zero is worthless if it is biased at 0.05.
+    """
+    target = 0.05
+    rng = np.random.default_rng(13)
+    for n in (10, 20, 50):
+        vals = []
+        for _ in range(10):
+            pbar = rng.uniform(0.1, 0.9, 400)
+            a = pbar * (1 - target) / target
+            b = (1 - pbar) * (1 - target) / target
+            demes = [(rng.random((n, 2, 400)) < rng.beta(a, b)).sum(axis=1)
+                     for _ in range(4)]
+            vals.append(fst(demes))
+        assert float(np.mean(vals)) == pytest.approx(target, abs=0.01), n
 
 
 def test_fst_positive_for_divergent_demes():
@@ -69,12 +128,27 @@ def test_expected_fst_monotonic_in_migration():
 
 
 def test_island_model_isolation_beats_migration():
-    """The headline: with everything else equal, less migration -> more
-    between-deme differentiation."""
-    iso = _run(SCENARIOS["isolated_islands"].params, n_founders=16, seed=3, years=60)
-    mix = _run(SCENARIOS["melting_pot"].params, n_founders=16, seed=3, years=60)
-    assert iso.history[-1]["fst"] > mix.history[-1]["fst"]
-    assert iso.history[-1]["fst"] > 0.03      # real structure emerged
+    """
+    The headline: with everything else equal, less migration -> more
+    between-deme differentiation (Wright 1931).
+
+    Averaged over seeds, and the absolute threshold is now meaningful rather
+    than decorative. Under the old biased G_ST both scenarios cleared 0.03
+    partly on sampling noise; under Weir & Cockerham the melting pot falls to
+    ~0.010 and goes slightly NEGATIVE on some seeds, which is what an
+    unbiased estimator does when there is nothing to find. Isolated islands
+    hold at ~0.095. The gap between those two numbers is the real result, and
+    it is larger than it looked before the estimator was fixed.
+    """
+    seeds = (3, 5, 7, 9, 11)
+    iso = [_run(SCENARIOS["isolated_islands"].params, n_founders=16,
+                seed=s, years=60).history[-1]["fst"] for s in seeds]
+    mix = [_run(SCENARIOS["melting_pot"].params, n_founders=16,
+                seed=s, years=60).history[-1]["fst"] for s in seeds]
+
+    assert all(a > b for a, b in zip(iso, mix))       # holds on every seed
+    assert float(np.mean(iso)) > 0.05                 # real structure emerged
+    assert float(np.mean(mix)) < 0.03                 # gene flow erases it
 
 
 def test_migration_moves_individuals_between_demes():
@@ -106,17 +180,33 @@ def test_full_equity_is_neutral():
 # ----------------------------------------------------------------------
 
 def test_assortative_mating_raises_height_variance():
-    """Positive assortative mating on stature should inflate the additive
-    variance of height relative to random mating (Fisher 1918)."""
-    base = _run(seed=8, years=50)
-    asrt = _run(replace(DemographyParams(), assortative_strength=3.0),
-                seed=8, years=50)
+    """
+    Positive assortative mating on stature inflates the additive variance of
+    height relative to random mating (Fisher 1918).
+
+    AVERAGED OVER SEEDS, and that is not defensive padding. Fisher's result
+    is about an expectation, while a ~100-person world for 50 years is
+    dominated by drift: across seeds the effect here is about +0.4 cm of SD
+    with a between-seed spread several times that, so any single seed agrees
+    only about two times in three. This test previously ran on seed 8 alone
+    and passed for that reason rather than on the strength of the mechanism
+    -- it then flipped when an unrelated change (the #31 juvenile-survival
+    draw) shifted the world's RNG stream by one call per birth. Comparing
+    means over several seeds tests the claim that is actually being made.
+    """
+    seeds = (3, 8, 9, 11, 14)
 
     def height_sd(w):
         h = [w.people[n.name].phenotype()["height_cm"] for n in w.living]
-        return float(np.std(h)) if len(h) > 3 else 0.0
+        return float(np.std(h)) if len(h) > 3 else float("nan")
 
-    assert height_sd(asrt) >= height_sd(base)
+    base, asrt = [], []
+    for s in seeds:
+        base.append(height_sd(_run(seed=s, years=50)))
+        asrt.append(height_sd(_run(replace(DemographyParams(),
+                                           assortative_strength=3.0),
+                                   seed=s, years=50)))
+    assert np.nanmean(asrt) > np.nanmean(base)
 
 
 # ----------------------------------------------------------------------

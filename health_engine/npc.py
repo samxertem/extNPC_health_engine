@@ -45,6 +45,7 @@ from .epigenome import Epigenome, germline_transmit
 from .genome import Genome, cross, sample_founder_genome
 from .loci import N_LOCI
 from .medical import MedicalCondition
+from .cnv import CopyNumber, sample_founder_copy_number, transmit_copy_number
 from .inbreeding import (DeleteriousLoad, derived_rng, sample_founder_load,
                          transmit_load)
 from .mito import MitoGenome, sample_founder_mito
@@ -102,6 +103,12 @@ class NPC:
     # it costs the caller's RNG stream nothing (see inbreeding.derived_rng).
     load: Optional["DeleteriousLoad"] = None
 
+    # Copy-number state (roadmap #12): how many copies of each recurrent CNV
+    # region this individual carries. Feeds the expression multiplier as
+    # copy_number/2, so the normal diploid state is exactly 1.0 and inert.
+    # None = layer inactive; also drawn from a spawned generator.
+    copy_number: Optional["CopyNumber"] = None
+
     _phenotype_cache: Optional[Dict[str, object]] = field(default=None, repr=False)
     # Parent-of-origin state (roadmap #4). Derived from the genome, so it is
     # built once on first use and never invalidated -- the genome is fixed at
@@ -118,15 +125,59 @@ class NPC:
         """Recompute the expression multiplier and drop the phenotype cache.
         Called after every epigenome change.
 
-        Composition (roadmap #8): the epigenome sets each locus's cis
-        expression; the gene-regulatory NETWORK then applies its trans
-        multiplier on top. At a default epigenome with no perturbation both
-        factors are exactly 1.0, so this is bit-for-bit identical to the
-        pre-GRN engine (see test_grn.test_baseline_is_bit_for_bit)."""
+        Composition, in the order the biology composes:
+
+          1. the epigenome (#16) sets each locus's cis expression;
+          2. the gene-regulatory NETWORK (#8) applies its trans multiplier;
+          3. gene dosage (#12) scales by copy_number / 2.
+
+        Copy number goes last because it is the crudest and most physical of
+        the three: methylation and regulation modulate what a present gene
+        does, while a deletion changes how many of it there are. At a default
+        epigenome, no perturbation and normal copy number all three factors
+        are exactly 1.0, so this is bit-for-bit identical to the pre-GRN
+        engine (see test_grn.test_baseline_is_bit_for_bit)."""
         from .grn import NETWORK
         cis = self.epigenome.expression()
-        self.expression = NETWORK.compose(cis, self.grn_perturbation or None)
+        expr = NETWORK.compose(cis, self.grn_perturbation or None)
+        if self.copy_number is not None and not self.copy_number.is_normal:
+            expr = expr * self.copy_number.dosage_multiplier()
+        self.expression = expr
         self._phenotype_cache = None
+
+    def apply_cnv(self, region: str, kind: str = "deletion",
+                  parent: str = "maternal") -> None:
+        """
+        Give this NPC a copy-number variant and re-express (#12).
+
+        The in-silico experiment API, the structural counterpart of
+        `perturb_gene`: pathogenic CNVs occur at ~1e-4 per gamete, so waiting
+        for one to arise in a simulated village is not a workable way to see
+        what one does. `kind` is "deletion" or "duplication"; `parent`
+        decides which haplotype carries it, which is recorded because
+        15q11-q13 is imprinted.
+        """
+        from .cnv import REGIONS, CopyNumber, DELETED, DUPLICATED, region_index
+        if region not in REGIONS:
+            raise KeyError(f"unknown CNV region {region!r}")
+        if self.copy_number is None:
+            self.copy_number = CopyNumber.normal()
+        row = 0 if parent == "maternal" else 1
+        self.copy_number.haplotypes[row, region_index(region)] = (
+            DELETED if kind == "deletion" else DUPLICATED)
+        self.refresh_expression()
+
+    def cnv_variants(self) -> List[Dict[str, object]]:
+        """Every non-diploid region this NPC carries (#12). Empty is normal."""
+        if self.copy_number is None:
+            return []
+        return self.copy_number.variants()
+
+    def copies_of_region(self, region: str) -> int:
+        """Copy number at one CNV region (#12). 2 is the normal diploid state."""
+        if self.copy_number is None:
+            return 2
+        return self.copy_number.copies_of(region)
 
     def perturb_gene(self, symbol: str, factor: float) -> None:
         """Set a gene's regulatory activity and re-express (#8). factor=0
@@ -167,16 +218,26 @@ class NPC:
 
     def relative_viability(self) -> float:
         """
-        Viability relative to the outbred population mean (#31) -- the number
-        a mortality model should use, because the baseline mutation load is
+        Viability relative to an average outbred individual -- the number a
+        mortality model should use, because the baseline mutation load is
         already inside any demographic rate fitted to real data. 1.0 means
         "an average outbred individual"; below 1 means this NPC carries more
         homozygous load than average, which is what being inbred does to you.
         Can exceed 1 for an unusually lightly-loaded individual.
+
+        Two structurally different mechanisms compose here: the recessive
+        deleterious load (#31), which is many alleles of tiny effect, and
+        copy-number variants (#12), which are few of large effect. They
+        multiply because they are independent causes of death.
         """
-        if self.load is None:
-            return 1.0
-        return self.load.relative_viability()
+        w = 1.0 if self.load is None else self.load.relative_viability()
+        # Copy-number variants carry their own fitness cost (#12). Composing
+        # here rather than in a separate hazard is what turns the CNV
+        # catalogue's de novo rates into an emergent mutation-selection
+        # balance instead of a stipulated carrier frequency.
+        if self.copy_number is not None:
+            w *= self.copy_number.fitness()
+        return w
 
     def realised_inbreeding(self) -> float:
         """
@@ -256,6 +317,58 @@ class NPC:
                 for name, arch in ARCHITECTURE.items()
             }
         return self._phenotype_cache
+
+    def phenotype_at_age(self, age: Optional[float] = None
+                         ) -> Dict[str, object]:
+        """
+        The phenotype expressed at a given age (roadmap #13). Defaults to
+        this NPC's current age.
+
+        `phenotype()` returns the MATURE phenotype and is deliberately
+        age-blind -- Stage 0's heritabilities were solved against that path,
+        and published human h2 estimates are themselves measured on adults,
+        so inserting an age factor into it would silently decalibrate the
+        engine while every reported target stayed the same. The schedule
+        therefore acts here, on the output, where it cannot reach the
+        calibration.
+
+        At `development.REFERENCE_AGE` this returns `phenotype()` exactly,
+        which `validation.developmental_identity` asserts to floating point.
+        """
+        from .development import REFERENCE_AGE, express_at_age
+
+        a = self.age if age is None else age
+        mature = self.phenotype()
+        if a == REFERENCE_AGE:
+            return dict(mature)
+        return {name: express_at_age(name, value, a, self.sex)
+                for name, value in mature.items()}
+
+    def height_at_age(self, age: Optional[float] = None) -> float:
+        """Stature at a given age -- the trait the growth curve is fitted to."""
+        return float(self.phenotype_at_age(age)["height_cm"])
+
+    def life_stage(self, age: Optional[float] = None) -> str:
+        """
+        A coarse label for the current developmental phase (#13). Boundaries
+        are the growth curve's own: puberty opens at the age the fitted
+        Preece-Baines curve starts its spurt, which differs by sex.
+        """
+        from .development import REFERENCE_AGE, peak_height_velocity_age
+
+        a = self.age if age is None else age
+        phv = peak_height_velocity_age(self.sex)
+        if a < 2:
+            return "infant"
+        if a < phv - 2.0:
+            return "child"
+        if a < REFERENCE_AGE:
+            return "adolescent"
+        if a < 40:
+            return "adult"
+        if a < 65:
+            return "midlife"
+        return "senescent"
 
     def canalization(self, trait: str) -> float:
         """
@@ -360,10 +473,30 @@ def random_founder(name: str, rng: np.random.Generator,
         birth_environment=environment,
     )
     npc.refresh_expression()
-    # Sex-chromosome layer (roadmap #2) drawn LAST, so the autosomal genome
-    # and environmental deviates above are sampled from the identical RNG
-    # positions as before this layer existed -- the calibrated core stays
-    # bit-for-bit. Founder X-linked genotypes are Hardy-Weinberg.
+    # ------------------------------------------------------------------
+    # DETERMINISM NOTE -- read before adding a layer here.
+    #
+    # The two layers below (#2 sexchrom, #3 mito) CONSUME from the caller's
+    # `rng`. Drawing them at the tail means the autosomal genome and
+    # deviates above sit at the same RNG positions they did before those
+    # layers existed, so THIS founder is bit-for-bit unchanged. It does not
+    # follow that a SEQUENCE of founders is: the extra draws advance the
+    # shared stream, so founder #0 is identical and #1 onward is not. Any
+    # loop drawing N founders from one generator therefore drifted when
+    # sessions 6 and 7 landed. The bit-for-bit claim for #2 and #3 is
+    # per-individual, not per-sequence (session-9 audit).
+    #
+    # The layers after them (#31 load, #12 copy number) do NOT have that
+    # caveat: they draw from a SPAWNED sub-generator, which advances the
+    # seed sequence without touching the bit-generator state and so costs
+    # the caller's stream nothing. See inbreeding.derived_rng. Retrofitting
+    # the same call onto the two below would remove the caveat entirely,
+    # at the cost of changing every figure and expectation seeded through
+    # them -- deliberately not done, because the drift is statistically
+    # harmless and the churn is not.
+    #
+    # Founder X-linked genotypes are Hardy-Weinberg.
+    # ------------------------------------------------------------------
     npc.sex_chromosomes = sample_founder_sex_chromosomes(rng, sex)
     # Mitochondrial layer (roadmap #3), also at the tail. Founders are
     # homoplasmic wild-type by default (carrier_prob=0); the haplogroup is a
@@ -375,6 +508,10 @@ def random_founder(name: str, rng: np.random.Generator,
     # byte-identical to a world without this layer. Founders are outbred by
     # construction: each haplotype is an independent Bernoulli(q).
     npc.load = sample_founder_load(derived_rng(rng))
+    # Copy number (roadmap #12). Founders are diploid-normal, so this is a
+    # no-op multiplier and refresh_expression above stays valid; see
+    # cnv.sample_founder_copy_number for why they start clean.
+    npc.copy_number = sample_founder_copy_number(derived_rng(rng))
     return npc
 
 
@@ -465,6 +602,16 @@ def reproduce(mother: NPC, father: NPC, child_name: str,
     # a child of NPCs built without it inherits nothing to be depressed by.
     if mother.load is not None and father.load is not None:
         child.load = transmit_load(mother.load, father.load, derived_rng(rng))
+    # Copy number (roadmap #12): one haplotype from each parent, plus de novo
+    # NAHR. Expression has to be recomputed if anything actually varies --
+    # `refresh_expression` above ran before this layer existed on the child.
+    # The re-expression is conditional so the overwhelmingly common
+    # diploid-normal case costs nothing.
+    if mother.copy_number is not None and father.copy_number is not None:
+        child.copy_number = transmit_copy_number(
+            mother.copy_number, father.copy_number, derived_rng(rng))
+        if not child.copy_number.is_normal:
+            child.refresh_expression()
     return child
 
 

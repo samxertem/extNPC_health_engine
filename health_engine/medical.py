@@ -21,7 +21,12 @@ sessions 2 and 3 land:
   * #17      the epigenetic clock advances here.
   * #21-#24  the PhysiologicalState vector ticks here, and allostatic
              load accumulates from sustained cortisol.
-  * #13      developmental trajectory: growth, puberty, senescence gates.
+  * #13      DONE, but deliberately not here. The growth / puberty /
+             senescence schedule lives in `development.py` and is applied
+             to the OUTPUT of phenotype() rather than inside the ageing
+             loop, because an age factor on the calibrated genotype ->
+             phenotype path would silently move every target heritability.
+             See that module's docstring.
   * #27      chronic conditions and inflammation must feed back into
              cognition/behaviour, not merely into the action set.
 """
