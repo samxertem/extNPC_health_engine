@@ -82,6 +82,14 @@ class DemographyParams:
     mutation_rate_scale: float = 1.0      # x Kong 2012 de novo rate
     recombination_scale: float = 1.0      # x deCODE map length (crossover freq)
 
+    # Inbreeding depression (roadmap #31) ----------------------------------
+    # Strength of the juvenile-survival cost applied to a newborn's realised
+    # recessive load, as an exponent on relative viability: 1.0 = the
+    # calibrated 1.4 lethal equivalents per gamete, 0.0 = off entirely (the
+    # pre-#31 world, for comparison runs). Values above 1 exaggerate the
+    # cost; they are an experimental knob, not a claim about any population.
+    inbreeding_depression: float = 1.0
+
     # Community / island model (Wright 1931) -------------------------------
     n_demes: int = 1                      # sub-populations; 1 = panmictic
     migration_rate: float = 0.0           # annual P(an individual changes deme)

@@ -5,7 +5,11 @@ Life-partner selection.
 The extNPC framework states plainly that "the health engine is used for
 life partner choices" (Sec. 3.6). This module implements that.
 
-STATUS: partially upgraded. Roadmap Stage 3 (items #30, #31) is NOT done.
+STATUS: Stage 3 is now done. #30 (Gale-Shapley deferred acceptance) lives in
+`simulation/demography.stable_matching`; #31 (full-pedigree Malecot kinship
+and inbreeding depression) lives in `health_engine/inbreeding.py`. The greedy
+matcher below is retained deliberately as the comparison baseline -- see
+`count_blocking_pairs` for what it is a baseline *for*.
 
 What is here now
 ----------------
@@ -28,18 +32,27 @@ What is here now
   than the expectation over meioses. Full sibs average 0.5 but scatter
   around it; the pedigree says 0.5 for all of them.
 
-What is NOT here yet (Stage 3)
-------------------------------
-* #30 Gale-Shapley deferred acceptance. `best_mate` below is still greedy
-  and one-sided, which leaves blocking pairs: two NPCs who each prefer
-  each other over their assigned partners. Gale & Shapley 1962 proved a
-  stable matching always exists; we are not computing one.
+Where the rest of it went
+-------------------------
+* #30 Gale-Shapley deferred acceptance is in
+  `simulation/demography.stable_matching`. `best_mate` below is greedy and
+  one-sided, so it leaves blocking pairs -- two NPCs who each prefer the
+  other over their assigned partner. Gale & Shapley 1962 proved a stable
+  matching always exists; `count_blocking_pairs` measures how far the greedy
+  one falls short of it.
 
-* #31 Full-pedigree kinship (Wright's coefficient of relationship /
-  Malecot's kinship coefficient) walked over the whole ancestry graph,
-  plus inbreeding depression scaling with F. The genomic estimator here
-  covers the *detection* half but not the depression half: no fitness
-  cost is currently applied to inbred offspring.
+* #31 Full-pedigree kinship (Malecot's coefficient walked over the whole
+  ancestry graph) and the fitness cost of inbreeding are in
+  `health_engine/inbreeding.py`. The genomic estimator here covers the
+  *detection* half; `inbreeding.Pedigree` supplies the expectation this
+  estimator realises, and the recessive-load layer supplies the depression.
+
+  Note the division of labour, because it is deliberate. The guard below
+  uses REALISED genomic relatedness, which is the better quantity for
+  deciding whether a specific pair is too close. The pedigree coefficient is
+  the better quantity for stating a population-level law, because Morton's
+  ln S = ln S_0 - B F is written in terms of expected F. The engine keeps
+  both and does not pretend they are interchangeable.
 """
 
 from __future__ import annotations

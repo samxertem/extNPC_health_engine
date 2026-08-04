@@ -246,8 +246,9 @@ class World:
         # 3-4. pair fertile singles by stable matching, WITHIN each deme
         self._form_couples()
 
-        # 5. births
-        n_births = self._reproduce(birth_env, famine_fert)
+        # 5. births, less those lost to inbreeding depression (#31)
+        n_births, n_infant_deaths = self._reproduce(birth_env, famine_fert)
+        n_deaths += n_infant_deaths
 
         # 6. layout
         self._reposition()
@@ -389,6 +390,7 @@ class World:
         by_name = {n.name: n for n in self.living}
         seen: set = set()
         births = 0
+        infant_deaths = 0
         newborns: List[NPC] = []
 
         for npc in list(self.living):
@@ -408,15 +410,48 @@ class World:
                            n_alive + births, p, self.rng,
                            resource_access=eff_access):
                 child = self._make_child(mother, father, birth_env)
-                newborns.append(child)
-                births += 1
+                # A birth happened either way -- the parents' counters and the
+                # pedigree record it. Whether the child JOINS the living
+                # population is decided by its realised recessive load (#31).
                 mmeta.n_children += 1
                 mmeta.last_birth_tick = self.tick
                 self.meta[father.name].n_children += 1
                 self.meta[father.name].last_birth_tick = self.tick
+                if self.rng.random() < self._juvenile_survival(child):
+                    newborns.append(child)
+                    births += 1
+                else:
+                    self._kill(child, cause="inbreeding")
+                    infant_deaths += 1
 
         self.living.extend(newborns)
-        return births
+        return births, infant_deaths
+
+    def _juvenile_survival(self, child: NPC) -> float:
+        """
+        Probability a newborn survives to join the population, from its own
+        recessive deleterious load (roadmap #31).
+
+        RELATIVE viability, not absolute. The absolute figure carries the
+        baseline mutation load every individual pays (~40%), which is already
+        inside `death_probability`'s Gompertz-Makeham constants -- those were
+        chosen against real life tables, and real life tables already contain
+        it. Applying it again would halve every cohort for no biological
+        reason. Dividing it out leaves the differential cost of being inbred,
+        which is the thing the engine did not previously have.
+
+        Note the residual: because individuals vary in load even at F = 0, and
+        a probability cannot exceed 1, the lightly-loaded half of an outbred
+        cohort gets no compensating bonus. That leaves a small constant
+        juvenile mortality (~5%) at F = 0. It is constant across F, so it
+        cannot manufacture a depression signal -- it shifts the intercept of
+        ln S, never the slope.
+        """
+        strength = self.params.inbreeding_depression
+        if strength <= 0.0 or child.load is None:
+            return 1.0
+        w = child.relative_viability()
+        return w if strength == 1.0 else float(w ** strength)
 
     def _make_child(self, mother: NPC, father: NPC,
                     birth_env: Environment) -> NPC:

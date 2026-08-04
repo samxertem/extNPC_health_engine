@@ -45,6 +45,8 @@ from .epigenome import Epigenome, germline_transmit
 from .genome import Genome, cross, sample_founder_genome
 from .loci import N_LOCI
 from .medical import MedicalCondition
+from .inbreeding import (DeleteriousLoad, derived_rng, sample_founder_load,
+                         transmit_load)
 from .mito import MitoGenome, sample_founder_mito
 from .sexchrom import (SexChromosomes, sample_founder_sex_chromosomes,
                        transmit_sex_chromosomes)
@@ -91,6 +93,14 @@ class NPC:
     # parallel layer. Carries the maternal-lineage haplogroup marker and the
     # heteroplasmy of a modelled pathogenic variant. None = layer inactive.
     mito: Optional["MitoGenome"] = None
+
+    # Recessive deleterious load (roadmap #31): rare, partially recessive
+    # alleles at 2000 loci that carry no trait weight and are invisible in
+    # the outbred phenotype, but become homozygous in proportion to F and so
+    # produce inbreeding depression. A parallel layer like the two above;
+    # None = inactive. Drawn from a SPAWNED generator, so unlike #2 and #3
+    # it costs the caller's RNG stream nothing (see inbreeding.derived_rng).
+    load: Optional["DeleteriousLoad"] = None
 
     _phenotype_cache: Optional[Dict[str, object]] = field(default=None, repr=False)
     # Parent-of-origin state (roadmap #4). Derived from the genome, so it is
@@ -143,6 +153,39 @@ class NPC:
         if self.mito is None:
             return {}
         return self.mito.phenotype()
+
+    def viability(self) -> float:
+        """
+        Absolute viability from the recessive deleterious load (#31): the
+        product over load loci of (1 - s*x). Includes the baseline mutation
+        load every individual pays, so it sits well below 1 even for an
+        outbred NPC. 1.0 when the layer is inactive.
+        """
+        if self.load is None:
+            return 1.0
+        return self.load.viability()
+
+    def relative_viability(self) -> float:
+        """
+        Viability relative to the outbred population mean (#31) -- the number
+        a mortality model should use, because the baseline mutation load is
+        already inside any demographic rate fitted to real data. 1.0 means
+        "an average outbred individual"; below 1 means this NPC carries more
+        homozygous load than average, which is what being inbred does to you.
+        Can exceed 1 for an unusually lightly-loaded individual.
+        """
+        if self.load is None:
+            return 1.0
+        return self.load.relative_viability()
+
+    def realised_inbreeding(self) -> float:
+        """
+        F measured from this individual's own excess homozygosity rather than
+        predicted from its pedigree (#31). See inbreeding.realised_inbreeding
+        for why the two differ.
+        """
+        from .inbreeding import realised_inbreeding
+        return realised_inbreeding(self)
 
     def effective_aerobic_capacity(self) -> float:
         """Aerobic capacity (VO2 max) after the mitochondrial gate (#3): the
@@ -326,6 +369,12 @@ def random_founder(name: str, rng: np.random.Generator,
     # homoplasmic wild-type by default (carrier_prob=0); the haplogroup is a
     # neutral maternal-lineage marker.
     npc.mito = sample_founder_mito(rng)
+    # Deleterious-load layer (roadmap #31). Drawn from a SPAWNED generator
+    # rather than from `rng`, so it consumes nothing from the caller's stream
+    # and every draw above -- and every founder after this one -- is
+    # byte-identical to a world without this layer. Founders are outbred by
+    # construction: each haplotype is an independent Bernoulli(q).
+    npc.load = sample_founder_load(derived_rng(rng))
     return npc
 
 
@@ -410,6 +459,12 @@ def reproduce(mother: NPC, father: NPC, child_name: str,
     # father's mitochondria contribute nothing.
     if mother.mito is not None:
         child.mito = mother.mito.transmit(rng)
+    # Deleterious load (roadmap #31): one meiosis per parent at unlinked
+    # loci, plus new mutation. Spawned generator again, so this costs the
+    # caller's stream nothing. Requires both parents to carry the layer --
+    # a child of NPCs built without it inherits nothing to be depressed by.
+    if mother.load is not None and father.load is not None:
+        child.load = transmit_load(mother.load, father.load, derived_rng(rng))
     return child
 
 

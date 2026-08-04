@@ -18,6 +18,7 @@ Layout
     mito.py          mitochondria: maternal inheritance, heteroplasmy, bottleneck (#3)
     imprint.py       genomic imprinting: parent-of-origin silencing (#4)
     canalize.py      developmental buffering / cryptic variation (#14b)
+    inbreeding.py    Malecot pedigree kinship + inbreeding depression (#31)
     physiology.py    physiological state vector, hormones, action bias
     medical.py       acquired, non-heritable conditions
     mating.py        life-partner selection
@@ -42,6 +43,10 @@ from .imprint import (IMPRINTED, ImprintedLocus, ImprintState, imprint_state,
                       parent_of_origin_report, relax_imprint)
 from .canalize import (CANALIZATION_THRESHOLD, canalization_factor,
                        expected_heritability, is_decanalizing)
+from .inbreeding import (SPECTRUM, DeleteriousLoad, LoadSpectrum, Pedigree,
+                         excess_mortality, first_cousin_excess_mortality,
+                         lethal_equivalents, realised_inbreeding,
+                         sample_founder_load, transmit_load)
 from .loci import LOCI, N_LOCI, describe, locus_index, pleiotropic_genes
 from .medical import ACTION_IMPACT_MAP, MedicalCondition, simulate_aging
 from .mito import (MitoGenome, oxphos_capacity, sample_founder_mito)
@@ -76,6 +81,9 @@ __all__ = [
     "parent_of_origin_report", "relax_imprint",
     "CANALIZATION_THRESHOLD", "canalization_factor", "expected_heritability",
     "is_decanalizing",
+    "SPECTRUM", "DeleteriousLoad", "LoadSpectrum", "Pedigree",
+    "excess_mortality", "first_cousin_excess_mortality", "lethal_equivalents",
+    "realised_inbreeding", "sample_founder_load", "transmit_load",
     "ARCHITECTURE", "TRAIT_TABLE", "Environment", "OCEAN_TRAITS",
     "CONTINUOUS_TRAITS", "CATEGORICAL_TRAITS",
     "architecture_summary", "loci_for_trait", "traits_touched_by",

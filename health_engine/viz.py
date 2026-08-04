@@ -894,3 +894,101 @@ def plot_canalization(out_path: str, trait: str = "height_cm",
                  "Waddington 1942; Rutherford & Lindquist 1998", fontsize=11)
     fig.tight_layout(rect=(0, 0, 1, 0.93))
     return _save(fig, out_path)
+
+
+def plot_inbreeding_depression(out_path: str, n: int = 3000,
+                               seed: int = 20260901) -> str:
+    """
+    Inbreeding depression (#31): the Morton/Crow/Muller regression.
+
+    Left: ln(survival) against pedigree F. The slope IS the number of lethal
+    equivalents per gamete. Points are simulated cohorts whose viability comes
+    out of their actual load genotypes; the line is the closed form computed
+    from the load spectrum, which nothing in that path evaluates.
+
+    Middle: pedigree F is an EXPECTATION over meioses, not a measurement.
+    Every full-sib child has pedigree F = 1/4, but realised homozygosity
+    scatters around it because meiosis is a lottery (Franklin 1977). The
+    spread is the point.
+
+    Right: where depression actually comes from. Rare recessive alleles are
+    almost invisible in an outbred population -- they sit heterozygous, hidden
+    -- and inbreeding converts them to homozygotes in proportion to F.
+    """
+    from .inbreeding import SPECTRUM
+    from .validation import _INBREEDING_TEMPLATES, _inbred_child
+
+    rng = np.random.default_rng(seed)
+    sp = SPECTRUM
+
+    levels, mean_w, spread_F, hom = [], [], [], []
+    for label, F in _INBREEDING_TEMPLATES:
+        kids = [_inbred_child(label, rng, sp) for _ in range(n)]
+        w = np.array([k.viability(sp) for k in kids])
+        het = np.array([float(np.mean(k.dosage == 1)) for k in kids])
+        h_exp = float(np.mean(2.0 * sp.p * sp.q))
+        levels.append(F)
+        mean_w.append(float(w.mean()))
+        spread_F.append(1.0 - het / h_exp)
+        hom.append(np.array([k.n_homozygous for k in kids], dtype=float))
+
+    # Measure realised F against the contemporaneous outbred cohort, as the
+    # validation harness does. Three generations of one-way mutation leave a
+    # constant excess heterozygosity in EVERY cohort; not subtracting it
+    # would shift all five violins down by ~0.026 and make the identity line
+    # look biased when it is not.
+    baseline = float(spread_F[0].mean())
+    spread_F = [arr - baseline for arr in spread_F]
+
+    log_s = np.log(np.array(mean_w) / mean_w[0])
+    F = np.array(levels)
+    slope, intercept = np.polyfit(F, np.log(np.array(mean_w)), 1)
+    B_obs, B_exp = -slope, sp.lethal_equivalents
+
+    fig, (axL, axM, axR) = plt.subplots(1, 3, figsize=(15, 4.6))
+
+    grid = np.linspace(0, 0.27, 60)
+    axL.plot(grid, -B_exp * grid, "--", color="#2c6fa8", lw=2,
+             label=f"closed form  $-BF$, B = {B_exp:.3f}")
+    axL.plot(F, log_s, "o", color="#c0504d", ms=7,
+             label=f"simulated cohorts (n={n} each)")
+    for x, y, lab in zip(F, log_s, ["outbred", "half 1st cous.", "1st cousins",
+                                    "double 1st cous.", "full sibs"]):
+        axL.annotate(lab, xy=(x, y), xytext=(9, 7),
+                     textcoords="offset points", fontsize=7.5, color="#5a6570")
+    axL.set_xlabel("pedigree inbreeding coefficient  F")
+    axL.set_ylabel(r"$\ln S(F) - \ln S_0$")
+    axL.set_title(f"Lethal equivalents recovered: B = {B_obs:.3f}\n"
+                  f"(closed form {B_exp:.3f})", fontsize=10)
+    axL.legend(fontsize=8, frameon=False, loc="lower left")
+    axL.grid(alpha=0.25)
+
+    parts = axM.violinplot(spread_F, positions=F, widths=0.035,
+                           showmeans=True, showextrema=False)
+    for body in parts["bodies"]:
+        body.set_facecolor("#9aa5b1")
+        body.set_alpha(0.7)
+    axM.plot([0, 0.25], [0, 0.25], "--", color="#2c6fa8", lw=1.6,
+             label="realised = pedigree")
+    axM.set_xlabel("pedigree F")
+    axM.set_ylabel("realised F (excess homozygosity)")
+    axM.set_title("Pedigree F is an expectation;\nrealised F is a measurement",
+                  fontsize=10)
+    axM.legend(fontsize=8, frameon=False, loc="upper left")
+    axM.grid(alpha=0.25)
+
+    bins = np.arange(0, max(h.max() for h in hom) + 2) - 0.5
+    for arr, F_lab, colour in ((hom[0], "outbred (F = 0)", "#9aa5b1"),
+                               (hom[-1], "full-sib child (F = 1/4)", "#c0504d")):
+        axR.hist(arr, bins=bins, alpha=0.65, color=colour,
+                 label=f"{F_lab}\nmean {arr.mean():.2f} loci")
+    axR.set_xlabel("load loci homozygous for the deleterious allele")
+    axR.set_ylabel("individuals")
+    axR.set_title("Inbreeding exposes what heterozygosity hid", fontsize=10)
+    axR.legend(fontsize=8, frameon=False)
+
+    fig.suptitle("Inbreeding depression (#31) -- Morton, Crow & Muller 1956; "
+                 f"calibrated to {B_exp:.1f} lethal equivalents "
+                 "(Charlesworth & Willis 2009)", fontsize=11)
+    fig.tight_layout(rect=(0, 0, 1, 0.93))
+    return _save(fig, out_path)

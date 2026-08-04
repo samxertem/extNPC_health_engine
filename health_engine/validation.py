@@ -780,6 +780,40 @@ def full_report(rng: np.random.Generator,
     add("    tested is Waddington's qualitative claim plus internal k^2")
     add("    consistency, not the magnitude. See canalize.py.")
 
+    # 9a. Malecot kinship (roadmap #31)
+    add("\n[9a] Malecot kinship over the full pedigree")
+    add("    Pure combinatorics -- no sampling. Any mismatch is a coding error.")
+    kin = malecot_kinship_check()
+    kin_pass = all(abs(o - e) < 1e-12 for o, e in kin.values())
+    for label, (obs, exp) in kin.items():
+        add(f"    {label:<32}{obs:>10.6f}  expect {exp:.6f}")
+    add(f"    -> {'PASS' if kin_pass else 'FAIL'}")
+
+    # 9b. Inbreeding depression (roadmap #31)
+    add("\n[9b] Inbreeding depression   ln S(F) = ln S_0 - B F   (Morton 1956)")
+    add("    B = lethal equivalents per gamete, recovered by regressing observed")
+    add("    survival on PEDIGREE F over depth-matched pedigrees. Viability comes")
+    add("    from the actual load genotypes; nothing in that path computes B.")
+    ib = inbreeding_depression(n_per_level=1200 if fast else 4000, rng=rng)
+    add(f"    {'F':>9}{'mean w':>10}{'ln S':>10}{'closed form':>13}{'realised F':>12}")
+    for F, w, ls, ex, rf in zip(ib.levels, ib.mean_viability, ib.log_survival,
+                                ib.exact_log_survival, ib.realised_F):
+        add(f"    {F:>9.4f}{w:>10.4f}{ls:>10.4f}{ex:>13.4f}{rf:>12.4f}")
+    add(f"    observed B  : {ib.observed_B:.4f} +/- {ib.stderr:.4f}"
+        f"   (closed form {ib.expected_B:.4f}, R^2 {ib.r_squared:.4f})")
+    add(f"    first-cousin excess mortality: {ib.first_cousin_excess * 100:.2f}%")
+    add(f"    excess het from one-way mutation: observed {ib.mutation_het_offset:.5f}"
+        f", predicted {ib.predicted_het_offset:.5f}")
+    add(f"    -> {'PASS' if ib.passes() else 'FAIL'}")
+    add("\n    B runs ~1% ABOVE the closed form on purpose-built pedigrees, and")
+    add("    the cause is identified: a deleterious allele that arose in a")
+    add("    GRANDPARENT can be made homozygous by the inbreeding loop, while")
+    add("    the closed form is computed from founding allele frequencies.")
+    add("    Rerunning with mutation=False shrinks the gap ~3x. Calibrated to")
+    add("    1.4 lethal equivalents (Charlesworth & Willis 2009 give 1-2 for")
+    add("    human survival to adulthood) -- unlike #14b, this one has real")
+    add("    human magnitudes behind it. See inbreeding.py.")
+
     return "\n".join(out)
 
 
@@ -1121,3 +1155,242 @@ def canalization_release(trait: str = "height_cm",
         predicted_fraction_stressed=expected_heritability(h2_0, k),
         mean_shift=float(zk.mean() - z0.mean()),
     )
+
+
+# ======================================================================
+# Inbreeding depression -- lethal equivalents (roadmap #31)
+# ======================================================================
+# Morton, Crow & Muller 1956 wrote survival against inbreeding as
+#
+#       ln S(F) = ln S_0 - B F
+#
+# and read B, the number of LETHAL EQUIVALENTS PER GAMETE, off the slope of
+# a real consanguinity study. We run the same regression on simulated
+# pedigrees. B is never used to make an individual: viability comes out of
+# the actual genotypes at the load loci, so recovering B from the slope is a
+# genuine measurement of an emergent quantity, not a readback.
+#
+# The pedigree template is IDENTICAL at every inbreeding level -- eight
+# founder slots, four grandparents, two parents, one child, three meioses on
+# every ancestral path. Only which founders are SHARED changes. That matters:
+# `transmit_load` mutates, mutation is one-directional, and a deeper pedigree
+# would therefore carry more new deleterious alleles. With depth held fixed,
+# mutation load is a constant across levels and cannot leak into the slope.
+
+@dataclass
+class InbreedingResult:
+    """The Morton/Crow/Muller regression, run on simulated pedigrees."""
+    levels: List[float]                  # pedigree F at each level
+    mean_viability: List[float]          # observed E[w] at each level
+    log_survival: List[float]            # ln(E[w] / E[w at F=0])
+    observed_B: float                    # regression slope, negated
+    expected_B: float                    # closed form from the load spectrum
+    stderr: float                        # se of the slope
+    r_squared: float
+    exact_log_survival: List[float]      # per-locus exact, no log-linearisation
+    realised_F: List[float]              # excess homozygosity vs the outbred cohort
+    mutation_het_offset: float           # observed excess het in the OUTBRED cohort
+    predicted_het_offset: float          # 2*K*u*generations / sum(2pq)
+    first_cousin_excess: float           # 1 - S(1/16)/S(0), observed
+    n_per_level: int
+
+    def passes(self, tol: float = 0.06) -> bool:
+        """
+        B recovered within a relative tolerance of the closed form, with
+        survival falling monotonically in F.
+
+        Deliberately NOT a pure standard-error test, and the reason is a
+        real result rather than an excuse. The measured B sits about 0.8%
+        ABOVE the spectrum's closed form, consistently and in an identifiable
+        direction: `transmit_load` mutates, so a deleterious allele that
+        arose in a grandparent can be made homozygous by the inbreeding loop,
+        while Morton's B is computed from FOUNDING allele frequencies and
+        knows nothing about it. Rerunning with `mutation=False` shrinks the
+        gap by a factor of ~3, which is how that was pinned down. The bias is
+        genuine and does not shrink with n, so a 3-standard-error test would
+        reject a correct model as soon as the sample got large enough.
+        """
+        rel = abs(self.observed_B - self.expected_B) / self.expected_B
+        monotone = all(b <= a + 1e-9 for a, b in zip(self.log_survival,
+                                                     self.log_survival[1:]))
+        return rel <= tol and monotone
+
+
+# Pedigree templates. Every one produces a child three meioses deep; the
+# label says which founder couples are shared between the two sides.
+_INBREEDING_TEMPLATES: List[Tuple[str, float]] = [
+    ("outbred", 0.0),
+    ("half_first_cousin", 1.0 / 32.0),
+    ("first_cousin", 1.0 / 16.0),
+    ("double_first_cousin", 1.0 / 8.0),
+    ("full_sib", 1.0 / 4.0),
+]
+
+
+def _inbred_child(level: str, rng: np.random.Generator, spectrum,
+                  mutation: bool = True):
+    """
+    One child at the named pedigree structure, built entirely out of the load
+    layer's own founder sampler and transmission code.
+
+    Layout, with X = one cross:
+
+        P = X(f0, f1)   Q = X(f2, f3)   ->  M = X(P, Q)
+        R = X(?, ?)     S = X(?, ?)     ->  N = X(R, S)   ->  child = X(M, N)
+
+    and the level decides how R and S relate to P and Q:
+
+        outbred             R, S from four fresh founders     f(M,N) = 0
+        half_first_cousin   R is a HALF sib of P              f(M,N) = 1/32
+        first_cousin        R is a FULL sib of P              f(M,N) = 1/16
+        double_first_cousin R full sib of P, S full sib of Q  f(M,N) = 1/8
+        full_sib            R = P and S = Q, so M, N are sibs f(M,N) = 1/4
+    """
+    from .inbreeding import sample_founder_load, transmit_load
+
+    f = [sample_founder_load(rng, spectrum) for _ in range(8)]
+
+    def X(a, b):
+        return transmit_load(a, b, rng, spectrum, mutation=mutation)
+
+    P, Q = X(f[0], f[1]), X(f[2], f[3])
+    if level == "full_sib":
+        R, S = P, Q
+    elif level == "double_first_cousin":
+        R, S = X(f[0], f[1]), X(f[2], f[3])
+    elif level == "first_cousin":
+        R, S = X(f[0], f[1]), X(f[6], f[7])
+    elif level == "half_first_cousin":
+        R, S = X(f[0], f[5]), X(f[6], f[7])
+    else:
+        R, S = X(f[4], f[5]), X(f[6], f[7])
+    return X(X(P, Q), X(R, S))
+
+
+def inbreeding_depression(n_per_level: int = 4000,
+                          rng: Optional[np.random.Generator] = None,
+                          spectrum=None,
+                          mutation: bool = True) -> InbreedingResult:
+    """
+    Regress ln(observed survival) on pedigree F and recover B.
+
+    `ln E[w]` rather than `E[ln w]`: Morton's S is an observed survival
+    PROPORTION, so the mean is taken on the viability scale and logged
+    afterwards. The two differ by a Jensen term, and using the wrong one
+    biases B upward.
+
+    `mutation=False` switches off new mutation in the pedigree crosses. It
+    is not a realism setting -- it isolates the small upward bias in the
+    measured B caused by recent-ancestor mutations being made homozygous by
+    the inbreeding loop, which the founding-frequency closed form omits.
+    """
+    from .inbreeding import SPECTRUM
+
+    rng = np.random.default_rng(20260901) if rng is None else rng
+    sp = SPECTRUM if spectrum is None else spectrum
+
+    levels: List[float] = []
+    mean_w: List[float] = []
+    exact: List[float] = []
+    realised: List[float] = []
+    se_log: List[float] = []
+
+    # Expected heterozygosity at the load loci, for the realised-F estimator.
+    h_expected = float(np.mean(2.0 * sp.p * sp.q))
+
+    for label, F in _INBREEDING_TEMPLATES:
+        kids = [_inbred_child(label, rng, sp, mutation) for _ in range(n_per_level)]
+        w = np.array([k.viability(sp) for k in kids])
+        het = np.array([float(np.mean(k.dosage == 1)) for k in kids])
+        levels.append(F)
+        mean_w.append(float(w.mean()))
+        exact.append(sp.exact_log_survival(F) - sp.exact_log_survival(0.0))
+        realised.append(1.0 - float(het.mean()) / h_expected)
+        # Delta-method se of ln(mean w). Taken from the ACTUAL spread of
+        # viabilities at this level, not from the 5-point regression
+        # residuals: viability under inbreeding has a long left tail (a
+        # homozygous lethal takes an individual to ~0), so the residual-based
+        # se badly understates how noisy the high-F levels are.
+        se_log.append(float(w.std(ddof=1) / np.sqrt(w.size) / w.mean()))
+
+    log_s = [float(np.log(m / mean_w[0])) for m in mean_w]
+
+    # Realised F is measured against the CONTEMPORANEOUS OUTBRED COHORT, not
+    # against the founding allele frequencies -- which is what a real study
+    # does, and here it is also necessary. `transmit_load` mutates one way
+    # only, so after three generations every cohort carries ~2*K*u*3 extra
+    # deleterious alleles, essentially all heterozygous. That inflates
+    # heterozygosity by a constant amount at EVERY level (the templates are
+    # depth-matched), so it shifts the intercept and not the slope. The
+    # offset is predicted in closed form and reported next to the observed
+    # one, rather than being quietly subtracted.
+    n_generations = 3
+    predicted_offset = (2.0 * sp.n_loci * sp.mutation_rate * n_generations
+                        / float(np.sum(2.0 * sp.p * sp.q)))
+    raw_offset = -realised[0]
+    realised = [r - realised[0] for r in realised]
+
+    # Fit on ln(mean w) directly rather than on the differenced ln S: the
+    # slope is identical, but every point then carries its own independent
+    # sampling error instead of sharing the F=0 level's error, which is what
+    # makes the propagated standard error below correct.
+    x = np.array(levels)
+    y = np.log(np.array(mean_w))
+    slope, intercept = np.polyfit(x, y, 1)
+    fit = slope * x + intercept
+    ss_res = float(np.sum((y - fit) ** 2))
+    ss_tot = float(np.sum((y - y.mean()) ** 2))
+
+    sxx = float(np.sum((x - x.mean()) ** 2))
+    var_slope = float(np.sum(((x - x.mean()) ** 2) * np.array(se_log) ** 2)) / sxx ** 2
+    se = float(np.sqrt(var_slope))
+
+    i_fc = levels.index(1.0 / 16.0)
+    return InbreedingResult(
+        levels=levels,
+        mean_viability=mean_w,
+        log_survival=log_s,
+        observed_B=float(-slope),
+        expected_B=sp.lethal_equivalents,
+        stderr=se,
+        r_squared=1.0 - ss_res / ss_tot if ss_tot > 0 else 1.0,
+        exact_log_survival=exact,
+        realised_F=realised,
+        mutation_het_offset=raw_offset,
+        predicted_het_offset=predicted_offset,
+        first_cousin_excess=1.0 - mean_w[i_fc] / mean_w[0],
+        n_per_level=n_per_level,
+    )
+
+
+def malecot_kinship_check() -> Dict[str, Tuple[float, float]]:
+    """
+    The pedigree recursion against textbook coefficients. Pure combinatorics
+    -- no sampling, no RNG -- so any mismatch is a coding error, not noise.
+    Returns {relationship: (observed, expected)}.
+    """
+    from .inbreeding import Pedigree
+
+    ped = Pedigree()
+    for founder in ("A", "B", "C", "D"):
+        ped.add(founder)
+    ped.add("E", "A", "B")          # full sibs E, F
+    ped.add("F", "A", "B")
+    ped.add("G", "E", "C")          # G and H are first cousins
+    ped.add("H", "F", "D")
+    ped.add("I", "G", "H")          # first-cousin offspring
+    ped.add("J", "E", "F")          # full-sib offspring
+    ped.add("K", "A", "E")          # parent-offspring mating
+
+    return {
+        "kinship full sibs":          (ped.kinship("E", "F"), 0.25),
+        "kinship parent-offspring":   (ped.kinship("A", "E"), 0.25),
+        "kinship unrelated founders": (ped.kinship("A", "C"), 0.0),
+        "self-kinship, outbred":      (ped.kinship("E", "E"), 0.5),
+        "relationship first cousins": (ped.relationship("G", "H"), 0.125),
+        "F, first-cousin child":      (ped.inbreeding("I"), 0.0625),
+        "F, full-sib child":          (ped.inbreeding("J"), 0.25),
+        "F, parent-offspring child":  (ped.inbreeding("K"), 0.25),
+        "self-kinship, inbred":       (ped.kinship("J", "J"), 0.625),
+        "F, founder":                 (ped.inbreeding("A"), 0.0),
+    }
