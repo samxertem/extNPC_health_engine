@@ -946,6 +946,42 @@ ARCHITECTURE: Dict[str, TraitArchitecture] = _build_map()
 # Introspection: pleiotropy report (roadmap #7 benchmark)
 # ----------------------------------------------------------------------
 
+def non_directional_variant(trait: str, v_dom: float = 0.05) -> TraitArchitecture:
+    """
+    The same trait calibrated the OLD way: dominance signs left as `loci.py`
+    drew them and V_D pinned to a declared share. This is the counterfactual
+    arm for `validation.stature_inbreeding_depression`, which runs both
+    architectures over one identical set of genomes so that the depression can
+    be shown appearing rather than merely asserted.
+
+    `v_dom = 0.05` is the share height and lung capacity declared before they
+    became directional -- the default of `TraitSpec.v_dom`.
+
+    The epistatic structure is COPIED from the live architecture rather than
+    redrawn, and that is not tidiness. Calibrating from a fresh generator gives
+    the same V_I but different pairs, and the epistatic term is *not*
+    F-independent: inbreeding correlates the centred dosages at two loci
+    (identity disequilibrium), so E[x_i x_j] > 0 grows with F and a different
+    set of pairs contributes its own depression. Sharing the pairs makes the
+    two architectures differ in the dominance vector `d` and nothing else,
+    which is what a paired contrast needs in order to attribute the result to
+    dominance signing.
+
+    It is still not a bit-for-bit reconstruction of the pre-change
+    architecture -- the GxE weights follow from `a_hat` and are shared, but the
+    additive scale is re-solved against the new `d`, as it must be.
+    """
+    from dataclasses import replace
+    spec = TRAIT_TABLE[trait]
+    alt = replace(spec, v_dom=v_dom, depression_per_10F=None,
+                  depression_source="")
+    arch = _calibrate_trait(alt, np.random.default_rng(GP_MAP_SEED))
+    live = ARCHITECTURE[trait]
+    arch.epi_i, arch.epi_j, arch.epi_w = live.epi_i, live.epi_j, live.epi_w
+    arch.v_i = live.v_i
+    return arch
+
+
 def traits_touched_by(symbol: str) -> Dict[str, float]:
     from .loci import LOCUS_BY_SYMBOL
     return dict(LOCUS_BY_SYMBOL[symbol].weights)

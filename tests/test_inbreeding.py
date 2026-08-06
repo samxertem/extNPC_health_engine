@@ -356,6 +356,70 @@ def test_joshi_nulls_stay_within_their_own_noise():
         assert shift_in_sd < 0.04, f"{trait}: {shift_in_sd:.4f} sd per 10% F"
 
 
+def test_stature_depression_is_recoverable_from_real_meioses():
+    """
+    The headline measurement. Five pedigree structures, children produced by
+    meiosis with crossovers, heights read out of the same genotypic_value
+    every NPC uses -- and the regression recovers a slope nothing in that path
+    evaluates. This is to directional dominance what
+    `test_lethal_equivalents_are_recoverable_by_regression` is to the load.
+    """
+    r = V.stature_inbreeding_depression(n_per_level=800,
+                                        rng=np.random.default_rng(41))
+    assert r.passes()
+    # the closed form, within the measurement's own error
+    assert r.observed_slope == pytest.approx(r.expected_slope, abs=3 * r.stderr)
+    # and Joshi's published figure, on the scale the paper reports
+    assert r.observed_per_10F == pytest.approx(-1.2, abs=0.4)
+    # realised F is the causal variable and recovers the same slope
+    assert r.realised_slope == pytest.approx(r.observed_slope, rel=0.15)
+
+
+def test_the_counterfactual_arm_isolates_dominance_signing():
+    """
+    Same genomes, same environmental draws, dominance signs left as loci.py
+    drew them: the depression nearly vanishes. Without this arm the result
+    could be an artefact of the pedigree templates rather than of dominance.
+
+    The PAIRED contrast is asserted rather than the arms separately, because
+    the shared draws cancel in the difference -- see StatureDepressionResult.
+    """
+    r = V.stature_inbreeding_depression(n_per_level=800,
+                                        rng=np.random.default_rng(42))
+    assert r.paired_slope == pytest.approx(r.paired_expected,
+                                           abs=3 * r.paired_stderr)
+    # the mechanism accounts for the overwhelming majority of the effect
+    assert abs(r.counterfactual_expected) < 0.15 * abs(r.expected_slope)
+    # and the paired se really is much tighter than the unpaired one
+    assert r.paired_stderr < 0.5 * r.stderr
+
+
+def test_realised_homozygosity_tracks_the_pedigree_in_the_trait_genome():
+    """The trait loci are LINKED and inherited by real recombination, unlike
+    the load layer's unlinked sites, so this is an independent check that the
+    pedigree templates deliver the F they claim."""
+    r = V.stature_inbreeding_depression(n_per_level=800,
+                                        rng=np.random.default_rng(43))
+    for pedigree_F, realised in zip(r.levels, r.realised_F):
+        assert realised == pytest.approx(pedigree_F, abs=0.02)
+
+
+def test_lung_capacity_depression_also_lands():
+    """The second directional trait, and the one whose V_D is uncomfortably
+    large (0.11). The depression is still exactly what it was calibrated to."""
+    r = V.stature_inbreeding_depression("lung_capacity", n_per_level=800,
+                                        rng=np.random.default_rng(44))
+    assert r.passes()
+    assert r.observed_per_10F == pytest.approx(-0.137, abs=0.05)
+
+
+def test_a_non_directional_trait_refuses_the_law():
+    """bmi declares no target, so asking it for a depression slope is a
+    category error rather than a number to be trusted."""
+    with pytest.raises(ValueError, match="no depression target"):
+        V.stature_inbreeding_depression("bmi", n_per_level=10)
+
+
 def test_the_two_inbreeding_mechanisms_stay_separate():
     """Viability depression (this module) and trait depression (traits.py) are
     different literatures and different scales. A change to the load spectrum

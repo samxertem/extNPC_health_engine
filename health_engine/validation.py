@@ -60,7 +60,8 @@ from .genome import (Genome, allele_frequencies, cross, dosage_matrix,
                      meiosis, sample_founder_genome)
 from .loci import ALT_FREQ, CM_POS, CHROM, HETEROZYGOSITY, N_LOCI, locus_index
 from .traits import (ARCHITECTURE, TRAIT_TABLE, TraitArchitecture, TraitKind,
-                     breeding_values, population_liabilities)
+                     breeding_values, non_directional_variant,
+                     population_liabilities)
 
 
 # ======================================================================
@@ -814,6 +815,38 @@ def full_report(rng: np.random.Generator,
     add("    human survival to adulthood) -- unlike #14b, this one has real")
     add("    human magnitudes behind it. See inbreeding.py.")
 
+    # 9c. Trait-scale inbreeding depression (directional dominance)
+    add("\n[9c] Directional dominance   M_F - M_0 = -F sum_j 2 p_j q_j d_j")
+    add("    The trait-scale twin of [9b]: the same pedigrees, scored for a")
+    add("    PHENOTYPE instead of survival. Two mechanisms, two literatures, one")
+    add("    engine -- an inbred individual can be short and still viable.")
+    for trait in ("height_cm", "lung_capacity"):
+        sd = stature_inbreeding_depression(
+            trait, n_per_level=400 if fast else 1500, rng=rng)
+        add(f"\n    {trait}   ({sd.source})")
+        add(f"    {'F':>9}{'realised F':>12}{'mean':>10}{'+/- sem':>9}")
+        for F, rf, m, se in zip(sd.levels, sd.realised_F, sd.mean_value,
+                                sd.sem_value):
+            add(f"    {F:>9.4f}{rf:>12.4f}{m:>10.3f}{se:>9.3f}")
+        add(f"    slope on pedigree F : {sd.observed_slope:+.4f} +/- {sd.stderr:.4f}"
+            f"   (closed form {sd.expected_slope:+.4f})")
+        add(f"    slope on realised F : {sd.realised_slope:+.4f}"
+            "   <- what F_ROH measures")
+        add(f"    per 10% F           : {sd.observed_per_10F:+.4f} {sd.unit}"
+            f"   (published {sd.published_per_10F:+.4f})")
+        add(f"    same genomes, non-directional architecture:"
+            f" {sd.counterfactual_slope:+.4f}"
+            f"   (its own leftover walk {sd.counterfactual_expected:+.4f})")
+        add(f"    PAIRED contrast     : {sd.paired_slope:+.4f} +/- "
+            f"{sd.paired_stderr:.4f}   (closed form {sd.paired_expected:+.4f})")
+        add(f"    -> {'PASS' if sd.passes() else 'FAIL'}")
+    add("\n    The paired contrast is the sharp test: both arms score the SAME")
+    add("    genomes with the SAME environmental draws, so residual and GxE")
+    add("    cancel exactly and only the sign of d differs. Its standard error")
+    add("    is ~4x below either arm's. V_D is an OUTPUT of this calibration and")
+    add("    lands at 1.4% of V_P for height -- independently estimated at")
+    add("    essentially zero (Zhu 2015), which nothing here was told.")
+
     # 10. Copy-number dosage response (roadmap #12)
     add("\n[10] CNV gene dosage   shift = (copies/2 - 1) * sum_j E[val_j]")
     add("    One cohort of genomes read at three copy numbers -- same genotypes,")
@@ -1412,6 +1445,211 @@ def inbreeding_depression(n_per_level: int = 4000,
         predicted_het_offset=predicted_offset,
         first_cousin_excess=1.0 - mean_w[i_fc] / mean_w[0],
         n_per_level=n_per_level,
+    )
+
+
+@dataclass
+class StatureDepressionResult:
+    """Trait-scale inbreeding depression, measured on real meioses."""
+    trait: str
+    unit: str
+    levels: List[float]              # pedigree F, one per template
+    realised_F: List[float]          # excess homozygosity at the trait loci
+    mean_value: List[float]          # trait units
+    sem_value: List[float]
+    n_per_level: int
+    observed_slope: float            # trait units per unit F, on pedigree F
+    realised_slope: float            # ... on realised F (what F_ROH measures)
+    expected_slope: float            # closed form: -sd * sum 2pq d
+    stderr: float
+    counterfactual_slope: float      # identical genomes, non-directional arch
+    counterfactual_expected: float   # its own closed form: the leftover walk
+    paired_slope: float              # slope of (directional - counterfactual)
+    paired_stderr: float
+    published_per_10F: float
+    source: str
+
+    @property
+    def observed_per_10F(self) -> float:
+        return self.observed_slope * 0.10
+
+    @property
+    def paired_expected(self) -> float:
+        return self.expected_slope - self.counterfactual_expected
+
+    def passes(self, k: float = 3.0) -> bool:
+        """
+        Three conditions, in increasing sharpness.
+
+        1. The slope sits within k standard errors of its closed form.
+        2. The most inbred cohort is significantly shorter than the outbred
+           one -- a real depression, not just a line fitted through noise.
+           Deliberately NOT strict monotonicity across all five levels: the
+           first two templates are 1/32 apart in F, which at this trait's sd
+           predicts a 0.4 cm step against a comparable sampling error, so
+           monotonicity there is close to a coin flip and would make the law
+           fail at random. Viability can be tested that way (see
+           `InbreedingResult`) because survival falls far more steeply.
+        3. The PAIRED contrast against the non-directional architecture
+           matches its own closed form. This is the sharp one, and it is
+           sharp for a structural reason: both arms score the same genomes
+           with the same environmental draws, so the residual and GxE terms
+           cancel exactly in the difference and what is left is the effect of
+           signing dominance and nothing else. Its standard error is roughly
+           an order of magnitude below either arm's, which is why the
+           unpaired arms are reported but not used as the criterion.
+        """
+        within = abs(self.observed_slope - self.expected_slope) <= k * self.stderr
+        drop = self.mean_value[0] - self.mean_value[-1]
+        drop_se = float(np.hypot(self.sem_value[0], self.sem_value[-1]))
+        depressed = drop > k * drop_se
+        paired = (abs(self.paired_slope - self.paired_expected)
+                  <= k * self.paired_stderr)
+        return within and depressed and paired
+
+
+def _pedigree_genome(level: str, rng: np.random.Generator) -> Genome:
+    """
+    One child's GENOME at the named pedigree structure, using the same
+    templates and the same layout as `_inbred_child` -- but through
+    `genome.cross`, so the homozygosity comes from real recombination and
+    segregation rather than from the load layer's unlinked sampler.
+
+    Working at the genome layer rather than building NPCs is a deliberate
+    economy: measuring a trait mean needs genotypes, and 14 crosses per child
+    at 5 levels is affordable where 14 full NPCs -- each with an epigenome, a
+    GRN pass and a physiological state vector -- is not.
+    """
+    f = [sample_founder_genome(rng) for _ in range(8)]
+
+    def X(a: Genome, b: Genome) -> Genome:
+        return cross(a, b, rng)[0]
+
+    P, Q = X(f[0], f[1]), X(f[2], f[3])
+    if level == "full_sib":
+        R, S = P, Q
+    elif level == "double_first_cousin":
+        R, S = X(f[0], f[1]), X(f[2], f[3])
+    elif level == "first_cousin":
+        R, S = X(f[0], f[1]), X(f[6], f[7])
+    elif level == "half_first_cousin":
+        R, S = X(f[0], f[5]), X(f[6], f[7])
+    else:
+        R, S = X(f[4], f[5]), X(f[6], f[7])
+    return X(X(P, Q), X(R, S))
+
+
+def stature_inbreeding_depression(trait: str = "height_cm",
+                                  n_per_level: int = 1200,
+                                  rng: Optional[np.random.Generator] = None
+                                  ) -> StatureDepressionResult:
+    """
+    Regress a trait's mean on pedigree F across five pedigree structures and
+    recover the depression slope -- the trait-scale twin of
+    `inbreeding_depression`, which does the same thing for viability.
+
+    What makes this a measurement and not a restatement of the calibration:
+    nothing in the path from genome to phenotype evaluates sum 2pq d. The
+    children are produced by meiosis with crossovers, their homozygosity is an
+    emergent property of the pedigree, and their heights come out of the same
+    `genotypic_value` every NPC uses. The closed form is recovered from the
+    other end.
+
+    Three slopes are reported and they answer different questions:
+
+      observed_slope       on PEDIGREE F. This is what the closed form
+                           predicts, because Falconer's F is an expected IBD
+                           probability.
+      realised_slope       on REALISED F (excess homozygosity at the trait
+                           loci). This is the quantity Joshi et al. 2015
+                           actually regressed on, since F_ROH is measured from
+                           a genome rather than read off a family tree, and it
+                           is the causally proximate variable -- an individual
+                           is short because of the homozygosity it GOT, not
+                           the homozygosity it was expected to get.
+      counterfactual_slope identical genomes scored through the
+                           non-directional architecture. Isolates the
+                           mechanism from the pedigree: if this arm also
+                           depressed, the effect would be an artefact of the
+                           templates rather than of dominance.
+
+    The trait's `clip` is bypassed. It is a display guard at +/-4.4 sd whose
+    only effect on a mean regression would be to bias it toward the interior.
+    """
+    rng = np.random.default_rng(20260902) if rng is None else rng
+    arch = ARCHITECTURE[trait]
+    spec = arch.spec
+    if not spec.is_directional:
+        raise ValueError(f"{trait} declares no depression target to check against")
+    alt = non_directional_variant(trait)
+
+    het_expected = float(np.mean(HETEROZYGOSITY))
+    levels: List[float] = []
+    realised: List[float] = []
+    means: List[float] = []
+    sems: List[float] = []
+    alt_means: List[float] = []
+    diff_means: List[float] = []
+    diff_sems: List[float] = []
+
+    for label, F in _INBREEDING_TEMPLATES:
+        kids = [_pedigree_genome(label, rng) for _ in range(n_per_level)]
+        dose = dosage_matrix(kids)
+
+        # One set of environmental draws, shared by both arms, so the
+        # counterfactual differs by architecture alone -- and so the paired
+        # difference below has the residual and GxE terms cancel exactly.
+        resid = rng.normal(0.0, 1.0, n_per_level)
+        gxe_in = rng.normal(0.0, 1.0, n_per_level)
+
+        def value(a):
+            z = population_liabilities(a, dose, resid, gxe_in)
+            return a.spec.mean + a.spec.sd * z
+
+        v, v_alt = value(arch), value(alt)
+        diff = v - v_alt
+        levels.append(F)
+        means.append(float(v.mean()))
+        sems.append(float(v.std(ddof=1) / np.sqrt(v.size)))
+        alt_means.append(float(v_alt.mean()))
+        diff_means.append(float(diff.mean()))
+        diff_sems.append(float(diff.std(ddof=1) / np.sqrt(diff.size)))
+        het = float(np.mean(dose == 1))
+        realised.append(1.0 - het / het_expected)
+
+    x = np.array(levels)
+    y = np.array(means)
+    slope, _ = np.polyfit(x, y, 1)
+    alt_slope, _ = np.polyfit(x, np.array(alt_means), 1)
+    paired_slope, _ = np.polyfit(x, np.array(diff_means), 1)
+
+    # Realised F carries the same one-way-mutation offset in every cohort as
+    # the load layer's does (the templates are depth-matched), so it shifts
+    # the intercept and not the slope; it is left in rather than subtracted.
+    xr = np.array(realised)
+    r_slope, _ = np.polyfit(xr, y, 1)
+
+    sxx = float(np.sum((x - x.mean()) ** 2))
+
+    def slope_se(sem: List[float]) -> float:
+        return float(np.sqrt(
+            float(np.sum(((x - x.mean()) ** 2) * np.array(sem) ** 2)) / sxx ** 2))
+
+    twopq = 2.0 * arch.p * (1.0 - arch.p)
+    expected = -spec.sd * float(np.sum(twopq * arch.d))
+    alt_twopq = 2.0 * alt.p * (1.0 - alt.p)
+    alt_expected = -alt.spec.sd * float(np.sum(alt_twopq * alt.d))
+
+    return StatureDepressionResult(
+        trait=trait, unit=spec.unit, levels=levels, realised_F=realised,
+        mean_value=means, sem_value=sems, n_per_level=n_per_level,
+        observed_slope=float(slope), realised_slope=float(r_slope),
+        expected_slope=expected, stderr=slope_se(sems),
+        counterfactual_slope=float(alt_slope),
+        counterfactual_expected=alt_expected,
+        paired_slope=float(paired_slope), paired_stderr=slope_se(diff_sems),
+        published_per_10F=-spec.depression_per_10F,
+        source=spec.depression_source,
     )
 
 
