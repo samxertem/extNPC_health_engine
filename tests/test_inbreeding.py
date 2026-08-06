@@ -314,20 +314,57 @@ def test_mutation_offset_matches_its_closed_form():
     assert r.mutation_het_offset == pytest.approx(r.predicted_het_offset, rel=0.20)
 
 
-def test_trait_layer_has_no_directional_dominance():
+def test_directional_traits_reproduce_their_published_depression():
     """
-    Documents an honest gap rather than a feature. `loci.py` draws dominance
-    ratios N(0, 0.15) -- random in sign -- so sum(2pq*d) is a random walk about
-    zero and the trait layer predicts essentially no inbreeding depression on
-    stature. Real depression IS directional (Joshi et al. 2015: ~1.2 cm per
-    10% F). If this assertion ever starts failing, the catalogue has acquired
-    directional dominance and inbreeding.py's docstring needs rewriting.
+    The closed form the calibration was solved against, read back out of the
+    architecture. Joshi et al. 2015 (Nature 523:459): -1.2 cm of height and
+    -137 ml of FEV1 per 10% F_ROH.
+
+    This replaces `test_trait_layer_has_no_directional_dominance`, which
+    asserted the ABSENCE of this mechanism and was written as a tripwire for
+    the day it arrived.
     """
+    from health_engine.inbreeding import predicted_depression
+    for trait, drop in (("height_cm", 1.2), ("lung_capacity", 0.137)):
+        assert predicted_depression(trait, 0.10) == pytest.approx(-drop, rel=1e-9), trait
+        # linear in F, and zero at F = 0
+        assert predicted_depression(trait, 0.0) == 0.0
+        assert predicted_depression(trait, 0.20) == pytest.approx(-2 * drop, rel=1e-9)
+
+
+def test_joshi_nulls_stay_within_their_own_noise():
+    """
+    Joshi 2015 tested 16 traits and found depression in four. BMI, adiposity,
+    blood pressure and lipids were nulls, and this engine reproduces the null
+    by leaving them non-directional.
+
+    The assertion is deliberately NOT `== 0`: these traits are uncalibrated in
+    this respect, not calibrated to zero, so what is left is the random walk
+    of loci.py's N(0, 0.15) dominance ratios. The bar is that the residual is
+    an order of magnitude below the smallest depression anyone has measured --
+    scaled by the trait's own sd, since a mmHg and a kg/m^2 are not comparable.
+    """
+    from health_engine.inbreeding import predicted_depression
     from health_engine.traits import ARCHITECTURE
-    for trait in ("height_cm", "aerobic_capacity", "immune_resilience"):
-        # in liability SD per unit F; 12 cm/unit F would be ~1.3 SD
-        assert abs(directional_dominance(trait)) < 0.25, trait
-    assert set(ARCHITECTURE) >= {"height_cm"}
+    for trait in ("bmi", "adiposity", "bp_set_point", "lipid_profile"):
+        arch = ARCHITECTURE[trait]
+        assert not arch.spec.is_directional, trait
+        # height loses 1.2/9.0 = 0.133 sd per 10% F; require < 0.04 sd, i.e.
+        # under a third of the weakest real signal, so a study of this
+        # population would not call it significant either.
+        shift_in_sd = abs(predicted_depression(trait, 0.10)) / arch.spec.sd
+        assert shift_in_sd < 0.04, f"{trait}: {shift_in_sd:.4f} sd per 10% F"
+
+
+def test_the_two_inbreeding_mechanisms_stay_separate():
+    """Viability depression (this module) and trait depression (traits.py) are
+    different literatures and different scales. A change to the load spectrum
+    must not move stature, and vice versa."""
+    from health_engine.inbreeding import predicted_depression
+    before = predicted_depression("height_cm", 0.25)
+    heavy = build_spectrum(target_B=4.0)
+    assert heavy.lethal_equivalents > SPECTRUM.lethal_equivalents
+    assert predicted_depression("height_cm", 0.25) == before
 
 
 def test_realised_inbreeding_of_an_outbred_founder_is_near_zero():

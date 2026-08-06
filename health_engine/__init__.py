@@ -55,8 +55,9 @@ from .development import (GROWTH, MATURATION, REFERENCE_AGE, growth_factor,
                           maturation_offset, peak_height_velocity_age,
                           schedule_summary, stature_fraction)
 from .inbreeding import (SPECTRUM, DeleteriousLoad, LoadSpectrum, Pedigree,
-                         excess_mortality, first_cousin_excess_mortality,
-                         lethal_equivalents, realised_inbreeding,
+                         directional_dominance, excess_mortality,
+                         first_cousin_excess_mortality, lethal_equivalents,
+                         predicted_depression, realised_inbreeding,
                          sample_founder_load, transmit_load)
 from .loci import LOCI, N_LOCI, describe, locus_index, pleiotropic_genes
 from .medical import ACTION_IMPACT_MAP, MedicalCondition, simulate_aging
@@ -93,8 +94,10 @@ __all__ = [
     "CANALIZATION_THRESHOLD", "canalization_factor", "expected_heritability",
     "is_decanalizing",
     "SPECTRUM", "DeleteriousLoad", "LoadSpectrum", "Pedigree",
-    "excess_mortality", "first_cousin_excess_mortality", "lethal_equivalents",
-    "realised_inbreeding", "sample_founder_load", "transmit_load",
+    "directional_dominance", "excess_mortality",
+    "first_cousin_excess_mortality", "lethal_equivalents",
+    "predicted_depression", "realised_inbreeding", "sample_founder_load",
+    "transmit_load",
     "REGIONS", "CNVRegion", "CopyNumber", "birth_prevalence",
     "equilibrium_frequency", "expected_de_novo_fraction", "induce",
     "predicted_mean_shift", "sample_founder_copy_number",

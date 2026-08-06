@@ -46,20 +46,24 @@ quantitative trait variation (Charlesworth & Willis 2009). The two are
 different classes of site, and conflating them is the commonest way to model
 this wrongly.
 
-There is a second reason it cannot come from the trait loci *here*: the
-catalogue's dominance ratios are drawn `N(0, 0.15)` -- random in sign. Trait
-depression under inbreeding is exactly
+There is a second reason it does not come from the trait loci: viability is
+not a trait in the catalogue, and the traits that ARE in the catalogue depress
+through a different route. Trait depression under inbreeding is exactly
 
     M_F - M_0 = -F * sum_j 2 p_j q_j d_j                    (Falconer 4th ed.)
 
-so a non-directional d makes that sum a random walk about zero, and the
-engine's expected trait depression is therefore ~0 by construction. That is
-a real property of the model and `directional_dominance` reports it rather
-than hiding it. Real inbreeding depression on stature is directional and
-measured -- Joshi et al. 2015 (*Nature* 523:459) found ~1.2 cm of height and
-~137 ml of FEV1 lost per 10% increase in F across 100+ cohorts -- and
-reproducing that would require re-signing every dominance ratio in the
-catalogue and re-solving every heritability. See "Limitations".
+which needs the dominance deviations to point the same way. Most of the
+catalogue's ratios are drawn `N(0, 0.15)` -- random in sign -- so that sum is
+a random walk about zero for most traits. The two traits with a measured
+depression are calibrated to it directly (`TraitSpec.depression_per_10F`;
+Joshi et al. 2015, *Nature* 523:459: ~1.2 cm of height and ~137 ml of FEV1
+per 10% of F across 35 cohorts), which is `traits.py`'s business, not this
+module's. `directional_dominance` and `predicted_depression` below read that
+calibration back out.
+
+The two layers answer different questions and are kept apart on purpose:
+this module asks whether an inbred individual SURVIVES, the trait layer asks
+how TALL it is if it does.
 
 So the load lives in its own parallel layer, exactly as the sex chromosomes
 (#2) and mitochondria (#3) do: a set of load loci that carry no trait weight,
@@ -713,12 +717,24 @@ def directional_dominance(trait: str) -> float:
 
         M_F - M_0 = -F * sum_j 2 p_j q_j d_j
 
-    Returns `sum_j 2 p_j q_j d_j`, in liability SD per unit F. Near zero for
-    every trait here, because `loci.py` draws dominance ratios N(0, 0.15) --
-    random in sign, so the sum is a random walk about zero. Real inbreeding
-    depression requires DIRECTIONAL dominance, and this function exists to
-    report honestly that the trait layer does not have it. The load layer,
-    which does, is where depression comes from in this engine.
+    Returns `sum_j 2 p_j q_j d_j`, in liability SD per unit F, positive when
+    inbreeding LOWERS the trait (Falconer & Mackay 1996 eq. 15.1).
+
+    Two regimes, and the number means something different in each:
+
+      * A trait calibrated against a measured depression (`TraitSpec.
+        depression_per_10F` -- height_cm, lung_capacity) returns exactly its
+        target, because `traits._calibrate_trait` solved for it. Here the
+        function is a consistency check on the calibration.
+
+      * Every other trait returns a small residual of the random walk that
+        `loci.py`'s N(0, 0.15) dominance ratios leave behind. It is NOT
+        calibrated to zero and should not be read as a modelled null: it is
+        an uncalibrated leftover, ~0.02-0.3 liability SD per unit F, which on
+        the trait scale is a fraction of the smallest depression anyone has
+        measured. For the four traits Joshi et al. 2015 tested and found no
+        depression in -- bmi, adiposity, bp_set_point, lipid_profile -- that
+        leftover is how the reproduced null is represented.
     """
     from .traits import ARCHITECTURE
     arch = ARCHITECTURE[trait]
@@ -726,16 +742,46 @@ def directional_dominance(trait: str) -> float:
     return float(np.sum(twopq * arch.d))
 
 
+def predicted_depression(trait: str, F: float) -> float:
+    """
+    The expected shift in `trait`, IN ITS OWN UNITS, for an individual with
+    inbreeding coefficient F. Negative = smaller than the outbred mean.
+
+        M_F - M_0 = -F * sd * sum_j 2 p_j q_j d_j
+
+    This is the trait-scale counterpart of `predicted_log_survival`: the same
+    pedigree F drives both, one through dominance deviations at the trait
+    loci and one through recessive load at the fitness loci. They are
+    independent mechanisms measured in different literatures (Joshi et al.
+    2015 vs Morton, Crow & Muller 1956) and this engine now carries both, so
+    they must not be read as two views of one number.
+
+    Categorical traits have no unit scale, so the shift is returned in
+    liability SD -- which is also what it means for the z-scored continuous
+    traits whose sd is 1.0.
+    """
+    from .traits import ARCHITECTURE
+    sd = ARCHITECTURE[trait].spec.sd
+    return -float(F) * sd * directional_dominance(trait)
+
+
 # ----------------------------------------------------------------------
 # Limitations
 # ----------------------------------------------------------------------
-# * NO DIRECTIONAL DOMINANCE ON TRAITS. Inbreeding here costs viability but
-#   does not shorten stature, which real inbreeding does (Joshi et al. 2015:
-#   ~1.2 cm per 10% F). Fixing it means re-signing every dominance ratio in
-#   loci.py so that d points consistently toward the fitter allele, which
-#   changes mean_g, re-solves every additive scale, and invalidates all of
-#   Stage 0's calibrated heritabilities. `directional_dominance` measures and
-#   reports the gap rather than papering over it.
+# * DIRECTIONAL DOMINANCE IS NOW MODELLED, on two traits only. Inbreeding
+#   costs viability here (this module) AND shortens stature (traits.py, via
+#   TraitSpec.depression_per_10F: height -1.2 cm and lung capacity -137 ml per
+#   10% F, Joshi et al. 2015). It is deliberately NOT applied to every trait:
+#   Joshi tested 16 and found depression in 4, so bmi, adiposity, bp_set_point
+#   and lipid_profile stay flat to reproduce the paper's nulls. Traits with no
+#   published estimate at all -- aerobic_capacity, the immune traits, the
+#   personality traits -- are simply uncalibrated in this respect, and
+#   `directional_dominance` reports the small residual left by loci.py's
+#   random-sign dominance ratios rather than a modelled zero.
+# * The two mechanisms are independent and must not be summed into one
+#   "cost of inbreeding". Dominance deviations at trait loci move a phenotype;
+#   recessive load at the fitness loci kills. An individual can be short and
+#   viable. The engine deliberately keeps them on separate scales.
 # * The load spectrum is a fixed constant of the engine: frequencies do not
 #   respond to the simulated population's own selection or drift. A world
 #   that inbreeds heavily for many generations should PURGE some of its

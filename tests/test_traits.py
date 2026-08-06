@@ -36,10 +36,49 @@ def test_additive_variance_hits_the_target_heritability():
 
 
 def test_dominance_and_epistasis_hit_their_targets():
+    """V_D is an input for most traits and an output for a directional one, so
+    each is checked against whatever it was actually calibrated to."""
     for name, arch in T.ARCHITECTURE.items():
-        assert arch.v_d == pytest.approx(arch.spec.v_dom, abs=1e-6), name
+        if arch.spec.is_directional:
+            # V_D was not requested; the depression slope was. Check that.
+            twopq = 2.0 * arch.p * (1.0 - arch.p)
+            assert float(np.sum(twopq * arch.d)) == pytest.approx(
+                arch.spec.target_dominance_sum(), rel=1e-9), name
+            # ... and that V_D nonetheless came out a legal variance share.
+            assert 0.0 < arch.v_d < 1.0 - arch.spec.h2, name
+        else:
+            assert arch.v_d == pytest.approx(arch.spec.v_dom, abs=1e-6), name
         assert arch.v_i == pytest.approx(arch.spec.v_epi, abs=1e-6), name
         assert arch.v_gxe == pytest.approx(arch.spec.v_gxe, abs=1e-6), name
+
+
+def test_directional_dominance_is_declared_only_with_a_citation():
+    """A depression target without a source is a tuned parameter wearing a
+    measurement's clothes. TraitSpec.validate refuses it; this pins that."""
+    with pytest.raises(ValueError, match="tuned parameter"):
+        T.TraitSpec("bogus", T.TraitKind.CONTINUOUS, h2=0.5, sd=1.0,
+                    v_dom=None, depression_per_10F=1.0).validate()
+    with pytest.raises(ValueError, match="never both"):
+        T.TraitSpec("bogus", T.TraitKind.CONTINUOUS, h2=0.5, sd=1.0,
+                    v_dom=0.05, depression_per_10F=1.0,
+                    depression_source="x").validate()
+
+
+def test_directional_dominance_preserves_curated_core_signs():
+    """Only anonymous peripheral loci are re-signed. A core gene's dominance
+    sign is a published claim (HERC2 +0.95, MC1R -0.80, GJB2 -1.00) and must
+    survive the directional path unchanged."""
+    from health_engine.loci import DOMINANCE_RATIO, LOCI
+    for name, arch in T.ARCHITECTURE.items():
+        if not arch.spec.is_directional:
+            continue
+        for k, i in enumerate(arch.idx):
+            ratio = DOMINANCE_RATIO[i]
+            if LOCI[i].is_core and ratio != 0.0:
+                expected = np.sign(ratio * LOCI[i].weights[name])
+                assert np.sign(arch.d[k]) == expected, f"{name}/{LOCI[i].symbol}"
+            elif not LOCI[i].is_core and ratio != 0.0:
+                assert arch.d[k] > 0.0, f"{name}/{LOCI[i].symbol}"
 
 
 def test_liabilities_are_standard_normal_in_founders(rng):

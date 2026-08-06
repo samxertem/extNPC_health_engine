@@ -35,6 +35,32 @@ Because these are closed forms, we do not tune effect sizes until a test
 passes -- we *solve* for the scaling that puts V_A exactly at the target
 narrow-sense heritability. See `_calibrate_trait`.
 
+Directional dominance
+---------------------
+The d_j above have signs, and the signs are the whole difference between a
+trait that shows inbreeding depression and one that does not. Falconer &
+Mackay 1996 eq. 15.1:
+
+    M_F  =  M_0  -  2F sum_j p_j q_j d_j
+
+so depression is driven by the PLAIN sum of the 2pq d, while V_D is their
+sum of SQUARES. Draw the signs at random -- which is what `loci.py` does
+for peripheral loci, N(0, 0.15) -- and the plain sum cancels to a random
+walk about zero while the sum of squares is whatever V_D was asked for.
+The result, which this engine shipped for eleven sessions, is dominance
+variance with no inbreeding depression on any trait.
+
+Traits with a measured depression therefore set `depression_per_10F`
+instead of `v_dom`: dominance is signed toward the trait-increasing allele
+at every peripheral locus and scaled so the catalogue reproduces the
+published slope, and **V_D becomes an output of calibration**. V_A is
+still solved to h^2 exactly afterwards, and mean_g still absorbs
+sum 2pq d, so the outbred founder mean does not move -- only inbred
+individuals do. Which traits get a target is a claim about the
+literature, not a modelling convenience: see height_cm and lung_capacity
+for the positives and bmi, adiposity, bp_set_point and lipid_profile for
+Joshi et al. 2015's nulls, reproduced deliberately.
+
 Every trait is calibrated so that V_P = V_A + V_D + V_I + V_GxE + V_E = 1.
 Liabilities are therefore standard normal in a random-mating founder
 population, which makes two things trivial:
@@ -114,9 +140,22 @@ class TraitSpec:
     sd: float = 1.0                 # phenotypic sd (continuous only)
     unit: str = ""
     # Variance shares, all as fractions of V_P = 1.
-    v_dom: float = 0.05
+    #
+    # `v_dom` is the DECLARED dominance variance share. Set it to None and
+    # give `depression_per_10F` instead to calibrate dominance against a
+    # measured inbreeding depression, in which case V_D becomes an output of
+    # calibration rather than an input. Exactly one of the two is required.
+    v_dom: Optional[float] = 0.05
     v_epi: float = 0.02
     v_gxe: float = 0.03
+    # Directional dominance (roadmap: the trait-scale counterpart of the
+    # load layer's lethal equivalents). The measured drop in this trait per
+    # 0.10 of F, in the trait's own `unit`. POSITIVE means inbreeding makes
+    # the trait SMALLER. None -- the default -- means no directional
+    # dominance, which for several traits below is a reproduced null result
+    # rather than an omission; see their notes.
+    depression_per_10F: Optional[float] = None
+    depression_source: str = ""
     # Categorical only: labels ordered LOW liability -> HIGH liability,
     # with the population prevalence of each.
     labels: Optional[Tuple[str, ...]] = None
@@ -129,13 +168,57 @@ class TraitSpec:
     def v_add(self) -> float:
         return self.h2
 
+    def residual_variance(self, v_dom: float) -> float:
+        """V_E given a dominance share, so that V_P = 1 exactly."""
+        return 1.0 - (self.h2 + v_dom + self.v_epi + self.v_gxe)
+
     @property
     def v_env(self) -> float:
-        rest = self.h2 + self.v_dom + self.v_epi + self.v_gxe
-        return 1.0 - rest
+        """Residual share implied by the DECLARED v_dom. Undefined for a
+        directional trait, whose V_D is not known until it is calibrated."""
+        if self.v_dom is None:
+            raise ValueError(
+                f"trait {self.name}: v_env is undefined for a directional trait; "
+                "use residual_variance(realised V_D)"
+            )
+        return self.residual_variance(self.v_dom)
+
+    @property
+    def is_directional(self) -> bool:
+        return self.depression_per_10F is not None
+
+    def target_dominance_sum(self) -> float:
+        """
+        sum_j 2 p_j q_j d_j required to reproduce `depression_per_10F`.
+
+        Falconer & Mackay 1996 eq. 15.1: the mean of an inbred population is
+        M_F = M_0 - 2F sum_j p_j q_j d_j, i.e. the depression is linear in F
+        with slope sum_j 2 p_j q_j d_j on the LIABILITY scale. Dividing the
+        measured drop by the trait's phenotypic sd converts it to that scale.
+        """
+        return (self.depression_per_10F / self.sd) / 0.10
 
     def validate(self) -> None:
-        if self.v_env <= 0.0:
+        if self.is_directional:
+            if self.v_dom is not None:
+                raise ValueError(
+                    f"trait {self.name}: declares both v_dom and "
+                    "depression_per_10F. V_D is either an input or an output, "
+                    "never both -- set v_dom=None."
+                )
+            if self.kind is not TraitKind.CONTINUOUS or self.sd <= 0.0:
+                raise ValueError(
+                    f"trait {self.name}: a depression target is expressed in the "
+                    "trait's own units, so it needs a continuous scale with sd > 0"
+                )
+            if not self.depression_source:
+                raise ValueError(
+                    f"trait {self.name}: depression_per_10F without "
+                    "depression_source is a tuned parameter, not a measurement"
+                )
+        elif self.v_dom is None:
+            raise ValueError(f"trait {self.name}: needs v_dom or depression_per_10F")
+        elif self.v_env <= 0.0:
             raise ValueError(
                 f"trait {self.name}: variance shares exceed 1 "
                 f"(h2={self.h2} + dom={self.v_dom} + epi={self.v_epi} + gxe={self.v_gxe})"
@@ -161,11 +244,28 @@ TRAIT_TABLE: Dict[str, TraitSpec] = {t.name: t for t in [
     # --- stature & body -------------------------------------------------
     TraitSpec("height_cm", C, h2=0.80, mean=170.0, sd=9.0, unit="cm",
               target_pgs_r2=0.40, clip=(130.0, 215.0),
-              note="Twin h^2 ~0.8; Yengo 2022 PGS reaches ~40% in Europeans."),
+              v_dom=None, depression_per_10F=1.2,
+              depression_source="Joshi et al. 2015, Nature 523:459",
+              note="Twin h^2 ~0.8; Yengo 2022 PGS reaches ~40% in Europeans. "
+                   "DIRECTIONAL DOMINANCE: stature is the best-measured human "
+                   "inbreeding depression there is -- Joshi 2015 meta-analysed "
+                   "35 cohorts (n~35,000) and found -1.2 cm per 10% F_ROH. V_D "
+                   "is therefore an output here, and it comes out at ~1.4% of "
+                   "V_P, which is an independent prediction: dominance variance "
+                   "for height is estimated at essentially zero in family data "
+                   "(Zhu et al. 2015, Nat. Genet. 47:1114). Nothing told the "
+                   "model that."),
     TraitSpec("bmi", C, h2=0.75, mean=24.5, sd=4.0, unit="kg/m^2",
-              target_pgs_r2=0.09, clip=(14.0, 45.0)),
+              target_pgs_r2=0.09, clip=(14.0, 45.0),
+              note="NO directional dominance, on purpose. Joshi et al. 2015 "
+                   "tested 16 traits and found inbreeding depression in only "
+                   "four; BMI was among the nulls. Leaving it flat reproduces "
+                   "the paper's negative result instead of assuming depression "
+                   "wherever it sounds plausible."),
     TraitSpec("adiposity", C, h2=0.72, mean=0.0, sd=1.0, unit="z",
-              note="Latent body-fat variable; feeds insulin sensitivity."),
+              note="Latent body-fat variable; feeds insulin sensitivity. "
+                   "Non-directional for the same reason as bmi (Joshi 2015 "
+                   "null on adiposity measures, incl. waist-hip ratio)."),
 
     # --- pigmentation ---------------------------------------------------
     TraitSpec("skin_tone", C, h2=0.85, v_dom=0.04, v_epi=0.01, v_gxe=0.02,
@@ -201,10 +301,29 @@ TRAIT_TABLE: Dict[str, TraitSpec] = {t.name: t for t in [
     TraitSpec("insulin_sensitivity", C, h2=0.45, v_gxe=0.08, unit="z",
               note="TCF7L2 + omnigenic background. High GxE: diet/activity."),
     TraitSpec("bp_set_point", C, h2=0.35, v_gxe=0.08, mean=118.0, sd=12.0,
-              unit="mmHg systolic", clip=(80.0, 190.0)),
-    TraitSpec("lipid_profile", C, h2=0.50, v_gxe=0.06, unit="z"),
+              unit="mmHg systolic", clip=(80.0, 190.0),
+              note="Non-directional: blood pressure was a Joshi 2015 null."),
+    TraitSpec("lipid_profile", C, h2=0.50, v_gxe=0.06, unit="z",
+              note="Non-directional: LDL/HDL/total cholesterol were Joshi 2015 "
+                   "nulls."),
     TraitSpec("lung_capacity", C, h2=0.55, v_gxe=0.06, mean=4.6, sd=0.8, unit="L",
-              clip=(1.5, 8.0)),
+              clip=(1.5, 8.0),
+              v_dom=None, depression_per_10F=0.137,
+              depression_source="Joshi et al. 2015, Nature 523:459 (FEV1)",
+              note="DIRECTIONAL DOMINANCE, with a caveat that matters: Joshi's "
+                   "-137 ml per 10% F_ROH is for FEV1, a timed expiratory "
+                   "volume, while this trait is a generic spirometric capacity "
+                   "with mean 4.6 L (closer to FVC). Applying the FEV1 slope to "
+                   "it assumes the two depress proportionally, which is "
+                   "plausible -- they correlate ~0.8 -- but is not what was "
+                   "measured. TREAT THE MAGNITUDE AS INDICATIVE, THE SIGN AND "
+                   "THE MECHANISM AS REAL. Reproducing it also costs V_D ~ 0.11, "
+                   "high for a dominance share, because only 82 loci carry this "
+                   "trait against 309 for height: the same total depression "
+                   "spread over a quarter as many loci needs larger per-locus "
+                   "deviations. That is an artefact of a 500-locus genome "
+                   "standing in for ~50,000 independent segments, the caveat "
+                   "already recorded at the top of this module."),
     TraitSpec("aerobic_capacity", C, h2=0.50, v_gxe=0.10, mean=42.0, sd=8.0,
               unit="mL/kg/min VO2max", clip=(15.0, 85.0),
               note="Large GxE: training response is itself heritable. "
@@ -355,11 +474,38 @@ def _calibrate_trait(spec: TraitSpec, rng: np.random.Generator) -> TraitArchitec
     q = 1.0 - p
     twopq = 2.0 * p * q
 
-    # --- dominance: scale the raw d/a ratios to hit V_D exactly ---------
+    # --- dominance ------------------------------------------------------
+    # Two regimes, and the difference is which function of the SAME vector
+    # is pinned. V_D = sum (2pq d)^2 is a sum of squares; inbreeding
+    # depression is F * sum (2pq d), a plain sum. Pinning one does not pin
+    # the other -- with signs drawn at random the plain sum cancels to
+    # ~zero while the sum of squares is whatever we asked for, which is
+    # exactly how this engine ended up with dominance variance but no
+    # inbreeding depression on any trait.
     d_hat = DOMINANCE_RATIO[idx] * a_hat
-    denom = float(np.sum((twopq * d_hat) ** 2))
-    s_d = float(np.sqrt(spec.v_dom / denom)) if denom > 0 and spec.v_dom > 0 else 0.0
-    d = s_d * d_hat
+    if not spec.is_directional:
+        # V_D is an INPUT: scale the raw d/a ratios to hit it exactly.
+        denom = float(np.sum((twopq * d_hat) ** 2))
+        s_d = float(np.sqrt(spec.v_dom / denom)) if denom > 0 and spec.v_dom > 0 else 0.0
+        d = s_d * d_hat
+    else:
+        # V_D is an OUTPUT: pin the plain sum to the measured depression.
+        #
+        # Directional dominance means the trait-INCREASING allele is the
+        # dominant one, so every heterozygote sits above the midpoint of its
+        # two homozygotes and d > 0 whatever the sign of a. Removing
+        # heterozygotes then lowers the mean, which is the depression.
+        #
+        # Only anonymous peripheral loci are re-signed. A curated core gene's
+        # dominance sign is a published claim about that gene (HERC2 +0.95,
+        # MC1R -0.80, GJB2 -1.00) and is never overridden -- for the traits
+        # below every core d/a ratio is 0.0 anyway, so this guard is
+        # future-proofing rather than a live correction.
+        is_core = np.array([LOCI[i].is_core for i in idx])
+        d_hat = np.where(is_core, d_hat, np.abs(d_hat))
+        denom = float(np.sum(twopq * d_hat))
+        s_d = spec.target_dominance_sum() / denom if denom != 0.0 else 0.0
+        d = s_d * d_hat
 
     # --- additive: solve the quadratic for V_A = h^2 ---------------------
     shrink = 1.0
@@ -371,6 +517,14 @@ def _calibrate_trait(spec: TraitSpec, rng: np.random.Generator) -> TraitArchitec
             shrink *= 0.5
     else:
         raise RuntimeError(f"trait {spec.name}: could not calibrate additive scale")
+    if shrink != 1.0 and spec.is_directional:
+        # Halving d to rescue the additive solve would silently halve the
+        # depression this trait was calibrated to reproduce. Fail loudly
+        # instead: the target and h^2 are jointly infeasible.
+        raise ValueError(
+            f"trait {spec.name}: dominance had to shrink by {shrink} to solve "
+            f"V_A = {spec.v_add}, which would break the depression target"
+        )
     d = d * shrink
     a = s_a * a_hat
 
@@ -411,7 +565,23 @@ def _calibrate_trait(spec: TraitSpec, rng: np.random.Generator) -> TraitArchitec
     gxe_w = s_g * a_hat
     v_gxe = s_g ** 2 * A2
 
-    v_e = spec.v_env
+    # A directional trait's residual is whatever is left once its V_D has
+    # been *measured* rather than assumed, so V_P = 1 still holds exactly.
+    # The non-directional path keeps reading `spec.v_env` verbatim: v_d and
+    # spec.v_dom agree there only to float precision, and computing v_e from
+    # the realised value instead would shift every other trait's residual in
+    # its last bit.
+    if spec.is_directional:
+        v_e = spec.residual_variance(v_d)
+        if v_e <= 0.0:
+            raise ValueError(
+                f"trait {spec.name}: reproducing a depression of "
+                f"{spec.depression_per_10F} {spec.unit} per 10% F requires "
+                f"V_D = {v_d:.4f}, which leaves no environmental variance "
+                f"(h2={spec.h2} + epi={spec.v_epi} + gxe={spec.v_gxe})"
+            )
+    else:
+        v_e = spec.v_env
     sd_env = float(np.sqrt(v_e))
 
     thresholds = None
