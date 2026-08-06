@@ -507,6 +507,96 @@ class World:
         self.invalidate_pedigree()      # a birth changes the parent map (#31)
         return child
 
+    # -- adding someone to a running world --------------------------------
+
+    def add_person(self, sex: Optional[str] = None, age: int = 0,
+                   deme: int = 0, mother: Optional[str] = None,
+                   father: Optional[str] = None,
+                   found_new_lineage: bool = True) -> NPC:
+        """
+        Insert one new individual into a world that is already running.
+
+        Two modes:
+          * **immigrant** (no parents) -- a fresh genome drawn the way a
+            founder's is. Optionally registered as a new founder lineage, so
+            they show up as their own colour on the map and their ancestry
+            does not silently claim descent from someone else's bloodline.
+          * **birth** (both parents named) -- a real meiosis between two
+            existing people, so the child inherits, carries recombination and
+            enters the pedigree properly.
+
+        **The insertion itself costs the world's own generator nothing.**
+        Every draw comes from a spawned sub-generator
+        (`inbreeding.derived_rng`), which advances the parent's seed
+        *sequence* while leaving its bit-generator *state* untouched, so
+        nobody already alive is re-rolled and the next draw the world makes is
+        the one it would have made anyway. Consuming from `self.rng` instead
+        would retroactively change every individual generated so far this
+        tick, which would make the feature actively dangerous for a thesis run.
+
+        What this does NOT promise is that the world's *future* is unchanged.
+        A new person pairs, reproduces and dies like anyone else, so runs
+        diverge from the moment they arrive -- that divergence is causal,
+        which is the point of adding them, and is a different thing from
+        silently corrupting the random stream.
+
+        `sex` may be None for a birth, in which case it is decided
+        genetically, exactly as `_make_child` does.
+        """
+        from health_engine.inbreeding import derived_rng
+
+        rng = derived_rng(self.rng)
+        env = self.environment or self._environment_from_params()
+        n_demes = max(1, int(self.params.n_demes))
+        deme = int(deme) % n_demes
+
+        if mother and father:
+            if mother not in self.people or father not in self.people:
+                raise KeyError("both parents must exist in this world")
+            ma, pa = self.people[mother], self.people[father]
+            if ma.sex == pa.sex:
+                raise ValueError("parents must be of opposite sex")
+            if ma.sex != "female":
+                ma, pa = pa, ma
+            npc = reproduce(ma, pa, "unnamed", rng, environment=env,
+                            mutation_rate_scale=self.params.mutation_rate_scale,
+                            map_scale=self.params.recombination_scale)
+            ancestry = LineageRegistry.child_ancestry(
+                self.meta[ma.name].ancestry, self.meta[pa.name].ancestry)
+            deme = self.meta[ma.name].deme
+        else:
+            sex = sex if sex in ("female", "male") else "female"
+            npc = random_founder("unnamed", rng, sex=sex, environment=env)
+            ancestry = None                       # decided once we have a name
+
+        name = self._fresh_name(npc.sex)
+        npc.name = name
+
+        if ancestry is None:
+            if found_new_lineage:
+                self.registry.register_founder(name)
+                ancestry = LineageRegistry.founder_ancestry(name)
+            else:
+                # attach to whichever bloodline currently dominates the deme,
+                # so an arrival can also represent ordinary in-migration
+                here = [m.ancestry for n, m in self.meta.items()
+                        if m.deme == deme and n in {p.name for p in self.living}]
+                ancestry = here[0] if here else LineageRegistry.founder_ancestry(name)
+
+        age = max(0, int(age))
+        if age > 0:
+            simulate_aging(npc, age, rng, env)
+
+        self.people[name] = npc
+        self.living.append(npc)
+        meta = PersonMeta(ancestry=ancestry, birth_tick=self.tick - age,
+                          deme=deme)
+        meta.color = self.registry.color_hex(ancestry, alive=True)
+        self.meta[name] = meta
+        self.invalidate_pedigree()     # a new person changes the parent map
+        self._reposition()
+        return npc
+
     # -- layout & metrics ------------------------------------------------
 
     def _reposition(self) -> None:

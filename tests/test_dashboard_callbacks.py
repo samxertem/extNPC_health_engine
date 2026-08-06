@@ -383,3 +383,124 @@ def test_the_inspector_reports_the_year_actually_shown(someone):
     year the user dragged to."""
     d, _ = A.render_map(1, someone, "map", 3, "default")
     assert d["tick"] in {t for t in range(0, A.WORLD.tick + 1)}
+
+
+# =====================================================================
+# Add-a-person and export panels
+# =====================================================================
+
+def test_the_settlement_picker_delivers_its_value_with_its_options():
+    """
+    The layout ships this dropdown with an EMPTY option list, so a value set
+    at layout time has nothing to resolve against and the control renders
+    blank. Options and value have to arrive together -- found in the browser,
+    where the settlement box was empty while its menu listed 'Aravel'.
+    """
+    mothers, fathers, demes, value = A.fill_add_person_pickers(1, "controls", None)
+    assert demes, "a world always has at least one settlement"
+    assert value in {d["value"] for d in demes}
+    assert all(isinstance(d["value"], str) for d in demes)
+
+
+def test_the_settlement_picker_keeps_a_still_valid_choice():
+    *_, value = A.fill_add_person_pickers(1, "controls", "0")
+    assert value == "0"
+
+
+def test_the_settlement_picker_falls_back_when_the_deme_count_shrinks():
+    """`n_demes` changes on Reset, so a previously valid selection can vanish."""
+    *_, value = A.fill_add_person_pickers(1, "controls", "7")
+    assert value == "0"
+
+
+def test_the_pickers_do_nothing_off_the_controls_tab():
+    out = A.fill_add_person_pickers(1, "overview", None)
+    assert all(o is no_update for o in out)
+
+
+def test_only_fertile_age_adults_are_offered_as_parents():
+    """`reproduce` is a meiosis between two living people; offering a child
+    or a corpse would produce an error the user cannot diagnose."""
+    mothers, fathers, _demes, _v = A.fill_add_person_pickers(1, "controls", None)
+    lo_f, hi_f = A.WORLD.params.female_fertility
+    lo_m, hi_m = A.WORLD.params.male_fertility
+    for opt in mothers:
+        npc = A.WORLD.people[opt["value"]]
+        assert npc.sex == "female" and lo_f <= npc.age <= hi_f
+    for opt in fathers:
+        npc = A.WORLD.people[opt["value"]]
+        assert npc.sex == "male" and lo_m <= npc.age <= hi_m
+
+
+def test_adding_an_immigrant_grows_the_population_and_selects_them():
+    before = len(A.WORLD.living)
+    msg, selected, _tick = A.add_person(1, "female", 0, "0", None, None)
+    assert len(A.WORLD.living) == before + 1
+    assert selected in A.WORLD.people
+    assert "unrelated arrival" in msg
+    assert A.WORLD.people[selected].sex == "female"
+
+
+def test_adding_a_person_does_not_advance_the_year():
+    tick = A.WORLD.tick
+    A.add_person(1, "male", 20, "0", None, None)
+    assert A.WORLD.tick == tick
+
+
+def test_half_a_parent_selection_is_refused_rather_than_guessed():
+    """Silently treating one parent as 'no parents' is how a user ends up
+    believing a genome was inherited when it was not."""
+    mothers, _f, _d, _v = A.fill_add_person_pickers(1, "controls", None)
+    before = len(A.WORLD.living)
+    msg, sel, _ = A.add_person(1, "female", 0, "0", mothers[0]["value"], None)
+    assert "BOTH parents" in msg
+    assert sel is no_update
+    assert len(A.WORLD.living) == before, "nobody should have been created"
+
+
+def test_a_hand_picked_consanguineous_cross_is_flagged():
+    """Choosing parents directly bypasses the pairing kinship threshold, which
+    is useful deliberately and must not happen quietly."""
+    from dashboard import inspector
+    mothers, fathers, _d, _v = A.fill_add_person_pickers(1, "controls", None)
+    for m in mothers:
+        for f in fathers:
+            msg, sel, _ = A.add_person(1, None, 0, "0", m["value"], f["value"])
+            if sel is no_update:
+                continue
+            F = A.WORLD.inbreeding_of(sel)
+            if F >= 1 / 64:
+                assert "consanguineous" in msg
+                return
+    pytest.skip("no consanguineous pairing available in this world")
+
+
+@pytest.mark.parametrize("trigger, suffix", [
+    ("btn-export-csv", ".zip"),
+    ("btn-export-json", ".json.gz"),
+])
+def test_both_exports_produce_a_download(trigger, suffix, monkeypatch):
+    class FakeCtx:
+        triggered_id = trigger
+    monkeypatch.setattr(A, "ctx", FakeCtx)
+    data, msg = A.export_run(1, 1, "callback test", "all")
+    assert data["filename"].endswith(suffix)
+    assert data["content"]
+    assert str(A.WORLD.seed) in data["filename"]
+    assert msg
+
+
+def test_exporting_does_not_mutate_the_world(monkeypatch):
+    class FakeCtx:
+        triggered_id = "btn-export-csv"
+    monkeypatch.setattr(A, "ctx", FakeCtx)
+    before = (A.WORLD.tick, len(A.WORLD.living), len(A.WORLD.history))
+    A.export_run(1, None, "", "all")
+    assert (A.WORLD.tick, len(A.WORLD.living), len(A.WORLD.history)) == before
+
+
+def test_the_fertility_schedule_blurb_states_its_source():
+    for key in ("legacy", "preindustrial", "modern"):
+        blurb = A.describe_fertility_schedule(key)
+        assert "mean maternal age" in blurb
+        assert blurb.strip().endswith(tuple("abcdefghijklmnopqrstuvwxyz)0123456789"))

@@ -1120,6 +1120,96 @@ app.layout = html.Div(style={
                 html.Div(glossary_panel()),
             ]),
         ]),
+
+        # ---- add a person -------------------------------------------
+        html.Div(style={**CARD, "marginTop": "12px"}, children=[
+            html.Div("ADD A PERSON", style={**LBL, "color": ACCENT,
+                                            "marginBottom": "4px"}),
+            html.Div("Insert someone into the running world. Draws from a "
+                     "spawned sub-generator, so nobody already alive is "
+                     "re-rolled — the world's own random stream is untouched "
+                     "and the run stays reproducible.",
+                     style={"color": MUTED, "fontSize": "11px",
+                            "lineHeight": "1.5", "marginBottom": "10px"}),
+            html.Div(style={"display": "flex", "gap": "10px",
+                            "flexWrap": "wrap", "alignItems": "flex-end"},
+                     children=[
+                labelled("sex", dcc.Dropdown(
+                    id="add-sex", clearable=False, className="dk-dd",
+                    options=[{"label": "female", "value": "female"},
+                             {"label": "male", "value": "male"}],
+                    value="female", style={"fontSize": "12px"}), "130px",
+                    "ignored when two parents are chosen — sex is then "
+                    "decided genetically by the father's X or Y (#2)"),
+                labelled("age", dcc.Input(
+                    id="add-age", type="number", min=0, max=90, step=1, value=0,
+                    style={"width": "100%", "background": PLANE, "color": INK,
+                           "border": f"1px solid {GRID}", "borderRadius": "6px",
+                           "padding": "6px 8px", "fontSize": "12px"}), "90px",
+                    "an arrival older than 0 is aged in properly — the "
+                    "epigenome advances and early conditions can appear"),
+                # Values are STRINGS, not ints. Deme 0 is the default
+                # settlement, and 0 is falsy in JavaScript -- Dash's dropdown
+                # resolves the selected label with a truthiness check, so an
+                # integer 0 matches no option and the control renders blank
+                # even though its options are correct. `add_person` casts back
+                # with int().
+                labelled("settlement", dcc.Dropdown(
+                    id="add-deme", clearable=False, className="dk-dd",
+                    options=[], value="0", style={"fontSize": "12px"}), "150px",
+                    "which deme they arrive in"),
+                labelled("mother (optional)", dcc.Dropdown(
+                    id="add-mother", className="dk-dd", options=[], value=None,
+                    placeholder="immigrant…", style={"fontSize": "12px"}),
+                    "200px",
+                    "pick BOTH parents for a real meiosis; leave empty for an "
+                    "unrelated arrival with a fresh genome"),
+                labelled("father (optional)", dcc.Dropdown(
+                    id="add-father", className="dk-dd", options=[], value=None,
+                    placeholder="immigrant…", style={"fontSize": "12px"}),
+                    "200px"),
+                btn("＋ Add person", "btn-add-person", primary=True),
+            ]),
+            html.Div(id="add-person-msg",
+                     style={"color": GOOD, "fontSize": "12px",
+                            "marginTop": "10px", "minHeight": "18px"}),
+        ]),
+
+        # ---- export -------------------------------------------------
+        html.Div(style={**CARD, "marginTop": "12px"}, children=[
+            html.Div("EXPORT THIS RUN", style={**LBL, "color": ACCENT,
+                                               "marginBottom": "4px"}),
+            html.Div("Everything the run knows, as files you can analyse "
+                     "elsewhere. Each export carries a manifest — seed, every "
+                     "parameter, the git commit and library versions — so a "
+                     "figure made from it can be traced back to the code that "
+                     "produced it.",
+                     style={"color": MUTED, "fontSize": "11px",
+                            "lineHeight": "1.5", "marginBottom": "10px"}),
+            html.Div(style={"display": "flex", "gap": "10px",
+                            "flexWrap": "wrap", "alignItems": "flex-end"},
+                     children=[
+                labelled("note (goes in the manifest)", dcc.Input(
+                    id="export-note", type="text", value="",
+                    placeholder="e.g. isolated islands, run 3",
+                    style={"width": "100%", "background": PLANE, "color": INK,
+                           "border": f"1px solid {GRID}", "borderRadius": "6px",
+                           "padding": "6px 8px", "fontSize": "12px"}), "280px"),
+                labelled("scope", dcc.Dropdown(
+                    id="export-scope", clearable=False, className="dk-dd",
+                    options=[{"label": "everyone who ever lived", "value": "all"},
+                             {"label": "living only", "value": "living"}],
+                    value="all", style={"fontSize": "12px"}), "220px",
+                    "the dead are included by default: dropping them "
+                    "conditions any analysis on survival"),
+                btn("⬇ CSV bundle (.zip)", "btn-export-csv", primary=True),
+                btn("⬇ Full world save (.json)", "btn-export-json"),
+            ]),
+            html.Div(id="export-msg",
+                     style={"color": MUTED, "fontSize": "11px",
+                            "marginTop": "10px", "minHeight": "18px"}),
+            dcc.Download(id="download-bundle"),
+        ]),
     ]),
 
     # ---- INDIVIDUAL (a game-style character sheet) -------------------
@@ -1586,6 +1676,135 @@ def style_drawer_mode(mode):
     return ([tools] * len(DRAWERS)
             + [(off if directory else on)] * len(DRAWERS)
             + [(on if directory else off)] * len(DRAWERS))
+
+
+@app.callback(
+    Output("download-bundle", "data"), Output("export-msg", "children"),
+    Input("btn-export-csv", "n_clicks"), Input("btn-export-json", "n_clicks"),
+    State("export-note", "value"), State("export-scope", "value"),
+    prevent_initial_call=True,
+)
+def export_run(_csv, _json, note, scope):
+    """
+    Build the export in-process and hand it to the browser.
+
+    `dcc.send_bytes` takes a writer callable, so the bundle is streamed into
+    the response rather than base64'd through a store. Both exports are pure
+    reads of the world -- nothing here advances or mutates the simulation.
+    """
+    from simulation import export as EX
+
+    trig = ctx.triggered_id
+    stamp = f"seed{WORLD.seed}-year{WORLD.tick}"
+    if trig == "btn-export-csv":
+        blob = EX.build_csv_bundle(WORLD, note=note or "",
+                                   living_only=(scope == "living"))
+        msg = (f"CSV bundle · {len(blob) / 1024:.0f} kB · "
+               f"{len(WORLD.people)} people, {len(WORLD.history)} years, "
+               f"commit {EX.git_commit()[:8]}")
+        return (dcc.send_bytes(lambda b: b.write(blob),
+                               f"extnpc-{stamp}.zip"), msg)
+    if trig == "btn-export-json":
+        blob = EX.build_world_save(WORLD, note=note or "")
+        msg = (f"Full world save · {len(blob) / 1024:.0f} kB · "
+               f"reloadable with simulation.export.load_world_save()")
+        return (dcc.send_bytes(lambda b: b.write(blob),
+                               f"extnpc-{stamp}-save.json.gz"), msg)
+    return no_update, no_update
+
+
+@app.callback(
+    Output("add-mother", "options"), Output("add-father", "options"),
+    Output("add-deme", "options"), Output("add-deme", "value"),
+    Input("tick", "data"), Input("active-tab", "data"),
+    State("add-deme", "value"),
+)
+def fill_add_person_pickers(_tick, active, current_deme):
+    """
+    Only fertile-age adults are offerable as parents, because `reproduce` is a
+    meiosis between two living people and anything else would be a silent
+    no-op or an error whose cause the user cannot see.
+
+    The settlement's VALUE is returned alongside its options. The layout ships
+    the dropdown with an empty option list, so a value set at layout time has
+    nothing to resolve against and the control renders blank -- options and
+    value have to arrive together. The value is preserved if it is still
+    valid (deme count can change on Reset) and otherwise falls back to the
+    first settlement.
+    """
+    if active != "controls":
+        return no_update, no_update, no_update, no_update
+    from simulation import deme_label
+    lo_f, hi_f = WORLD.params.female_fertility
+    lo_m, hi_m = WORLD.params.male_fertility
+
+    def opts(sex, lo, hi):
+        people = sorted((n for n in WORLD.living
+                         if n.sex == sex and lo <= n.age <= hi),
+                        key=lambda n: n.name)
+        return [{"label": f"{n.name.split('-')[0]} · {n.age}y", "value": n.name}
+                for n in people]
+
+    demes = [{"label": deme_label(d), "value": str(d)}
+             for d in range(max(1, int(WORLD.params.n_demes)))]
+    valid = {d["value"] for d in demes}
+    value = str(current_deme) if str(current_deme) in valid else demes[0]["value"]
+    return opts("female", lo_f, hi_f), opts("male", lo_m, hi_m), demes, value
+
+
+@app.callback(
+    Output("add-person-msg", "children"),
+    Output("selected", "data", allow_duplicate=True),
+    Output("tick", "data", allow_duplicate=True),
+    Input("btn-add-person", "n_clicks"),
+    State("add-sex", "value"), State("add-age", "value"),
+    State("add-deme", "value"), State("add-mother", "value"),
+    State("add-father", "value"),
+    prevent_initial_call=True,
+)
+def add_person(_n, sex, age, deme, mother, father):
+    """
+    Add the person and select them, so the Individual tab is already showing
+    who just arrived.
+
+    Exactly one parent chosen is rejected rather than quietly treated as an
+    immigrant: it is far more likely to be a half-finished selection than an
+    intention, and silently ignoring half the input is how a user ends up
+    believing a genome is inherited when it is not.
+    """
+    if mother and not father or father and not mother:
+        return ("Choose BOTH parents for a birth, or neither for an "
+                "unrelated arrival."), no_update, no_update
+    try:
+        npc = WORLD.add_person(sex=sex, age=int(age or 0),
+                               deme=int(deme or 0),
+                               mother=mother or None, father=father or None)
+    except (KeyError, ValueError) as exc:
+        return f"Could not add: {exc}", no_update, no_update
+
+    who = npc.name.split("-")[0]
+    flag = ""
+    if mother and father:
+        F = WORLD.inbreeding_of(npc.name)
+        detail = (f"born to {mother.split('-')[0]} × {father.split('-')[0]}"
+                  f" · pedigree F {F:.4f} ({inspector.relationship_label(F)})")
+        # Choosing parents by hand BYPASSES the pairing kinship threshold that
+        # normally blocks close relatives, so a consanguineous cross is
+        # possible here and nowhere else. That is useful for studying
+        # inbreeding depression deliberately, but it must not happen quietly.
+        if F >= 1 / 64:
+            flag = "⚠ consanguineous (the pairing threshold does not apply " \
+                   "to hand-picked parents) — "
+    else:
+        detail = "unrelated arrival, new bloodline"
+    # The KPI row, the map and the directory all read per-YEAR recorded state
+    # (the history row and the snapshot frame), so a mid-year arrival cannot
+    # appear in them without fabricating a record. Say so rather than invent
+    # one: the alternative is a history row for a year that did not happen.
+    return (f"{flag}Added {who} ({npc.sex}, age {npc.age}) — {detail}. "
+            f"Now {len(WORLD.living)} alive; they appear in the charts and on "
+            f"the map at the next year.",
+            npc.name, WORLD.tick)
 
 
 @app.callback(
