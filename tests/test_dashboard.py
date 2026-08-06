@@ -170,3 +170,79 @@ def test_bmi_is_labelled_as_an_endpoint_while_still_growing(grown_world):
     assert "at maturity" in _text(inspector.summary_card(grown_world, growing[0]))
     # ...and an adult, whose BMI *is* current, must not carry the caveat.
     assert "at maturity" not in _text(inspector.summary_card(grown_world, mature[0]))
+
+
+# ---------------------------------------------------------------------
+# Directional dominance in the inspector (session 15)
+# ---------------------------------------------------------------------
+
+@pytest.fixture(scope="module")
+def inbred_world():
+    """A world run long enough for someone's parents to be related."""
+    w = World(n_founders=12, seed=5)
+    for _ in range(60):
+        w.step()
+    return w
+
+
+def _most_inbred(world):
+    return max(world.living, key=lambda p: world.inbreeding_of(p.name))
+
+
+def test_an_inbred_individual_shows_the_stature_cost(inbred_world):
+    """The engine's second cost of inbreeding has to be visible, or the
+    mechanism exists only in the test suite."""
+    from health_engine.inbreeding import predicted_depression
+
+    npc = _most_inbred(inbred_world)
+    F = inbred_world.inbreeding_of(npc.name)
+    assert F > 1e-9, "fixture failed to produce a consanguineous birth"
+    text = _text(inspector.summary_card(inbred_world, npc.name))
+    assert "stature cost" in text
+    # the number shown is the closed form, not a re-derivation
+    assert f"{predicted_depression('height_cm', F):+.2f}" in text
+
+
+def test_an_outbred_individual_claims_no_stature_cost(inbred_world):
+    """At F = 0 the expected cost is exactly zero, and a row reading
+    '-0.00 cm' would be a claim where there is nothing to claim."""
+    outbred = [p for p in inbred_world.living
+               if inbred_world.inbreeding_of(p.name) <= 1e-9]
+    if not outbred:
+        pytest.skip("no outbred individuals alive in this world")
+    assert "stature cost" not in _text(
+        inspector.summary_card(inbred_world, outbred[0].name))
+
+
+def test_the_two_costs_of_inbreeding_are_shown_side_by_side(inbred_world):
+    """Viability and stature are separate mechanisms from separate
+    literatures; the character sheet must not let one stand in for both."""
+    from dashboard import app as dash_app
+
+    npc = _most_inbred(inbred_world)
+    # `_inbreeding_section` reads the module-level WORLD, so it has to be
+    # swapped -- and put back, or every later test in this pytest session
+    # inherits our fixture's world.
+    previous = dash_app.WORLD
+    try:
+        dash_app.WORLD = inbred_world
+        text = _text(dash_app._inbreeding_section(npc.name, npc))
+    finally:
+        dash_app.WORLD = previous
+    assert "relative viability" in text
+    assert "expected stature cost" in text
+    assert "expected lung cost" in text
+
+
+def test_the_inbreeding_chart_carries_the_stature_cost_on_hover(inbred_world):
+    """The predicted cost is a linear rescale of the mean-F line, so it rides
+    in customdata rather than as a redundant trace -- but it must be there,
+    and it must match the closed form."""
+    from health_engine.inbreeding import predicted_depression
+
+    cols = inbred_world.history_columns()
+    fig = panels.inbreeding_figure(cols)
+    trace = next(t for t in fig.data if t.name == "mean F")
+    assert trace.customdata is not None
+    for f, cost in zip(cols["mean_inbreeding"], trace.customdata):
+        assert cost == pytest.approx(predicted_depression("height_cm", f))

@@ -134,7 +134,15 @@ def _inbreeding_rows(F: float, npc, cnvs: List[dict]) -> List:
     an EXPECTATION over meioses; the realised value is what this individual's
     genome actually got, and the two differ because meiosis is a lottery.
     Showing only one of them would hide the engine's own point.
+
+    `viability` and `stature cost` are the engine's TWO costs of inbreeding and
+    are deliberately adjacent: recessive load decides survival, directional
+    dominance decides height, and they are independent. The stature figure is
+    an expectation at this pedigree F -- see `app._inbreeding_section` for why
+    it is not keyed off the realised value.
     """
+    from health_engine.inbreeding import predicted_depression
+
     rows = [
         _kv("pedigree F", _fmt_f(F), _f_color(F)),
     ]
@@ -145,6 +153,10 @@ def _inbreeding_rows(F: float, npc, cnvs: List[dict]) -> List:
                     _f_color(max(npc.realised_inbreeding(), 0.0))))
     rows.append(_kv("viability", f"{npc.relative_viability():.3f}",
                     CRIT if npc.relative_viability() < 0.9 else INK))
+    if F > 1e-9:
+        stature = predicted_depression("height_cm", F)
+        rows.append(_kv("stature cost", f"{stature:+.2f} cm",
+                        CRIT if stature <= -1.0 else WARN))
     if npc.load is not None:
         rows.append(_kv("hidden load", f"{npc.load.n_carried} alleles",
                         small=True))

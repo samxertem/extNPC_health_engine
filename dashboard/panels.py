@@ -418,6 +418,19 @@ def inbreeding_figure(cols: Dict[str, List[float]]) -> go.Figure:
     thresholds, and the resulting juvenile survival on the right. The two
     together are the whole of Morton's law made visible: as F rises, survival
     falls, and the slope between them is the lethal-equivalent count.
+
+    The engine's SECOND cost of inbreeding -- directional dominance on stature
+    -- rides along in the mean-F hover rather than as a trace of its own, for
+    two reasons. It is a deterministic rescale of the mean-F line
+    (cost = -F * sd * sum 2pq d), so a curve would carry no information the
+    axis does not already have. And the *observed* mean height deliberately is
+    NOT plotted against F here: in a population of ~70 the mean breeding value
+    drifts by on the order of 1.7 cm over six generations, against a
+    depression of ~0.8 cm at a typical mean F of 0.065. A panel implying the
+    observed fall in height IS the depression would be showing mostly drift.
+    The controlled measurement lives in
+    `validation.stature_inbreeding_depression`, where thousands of children per
+    pedigree level make it a signal.
     """
     fig = go.Figure()
     if not cols or not cols.get("tick"):
@@ -452,18 +465,26 @@ def inbreeding_figure(cols: Dict[str, List[float]]) -> go.Figure:
         x=t, y=max_f, mode="lines",
         line=dict(color=WARN, width=1.2, dash="dot"), name="max F",
         hovertemplate="year %{x}<br>max F %{y:.4f}<extra></extra>"))
+    # What this year's mean F costs in stature, exactly, from the same closed
+    # form the harness checks. Carried as customdata so it needs no axis.
+    from health_engine.inbreeding import predicted_depression
+    stature_cost = [predicted_depression("height_cm", f) for f in mean_f]
+
     fig.add_trace(go.Scatter(
-        x=t, y=mean_f, mode="lines",
+        x=t, y=mean_f, mode="lines", customdata=stature_cost,
         line=dict(color=CRIT, width=2.4, shape="spline", smoothing=0.6),
         fill="tozeroy", fillcolor="rgba(200,66,66,0.12)", name="mean F",
-        hovertemplate="year %{x}<br>mean F %{y:.4f}<extra></extra>"))
+        hovertemplate="year %{x}<br>mean F %{y:.4f}"
+                      "<br>expected stature cost %{customdata:+.2f} cm"
+                      "<extra></extra>"))
     fig.add_trace(go.Scatter(
         x=t, y=viab, mode="lines", yaxis="y2",
         line=dict(color=CAT[0], width=1.8), name="viability (right axis)",
         hovertemplate="year %{x}<br>viability %{y:.3f}<extra></extra>"))
 
-    _style(fig, "Inbreeding and its cost  ·  ln S(F) = ln S₀ − B·F  "
-                "·  Morton, Crow & Muller 1956", height=260)
+    _style(fig, "Inbreeding and its two costs  ·  survival ln S(F) = ln S₀ − B·F "
+                "(Morton 1956)  ·  stature −F·Σ2pqd (Joshi 2015, on hover)",
+           height=260)
     # Scale to the DATA, with headroom, rather than to whichever reference
     # line happens to be furthest away.
     fig.update_yaxes(title="pedigree F", range=[0, peak * 1.45])

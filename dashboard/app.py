@@ -303,7 +303,22 @@ def char_info(name):
 
 
 def _inbreeding_section(name, npc):
-    """Rows for the character sheet's inbreeding / genetic-load block (#31, #12)."""
+    """Rows for the character sheet's inbreeding / genetic-load block (#31, #12).
+
+    Two costs of inbreeding are shown, and they are separate mechanisms rather
+    than two views of one number: recessive load decides whether this
+    individual survived, dominance deviations at the trait loci decide how tall
+    they are. An inbred person can be short and perfectly viable.
+
+    The trait costs are keyed off PEDIGREE F, not realised F, and are labelled
+    "expected" for that reason. The closed form
+    M_F - M_0 = -F * sum 2pq d is an expectation over meioses, so it answers
+    "what does this family tree cost?" -- not "how much of this person's height
+    is attributable to their homozygosity", which is unanswerable for one
+    individual whose environmental draw is unobservable. Sitting it beside the
+    realised F row is the point: the two differ because meiosis is a lottery.
+    """
+    from health_engine.inbreeding import predicted_depression
     from .inspector import relationship_label
 
     F = WORLD.inbreeding_of(name)
@@ -315,6 +330,13 @@ def _inbreeding_section(name, npc):
         _row("relative viability", f"{npc.relative_viability():.3f}",
              CRIT if npc.relative_viability() < 0.9 else GOOD),
     ]
+    if F > 1e-9:
+        stature = predicted_depression("height_cm", F)
+        lung = predicted_depression("lung_capacity", F)
+        rows.append(_row("expected stature cost", f"{stature:+.2f} cm",
+                         CRIT if stature <= -1.0 else WARN))
+        rows.append(_row("expected lung cost", f"{lung:+.3f} L",
+                         CRIT if lung <= -0.12 else WARN))
     if npc.load is not None:
         rows.append(_row("hidden recessive load", f"{npc.load.n_carried} alleles"))
         rows.append(_row("expressed (homozygous)", npc.load.n_homozygous,
