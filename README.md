@@ -7,7 +7,7 @@ The goal is not a game system that *feels* genetic. It is a simulator whose
 emergent output can be checked against the closed-form laws of population
 genetics — and which says so honestly when it cannot.
 
-**Version 0.5.0** · 133 tests passing · roadmap 30/32 items
+**Version 0.5.0** · 264 tests passing · roadmap 32/32 items — engine complete
 
 ---
 

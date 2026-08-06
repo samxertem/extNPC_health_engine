@@ -111,17 +111,28 @@
     var cv = document.getElementById("rts-canvas");
     if (!cv || !R.sheet || !R.vill || !R.data) return;
     // keep the backing store matched to the displayed size (handles the tab
-    // being hidden at first paint, then shown, and window resizes)
-    var box = cv.parentElement.getBoundingClientRect();
+    // being hidden at first paint, then shown, and window resizes).
+    // BOTH dimensions are measured, and from the canvas's own box rather than
+    // the parent's: the CSS height is a calc() against the viewport, so a
+    // hardcoded backing-store height makes the browser scale the drawing to
+    // fit and squashes the whole world vertically. Height must also be able
+    // to trigger the resize on its own — a window resized only vertically
+    // never changes the width.
+    var box = cv.getBoundingClientRect();
+    if (box.width < 1 || box.height < 1) return;   // tab hidden: nothing to size against
     var wantW = Math.max(600, Math.floor(box.width));
-    if (Math.abs(cv.width - wantW) > 2) { cv.width = wantW; cv.height = 620; R.terrain = null; }
+    var wantH = Math.max(460, Math.floor(box.height));   // matches the CSS minHeight
+    if (Math.abs(cv.width - wantW) > 2 || Math.abs(cv.height - wantH) > 2) {
+      cv.width = wantW; cv.height = wantH; R.terrain = null;
+    }
     var W = cv.width, H = cv.height, ctx = cv.getContext("2d");
     ctx.imageSmoothingEnabled = false;
     var data = R.data, m = mapper(W, H);
     var t = (performance.now() - R.t0) / 1000;
 
     // terrain (rebuild if the seed changed, e.g. on Reset)
-    if (!R.terrain || R.terrainSeed !== data.seed || R.terrain.width !== W) {
+    if (!R.terrain || R.terrainSeed !== data.seed ||
+        R.terrain.width !== W || R.terrain.height !== H) {
       R.terrain = buildTerrain(data.seed || 1, W, H); R.terrainSeed = data.seed;
     }
     ctx.clearRect(0, 0, W, H);

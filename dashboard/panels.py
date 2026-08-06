@@ -337,6 +337,11 @@ def _last(cols: Dict[str, List[float]], key: str, default=0.0):
     return v[-1] if v else default
 
 
+def _n_demes(params, default: int = 1) -> int:
+    """Deme count off a params object, tolerating callers that pass None."""
+    return int(getattr(params, "n_demes", default) or default)
+
+
 def kpi_data(cols: Dict[str, List[float]], params) -> List[dict]:
     """Values + short glossary for the KPI stat-tile row. `delta` is the change
     over the last 10 recorded years, for a sparkline-free trend arrow."""
@@ -363,9 +368,19 @@ def kpi_data(cols: Dict[str, List[float]], params) -> List[dict]:
              value=f"{_last(cols,'heterozygosity'):.3f}",
              delta=delta("heterozygosity"), fmt="f3", accent=CAT[1],
              glossary=GLOSSARY["heterozygosity"]["text"]),
-        dict(key="fst", label="F_ST", value=f"{_last(cols,'fst'):.3f}",
-             delta=delta("fst"), fmt="f3", accent=CAT[6],
-             glossary=GLOSSARY["fst"]["text"]),
+        # With one deme there is no partition to estimate over, so the tile
+        # shows an em-dash rather than 0.000 -- for the same reason
+        # `fst_figure` hides its axes in that state: a displayed zero asserts
+        # "no differentiation was measured", which is a different claim from
+        # "there is nothing to measure".
+        dict(key="fst", label="F_ST",
+             value=(f"{_last(cols,'fst'):.3f}" if _n_demes(params) > 1 else "—"),
+             delta=(delta("fst") if _n_demes(params) > 1 else 0.0),
+             fmt=("f3" if _n_demes(params) > 1 else "none"), accent=CAT[6],
+             glossary=(GLOSSARY["fst"]["text"] if _n_demes(params) > 1 else
+                       "Undefined in a single-deme world — F_ST measures "
+                       "differentiation BETWEEN sub-populations, and there is "
+                       "only one. Raise 'demes' in Controls, then Reset.")),
         dict(key="mean_relatedness", label="KINSHIP",
              value=f"{_last(cols,'mean_relatedness'):.3f}",
              delta=delta("mean_relatedness"), fmt="f3", accent=CAT[5],

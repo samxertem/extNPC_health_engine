@@ -267,7 +267,15 @@ def summary_card(world, name: Optional[str],
             _kv("height", (f"{h_now:.1f} cm  → {ph['height_cm']:.0f} adult"
                            if growing else f"{h_now:.1f} cm")),
             _kv("life stage", npc.life_stage()),
-            _kv("BMI", f"{ph['bmi']:.1f}"),
+            # BMI is the MATURE value and is labelled as such while the
+            # individual is still growing. #13 models stature only --
+            # Preece-Baines is a height curve and the engine has no body-mass
+            # trajectory -- so there is nothing to age-express BMI with.
+            # Printing the bare number put "BMI 24.4" against a three-year-old,
+            # which is not a possible value for a toddler (~15-16) and read as
+            # a measurement rather than an endpoint.
+            _kv("BMI", (f"{ph['bmi']:.1f} at maturity" if growing
+                        else f"{ph['bmi']:.1f}")),
             _kv("VO₂ (mito-gated)", f"{npc.effective_aerobic_capacity():.2f}"),
             _kv("epigenetic age", f"{npc.epigenome.epigenetic_age:.1f}",
                 CRIT if npc.epigenetic_age_acceleration > 3 else INK),

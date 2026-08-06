@@ -506,7 +506,17 @@ def _deme_short(d: int) -> str:
 
 def lineage_legend_view():
     swatches = panels.lineage_legend(WORLD)
-    rows = [html.Div("BLOODLINES", style={**LBL, "marginBottom": "8px"})]
+    rows = []
+    if WORLD.params.n_demes <= 1:
+        # A single town on the map is the configured world, not a rendering
+        # fault -- say so, because it is the first thing the map looks like.
+        rows.append(html.Div(
+            "One settlement — this world is a single panmictic deme, which is "
+            "the reproducibility baseline. Raise “demes” in Controls and press "
+            "Reset to populate the map and make F_ST measurable.",
+            style={"color": MUTED, "fontSize": "11px", "lineHeight": "1.5",
+                   "marginBottom": "10px"}))
+    rows.append(html.Div("BLOODLINES", style={**LBL, "marginBottom": "8px"}))
     for name, hexc in swatches:
         rows.append(html.Div([
             html.Span(style={"display": "inline-block", "width": "11px",
@@ -1020,7 +1030,15 @@ app.layout = html.Div(style={
             html.Div(style=CARD, children=[
                 html.Div("COMMUNITY & RESOURCES", style={**LBL, "color": ACCENT, "marginBottom": "8px"}),
                 labelled("demes (Reset to apply)", slider("ndemes", 1, 8, 1, DEFAULTS["n_demes"],
-                         {1: "1", 4: "4", 8: "8"}), "auto"),
+                         {1: "1", 4: "4", 8: "8"}), "auto",
+                         "Wright 1931 island model: separate settlements that "
+                         "pair within themselves and exchange migrants. The "
+                         "default of 1 is deliberate — a single panmictic deme "
+                         "is the reproducibility baseline (no structure means "
+                         "no extra RNG draws), and it leaves F_ST undefined. "
+                         "Raise this to make the community layer measurable; "
+                         "founders are split across demes, so raise founders "
+                         "too or small demes may fail to pair"),
                 labelled("migration rate", slider("migr", 0.0, 0.3, 0.005, 0.0), "auto",
                          "annual P(an individual changes deme) — gene flow"),
                 labelled("resource equity", slider("equity", 0.0, 1.0, 0.05, 1.0), "auto",
@@ -1308,10 +1326,14 @@ def fire_shock(_p, _f, _b, mag):
 def render_always(_tick):
     cols = WORLD.history_columns()
     r = WORLD.history[-1] if WORLD.history else {}
+    # F_ST reads "—" in a single-deme world for the same reason the KPI tile
+    # and the Community chart do: there is no partition to estimate over, and
+    # printing 0.000 would assert a measurement that was never made.
+    fst_txt = (f"{r.get('fst', 0):.3f}" if WORLD.params.n_demes > 1 else "—")
     headline = (f"year {int(r.get('tick', 0))} · {int(r.get('n_alive', 0))} alive · "
                 f"gen {int(r.get('max_generation', 0))} · "
                 f"{int(r.get('n_couples', 0))} couples · "
-                f"H {r.get('heterozygosity', 0):.3f} · F_ST {r.get('fst', 0):.3f}")
+                f"H {r.get('heterozygosity', 0):.3f} · F_ST {fst_txt}")
     recent = WORLD.chronicle.recent(3)
     ticker = "  ·  ".join(f"y{e.tick} {e.text}" for e in recent) if recent else \
         "the chronicle will narrate notable events as they happen"
