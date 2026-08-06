@@ -425,6 +425,9 @@ def main() -> None:
         viz.plot_inbreeding_depression(
             os.path.join(out, "inbreeding_depression.png"),
             n=800 if FAST else 3000),
+        viz.plot_directional_dominance(
+            os.path.join(out, "directional_dominance.png"),
+            n=500 if FAST else 1500),
         viz.plot_cnv_dosage(os.path.join(out, "cnv_dosage.png"),
                             n=800 if FAST else 2500),
         viz.plot_development(os.path.join(out, "development.png")),

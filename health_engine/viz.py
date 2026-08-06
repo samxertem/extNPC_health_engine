@@ -994,6 +994,135 @@ def plot_inbreeding_depression(out_path: str, n: int = 3000,
     return _save(fig, out_path)
 
 
+def plot_directional_dominance(out_path: str, trait: str = "height_cm",
+                               n: int = 1500, seed: int = 20260902) -> str:
+    """
+    Directional dominance: inbreeding depression on a PHENOTYPE.
+
+    The companion to `plot_inbreeding_depression`, which shows the fitness
+    half. Two mechanisms, two literatures, one engine -- and they are kept
+    apart, because an inbred individual can be short and still viable.
+
+    Left: the A/B. Both series are the SAME genomes, produced by real meiosis
+    over the same five pedigree structures, scored through two architectures
+    that differ only in the sign of the dominance deviations. The directional
+    arm tracks the closed form; the arm with `loci.py`'s random signs stays
+    flat. This is the whole result in one panel.
+
+    Middle: why. Each locus contributes 2*p*q*d to the depression, and the
+    histogram is that quantity across the trait's loci. Random signs put it
+    symmetrically about zero, so the PLAIN SUM cancels -- while the sum of
+    SQUARES, which is V_D, is unaffected by sign and stays exactly where it
+    was asked to be. Signing the deviations moves the distribution off zero
+    without inventing any new variance. That distinction is the entire reason
+    this engine carried dominance variance for eleven sessions with no
+    inbreeding depression on any trait.
+
+    Right: which traits, against the paper. Joshi et al. 2015 tested 16 traits
+    and reported depression in four. Reproducing the two this engine can
+    represent is the positive result; leaving BMI, adiposity, blood pressure
+    and lipids flat reproduces the negatives, which is the part that
+    distinguishes a model from a curve fit. Values are in phenotypic SD so
+    that centimetres, litres and mmHg are comparable.
+    """
+    from .inbreeding import predicted_depression
+    from .traits import ARCHITECTURE, non_directional_variant
+    from . import validation as V
+
+    r = V.stature_inbreeding_depression(trait, n_per_level=n,
+                                        rng=np.random.default_rng(seed))
+    arch = ARCHITECTURE[trait]
+    alt = non_directional_variant(trait)
+    unit = arch.spec.unit
+
+    fig, (axL, axM, axR) = plt.subplots(1, 3, figsize=(15, 4.6))
+
+    # ---- left: the A/B regression -----------------------------------
+    F = np.array(r.levels)
+    grid = np.linspace(0, 0.27, 60)
+    m0 = r.mean_value[0]
+    axL.plot(grid, m0 + r.expected_slope * grid, "--", color="#2c6fa8", lw=2,
+             label=f"closed form  $-F\\sum 2pqd$  ({r.expected_slope:+.2f} {unit}/F)")
+    axL.errorbar(F, r.mean_value, yerr=r.sem_value, fmt="o", color="#c0504d",
+                 ms=7, capsize=3,
+                 label=f"directional (n={n} per level)")
+    axL.errorbar(F, r.counterfactual_value, yerr=r.sem_value, fmt="s",
+                 color="#9aa5b1", ms=6, capsize=3,
+                 label="same genomes, random dominance signs")
+    for x, y, lab in zip(F, r.mean_value, ["outbred", "half 1st cous.",
+                                           "1st cousins", "double 1st cous.",
+                                           "full sibs"]):
+        axL.annotate(lab, xy=(x, y), xytext=(11, -16),
+                     textcoords="offset points", fontsize=7.5, color="#5a6570",
+                     ha="left")
+    axL.set_xlabel("pedigree inbreeding coefficient  F")
+    axL.set_ylabel(f"mean {trait}  ({unit})")
+    axL.set_title(f"{r.observed_per_10F:+.2f} {unit} per 10% F\n"
+                  f"(published {r.published_per_10F:+.2f}; {r.source})",
+                  fontsize=10)
+    axL.legend(fontsize=8, frameon=False, loc="lower left")
+    axL.grid(alpha=0.25)
+
+    # ---- middle: the mechanism, per locus ----------------------------
+    twopq = 2.0 * arch.p * (1.0 - arch.p)
+    before = twopq * alt.d
+    after = twopq * arch.d
+    lim = float(max(np.abs(before).max(), np.abs(after).max())) * 1.05
+    bins = np.linspace(-lim, lim, 45)
+    axM.hist(before, bins=bins, alpha=0.65, color="#9aa5b1",
+             label=f"random signs\n$\\sum$ = {before.sum():+.3f},  "
+                   f"$V_D$ = {alt.v_d:.4f}")
+    axM.hist(after, bins=bins, alpha=0.65, color="#c0504d",
+             label=f"signed toward the taller allele\n"
+                   f"$\\sum$ = {after.sum():+.3f},  $V_D$ = {arch.v_d:.4f}")
+    axM.axvline(0.0, color="#5a6570", lw=1, ls=":")
+    axM.set_xlabel(r"per-locus contribution  $2p_jq_jd_j$")
+    axM.set_ylabel("loci")
+    axM.set_title("The plain sum cancels; the sum of squares does not\n"
+                  "$V_D$ is an OUTPUT here, and lands at "
+                  f"{arch.v_d / 1.0:.1%} of $V_P$", fontsize=10)
+    axM.legend(fontsize=7.5, frameon=False)
+
+    # ---- right: positives and nulls, against the paper ---------------
+    rows = [("height_cm", 1.2), ("lung_capacity", 0.137), ("bmi", 0.0),
+            ("adiposity", 0.0), ("bp_set_point", 0.0), ("lipid_profile", 0.0)]
+    y = np.arange(len(rows))
+    model, published, colours = [], [], []
+    for name, pub in rows:
+        sd = ARCHITECTURE[name].spec.sd
+        model.append(predicted_depression(name, 0.10) / sd)
+        published.append(-pub / sd)
+        colours.append("#c0504d" if pub else "#9aa5b1")
+    axR.barh(y, model, color=colours, alpha=0.8, height=0.55)
+    axR.plot(published, y, "d", color="#2c6fa8", ms=8,
+             label="Joshi et al. 2015")
+    # Both bar colours are this engine; the distinction is whether the trait
+    # was calibrated to a depression at all, which is the point of the panel.
+    from matplotlib.patches import Patch
+    axR.legend(handles=[
+        Patch(facecolor="#c0504d", alpha=0.8, label="engine, calibrated"),
+        Patch(facecolor="#9aa5b1", alpha=0.8, label="engine, uncalibrated"),
+        plt.Line2D([], [], marker="d", ls="", color="#2c6fa8", ms=8,
+                   label="Joshi et al. 2015"),
+    ], fontsize=8, frameon=False, loc="lower left")
+    axR.axvline(0.0, color="#5a6570", lw=1)
+    axR.set_yticks(y)
+    axR.set_yticklabels([n for n, _ in rows], fontsize=8)
+    axR.invert_yaxis()
+    axR.set_xlabel("depression per 10% F  (phenotypic SD)")
+    axR.xaxis.set_major_locator(plt.MaxNLocator(nbins=5))
+    axR.set_title("Two positives reproduced -- and so are\nthe four nulls, "
+                  "which is the harder half", fontsize=10)
+    axR.grid(alpha=0.25, axis="x")
+
+    fig.suptitle("Directional dominance -- "
+                 r"$M_F - M_0 = -F\sum_j 2p_jq_jd_j$  "
+                 "(Falconer & Mackay 1996; Joshi et al. 2015, Nature 523:459)",
+                 fontsize=11)
+    fig.tight_layout(rect=(0, 0, 1, 0.93))
+    return _save(fig, out_path)
+
+
 def plot_cnv_dosage(out_path: str, region: str = "15q11-q13",
                     n: int = 2500, seed: int = 20261001) -> str:
     """

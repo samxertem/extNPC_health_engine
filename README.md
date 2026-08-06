@@ -138,6 +138,7 @@ these laws; they are measured from emergent output and compared to theory.
 | Cryptic-variation release | Var(z) = k²·V_gen + V_env past the buffering threshold | Waddington 1942 |
 | Wright's F_ST | between-deme differentiation vs migration | Wright 1931; Weir & Cockerham 1984 |
 | Lethal equivalents | ln S(F) = ln S₀ − B·F, B recovered by regression | Morton, Crow & Muller 1956 |
+| Directional dominance | M_F − M₀ = −F·Σⱼ2pⱼqⱼdⱼ; −1.2 cm of stature per 10% F | Falconer & Mackay 1996; Joshi et al. 2015 |
 | Malécot kinship | pedigree coefficients to machine precision | Malécot 1948; Wright 1922 |
 | CNV dosage response | shift = (copies/2 − 1)·Σⱼ E[valⱼ]; deletion/duplication mirror | Jacquemont et al. 2011 |
 | Developmental identity | age schedule is *exactly* 1.0 at the calibration age | — |
@@ -225,14 +226,20 @@ Kept deliberately visible, per the project's scientific-honesty standard.
   cannot evolve: buffering capacity is a per-trait constant, not a heritable
   modifier, which is precisely what Waddington's selection experiments were
   about.
-- **Inbreeding costs viability but not stature.** The fitness half of #31 is
-  modelled (1.4 lethal equivalents per gamete, recovered by regression), but
-  real inbreeding also *shortens* people — Joshi et al. 2015 measured ~1.2 cm
-  of height and ~137 ml of FEV1 lost per 10% increase in F. That requires
-  **directional** dominance, and `loci.py` draws dominance ratios N(0, 0.15),
-  random in sign, so the catalogue's expected trait depression is ~0.
-  `inbreeding.directional_dominance()` measures and reports the gap. Fixing it
-  means re-signing every dominance ratio and re-solving every additive scale.
+- **Directional dominance covers two traits, not all of them.** Inbreeding now
+  costs both viability (1.4 lethal equivalents per gamete) *and* stature:
+  `height_cm` and `lung_capacity` are calibrated to Joshi et al. 2015 (−1.2 cm
+  and −137 ml per 10% F) with `V_D` as an output of the calibration rather than
+  an input. Four traits Joshi tested and found nothing in — BMI, adiposity,
+  blood pressure, lipids — are deliberately left flat, so the model reproduces
+  the paper's nulls as well as its positives. But every *other* trait is
+  **uncalibrated in this respect, not calibrated to zero**: what
+  `inbreeding.directional_dominance()` returns for them is the small residual
+  of `loci.py`'s random-sign dominance ratios. `lung_capacity` carries a second
+  caveat — Joshi measured FEV1, a timed volume, while this trait is a generic
+  spirometric capacity, and reproducing the slope costs `V_D = 0.11` because
+  only 82 loci carry it. Sign and mechanism are real; the magnitude is
+  indicative.
 - **The load spectrum does not evolve.** A world that inbreeds heavily for
   many generations should *purge* some of its recessive load (Crnokrak &
   Barrett 2002). Transmitted genotypes drift, but `SPECTRUM.q` — and hence the
@@ -275,10 +282,10 @@ inbreeding depression (`inbreeding.py`), #12 structural variants
 (`cnv.py`) and #13 developmental trajectory (`development.py`).
 
 What remains is not roadmap work. It is the scientific debt listed under
-[Known limitations](#known-limitations) — chiefly the absence of directional
-dominance, which is why inbreeding here costs viability but not stature — and
-the one genuinely open question: **`PhysiologicalState` has never driven a
-live LLM.** `to_prompt()` and `action_distribution()` are validated by KL
+[Known limitations](#known-limitations) — session 15 closed the largest item,
+directional dominance, so inbreeding now shortens people as well as killing
+them — and the one genuinely open question: **`PhysiologicalState` has never
+driven a live LLM.** `to_prompt()` and `action_distribution()` are validated by KL
 divergence between states, but nothing consumes them. That is the gap between
 "a genetics simulator" and "a genetics simulator that demonstrably changes how
 an agent behaves."

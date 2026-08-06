@@ -1463,6 +1463,7 @@ class StatureDepressionResult:
     expected_slope: float            # closed form: -sd * sum 2pq d
     stderr: float
     counterfactual_slope: float      # identical genomes, non-directional arch
+    counterfactual_value: List[float]   # its per-level means, for plotting
     counterfactual_expected: float   # its own closed form: the leftover walk
     paired_slope: float              # slope of (directional - counterfactual)
     paired_stderr: float
@@ -1646,6 +1647,7 @@ def stature_inbreeding_depression(trait: str = "height_cm",
         observed_slope=float(slope), realised_slope=float(r_slope),
         expected_slope=expected, stderr=slope_se(sems),
         counterfactual_slope=float(alt_slope),
+        counterfactual_value=alt_means,
         counterfactual_expected=alt_expected,
         paired_slope=float(paired_slope), paired_stderr=slope_se(diff_sems),
         published_per_10F=-spec.depression_per_10F,
