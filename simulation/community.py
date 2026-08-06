@@ -250,7 +250,13 @@ def deme_layout(n_demes: int, seed: int) -> np.ndarray:
     golden = np.pi * (3.0 - np.sqrt(5.0))       # ~2.399963 rad
     pts = np.empty((n, 2))
     for i in range(n):
-        r = 0.40 * MAP_SIZE * np.sqrt((i + 0.5) / n)
+        # A lone settlement sits at the centre. The sunflower radius is
+        # sqrt((i+0.5)/n), which is 0.707 -- not 0 -- at n=1, so without this
+        # the single deme was placed off-centre at (78.3, 50); combined with
+        # the n=1 territory radius of MAP_SIZE*0.34 = 34 that put its edge at
+        # 112.3 on a map of 100, and ~13% of villagers rendered outside the
+        # world square. Centred, the same radius spans 16..84 comfortably.
+        r = 0.0 if n == 1 else 0.40 * MAP_SIZE * np.sqrt((i + 0.5) / n)
         th = i * golden
         jitter = rng.uniform(-0.03, 0.03, size=2) * MAP_SIZE if n > 1 else np.zeros(2)
         pts[i] = (cx + r * np.cos(th) + jitter[0],
@@ -259,17 +265,29 @@ def deme_layout(n_demes: int, seed: int) -> np.ndarray:
 
 
 def territory_radius(centers: np.ndarray) -> float:
-    """A settlement's territory radius = ~45% of the nearest-neighbour spacing,
-    so territories are roomy but rarely overlap."""
+    """
+    A settlement's territory radius = ~45% of the nearest-neighbour spacing,
+    so territories are roomy but rarely overlap.
+
+    The radius is additionally capped so that **every** territory fits inside
+    the map. Spacing alone does not guarantee that: a settlement placed near
+    an edge can be far from its neighbours and still overhang the boundary,
+    which draws its villagers outside the world square. n=3 overhung by ~0.9
+    units before this cap; the old n=1 case overhung by 12.3.
+    """
     n = len(centers)
+    # distance from the closest centre to the nearest map edge -- no territory
+    # may be wider than this without leaving the map
+    to_edge = float(min(centers.min(), MAP_SIZE - centers.max()))
+    ceiling = min(MAP_SIZE * 0.34, max(to_edge, 1.0))
     if n <= 1:
-        return MAP_SIZE * 0.34
+        return float(ceiling)
     best = np.inf
     for i in range(n):
         d = np.hypot(*(centers - centers[i]).T)
         d[i] = np.inf
         best = min(best, float(d.min()))
-    return float(np.clip(0.45 * best, 6.0, MAP_SIZE * 0.34))
+    return float(np.clip(0.45 * best, min(6.0, ceiling), ceiling))
 
 
 def choose_migration_weighted(deme_id: int, centers: np.ndarray,

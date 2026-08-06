@@ -277,6 +277,33 @@ def test_deme_layout_shape_and_bounds():
     assert pts.min() >= -1 and pts.max() <= MAP_SIZE + 1
 
 
+def test_a_lone_settlement_sits_at_the_centre_of_the_map():
+    """
+    The sunflower radius sqrt((i+0.5)/n) is 0.707 at n=1, not 0, so without an
+    explicit case the single deme was placed off-centre at (78.3, 50) -- and
+    since n=1 also takes the largest territory radius, its edge fell outside
+    the map. n=1 is the DEFAULT world, so this was the one layout that had to
+    be right.
+    """
+    pts = deme_layout(1, seed=7)
+    assert pts.shape == (1, 2)
+    assert pts[0] == pytest.approx([MAP_SIZE / 2.0, MAP_SIZE / 2.0])
+
+
+@pytest.mark.parametrize("n", [1, 2, 3, 4, 6, 8])
+def test_every_territory_fits_inside_the_map(n):
+    """
+    Bounds must hold for the CENTRE PLUS ITS RADIUS, not just the centre --
+    villagers are scattered across the whole territory, and the canvas
+    renderer maps 0..MAP_SIZE onto the drawing area, so anything beyond that
+    is drawn outside the world.
+    """
+    centers = deme_layout(n, seed=7)
+    r = territory_radius(centers)
+    assert (centers - r).min() >= 0.0
+    assert (centers + r).max() <= MAP_SIZE
+
+
 def test_deme_layout_is_deterministic():
     assert np.allclose(deme_layout(5, seed=3), deme_layout(5, seed=3))
 

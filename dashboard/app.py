@@ -580,10 +580,28 @@ def inspector_column(suffix: str, extras=None):
                                  "border": f"1px solid {GRID}", "borderRadius": "6px",
                                  "padding": "6px 8px", "fontSize": "12px",
                                  "marginBottom": "6px"}),
-                dcc.Dropdown(id=f"dirsort-{suffix}",
-                             options=inspector.SORT_FIELDS, value="age",
-                             clearable=False, className="dk-dd",
-                             style={"marginBottom": "8px", "fontSize": "12px"}),
+                html.Div(style={"display": "flex", "gap": "6px",
+                                "alignItems": "center", "marginBottom": "8px"},
+                         children=[
+                    html.Div(dcc.Dropdown(id=f"dirsort-{suffix}",
+                                          options=inspector.SORT_FIELDS,
+                                          value="age", clearable=False,
+                                          className="dk-dd",
+                                          style={"fontSize": "12px"}),
+                             style={"flex": 1, "minWidth": 0}),
+                    # Direction toggle. The list is capped at 40 rows, so
+                    # without this the youngest / least inbred / shortest
+                    # individuals cannot be reached at all -- and a child is
+                    # exactly who you need selected to see #13 do anything.
+                    html.Button("↓", id=f"dirdir-{suffix}", n_clicks=0,
+                                title="sort descending (click for ascending)",
+                                style={"background": "transparent",
+                                       "border": f"1px solid {GRID}",
+                                       "color": INK2, "borderRadius": "6px",
+                                       "padding": "5px 10px", "fontSize": "13px",
+                                       "fontWeight": 700, "cursor": "pointer",
+                                       "flex": "0 0 auto"}),
+                ]),
             ]),
             html.Div(id=f"dlist-{suffix}",
                      style={"maxHeight": "420px", "overflowY": "auto"}),
@@ -1543,23 +1561,54 @@ def style_drawer_mode(mode):
             + [(on if directory else off)] * len(DRAWERS))
 
 
+def sort_is_descending(n_clicks) -> bool:
+    """
+    Direction from the toggle's click count: even = descending (the original
+    behaviour and the sensible default for "oldest", "most inbred"), odd =
+    ascending. Parity is used rather than a `dcc.Store` because the direction
+    is pure UI state with no meaning to the world -- adding a Store would put
+    it in the layout, the callback graph and every snapshot for nothing.
+    """
+    return int(n_clicks or 0) % 2 == 0
+
+
 @app.callback(
     [Output(f"dlist-{s}", "children") for s in DRAWERS],
     Input("drawer-mode", "data"), Input("tick", "data"),
     Input("timeline", "data"), Input("selected", "data"),
     [Input(f"dirq-{s}", "value") for s in DRAWERS],
     [Input(f"dirsort-{s}", "value") for s in DRAWERS],
+    [Input(f"dirdir-{s}", "n_clicks") for s in DRAWERS],
 )
 def render_drawer_list(mode, _tick, scrub, selected, *rest):
     frame = WORLD.frame_at(scrub)
     if mode == "directory":
-        queries, sorts = rest[:len(DRAWERS)], rest[len(DRAWERS):]
-        # each drawer keeps its own filter box, so these render per instance
+        n = len(DRAWERS)
+        queries, sorts, dirs = rest[:n], rest[n:2 * n], rest[2 * n:3 * n]
+        # each drawer keeps its own filter box, sort and direction
         return [inspector.directory_rows(frame, q or "", s or "age",
-                                         selected=selected)
-                for q, s in zip(queries, sorts)]
+                                         selected=selected,
+                                         descending=sort_is_descending(d))
+                for q, s, d in zip(queries, sorts, dirs)]
     view = inspector.leaderboard_view(frame, selected)
     return [view] * len(DRAWERS)
+
+
+@app.callback(
+    [Output(f"dirdir-{s}", "children") for s in DRAWERS],
+    [Output(f"dirdir-{s}", "title") for s in DRAWERS],
+    [Input(f"dirdir-{s}", "n_clicks") for s in DRAWERS],
+)
+def label_sort_direction(*clicks):
+    """Arrow and tooltip follow the direction, so the control says what it
+    will do rather than what it just did."""
+    arrows, titles = [], []
+    for c in clicks:
+        desc = sort_is_descending(c)
+        arrows.append("↓" if desc else "↑")
+        titles.append("sorting descending — click for ascending" if desc else
+                      "sorting ascending — click for descending")
+    return arrows + titles
 
 
 @app.callback(

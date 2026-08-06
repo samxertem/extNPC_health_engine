@@ -238,6 +238,59 @@ def test_unknown_sort_field_falls_back_rather_than_raising(normal_world):
     assert inspector.directory_rows(frame, sort_by="not-a-field")
 
 
+@pytest.mark.parametrize("field", [f["value"] for f in inspector.SORT_FIELDS])
+def test_ascending_sort_reaches_the_other_end_of_every_field(field, normal_world):
+    """
+    The list is capped at `limit`, so descending-only sorting made the
+    youngest, the least inbred, the shortest and the healthiest individuals
+    literally unreachable from the directory.
+    """
+    frame = normal_world.frame_at(None)
+    people = frame["people"]
+    asc = inspector.directory_rows(frame, sort_by=field, descending=False)
+    desc = inspector.directory_rows(frame, sort_by=field, descending=True)
+    first_asc = [r.id["name"] for r in asc if hasattr(r, "id")][0]
+    first_desc = [r.id["name"] for r in desc if hasattr(r, "id")][0]
+    assert first_asc == min(people, key=lambda p: p.get(field, 0))["name"]
+    assert first_desc == max(people, key=lambda p: p.get(field, 0))["name"]
+
+
+def test_descending_remains_the_default_for_existing_callers(normal_world):
+    frame = normal_world.frame_at(None)
+    assert ([r.id["name"] for r in inspector.directory_rows(frame) if hasattr(r, "id")]
+            == [r.id["name"] for r in inspector.directory_rows(frame, descending=True)
+                if hasattr(r, "id")])
+
+
+def test_ascending_sort_surfaces_children(normal_world):
+    """The concrete motivation: selecting a child is what makes the
+    developmental trajectory (#13) visible in the inspector at all."""
+    frame = normal_world.frame_at(None)
+    rows = inspector.directory_rows(frame, sort_by="age", descending=False)
+    names = [r.id["name"] for r in rows if hasattr(r, "id")]
+    ages = {p["name"]: p["age"] for p in frame["people"]}
+    assert ages[names[0]] == min(ages.values())
+    assert ages[names[0]] < 18, "the top of an ascending age sort must be a child"
+
+
+@pytest.mark.parametrize("clicks, expected", [
+    (None, True), (0, True), (1, False), (2, True), (7, False),
+])
+def test_sort_direction_toggles_on_click_parity(clicks, expected):
+    from dashboard.app import sort_is_descending
+    assert sort_is_descending(clicks) is expected
+
+
+def test_the_direction_button_says_what_it_will_do():
+    from dashboard.app import DRAWERS, label_sort_direction
+    out = label_sort_direction(*([0] * len(DRAWERS)))
+    arrows, titles = out[:len(DRAWERS)], out[len(DRAWERS):]
+    assert set(arrows) == {"↓"}
+    assert all("click for ascending" in t for t in titles)
+    out = label_sort_direction(*([1] * len(DRAWERS)))
+    assert set(out[:len(DRAWERS)]) == {"↑"}
+
+
 def test_frames_missing_the_session_11_fields_still_render(normal_world):
     """
     The snapshot buffer is capped, not versioned: frames captured before
@@ -408,19 +461,16 @@ def test_map_payload_is_wellformed_for_every_layer(layer, normal_world):
         assert dm["n"] >= 0 and dm["r"] > 0
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "DEFECT (found by this suite, 2026-08-06): in the DEFAULT single-deme "
-    "world, villagers are placed outside the map bounds the payload itself "
-    "declares. `community.deme_layout` uses a golden-angle sunflower spread, "
-    "r = 0.40*MAP_SIZE*sqrt((i+0.5)/n); at n=1 that is sqrt(0.5)=0.707, so the "
-    "lone settlement sits off-centre at (78.3, 50) instead of at the centre. "
-    "`territory_radius` then returns MAP_SIZE*0.34 = 34 for n=1, and "
-    "78.3 + 34 = 112.3 against a declared size of 100. ~13% of villagers in a "
-    "grown default world render past the right edge of the world square. "
-    "Multi-deme worlds are unaffected (smaller radii, interior centres). "
-    "Fix is to centre the layout when n == 1; deme_layout draws from its own "
-    "RNG, so this cannot disturb the genetic stream."))
 def test_villagers_stay_inside_the_world_the_payload_declares(normal_world):
+    """
+    Regression test for a defect this suite found on 2026-08-06 and which was
+    fixed the same day. `community.deme_layout` uses a golden-angle sunflower
+    spread, r = 0.40*MAP_SIZE*sqrt((i+0.5)/n); at n=1 that is sqrt(0.5)=0.707
+    rather than 0, so the lone settlement sat off-centre at (78.3, 50). With
+    the n=1 territory radius of MAP_SIZE*0.34 = 34 its edge reached 112.3 on a
+    map declared as 100, and ~13% of villagers in a grown DEFAULT world
+    rendered outside the world square. Multi-deme worlds were unaffected.
+    """
     d = build_mapdata(normal_world, None)
     outside = [p for p in d["people"]
                if not (0 <= p["x"] <= d["size"] and 0 <= p["y"] <= d["size"])]

@@ -471,8 +471,18 @@ def _sort_value_text(value, field: str) -> str:
 def directory_rows(frame: Optional[dict], query: str = "",
                    sort_by: str = "age", deme: Optional[int] = None,
                    sex: Optional[str] = None, limit: int = 40,
-                   selected: Optional[str] = None) -> List:
-    """Filtered, sorted, clickable list of everyone alive in this frame."""
+                   selected: Optional[str] = None,
+                   descending: bool = True) -> List:
+    """
+    Filtered, sorted, clickable list of everyone alive in this frame.
+
+    `descending` defaults to True, which is what every caller written before
+    the toggle existed will get. The ascending direction is not a nicety: the
+    list is capped at `limit`, so with descending-only sorting the youngest,
+    the least inbred, the shortest and the healthiest individuals are all
+    literally unreachable -- and a child is exactly who you need to select to
+    see the developmental trajectory (#13) do anything.
+    """
     if not frame or not frame["people"]:
         return [html.Div("No living population.",
                          style={"color": MUTED, "fontSize": "12px"})]
@@ -491,7 +501,8 @@ def directory_rows(frame: Optional[dict], query: str = "",
     # `.get` with a default because the snapshot buffer is capped, not
     # versioned: frames captured before a field existed are still in the ring
     # and must not crash the directory when the user sorts by it.
-    rows = sorted(rows, key=lambda p: p.get(field, 0), reverse=True)[:limit]
+    rows = sorted(rows, key=lambda p: p.get(field, 0),
+                  reverse=bool(descending))[:limit]
 
     if not rows:
         return [html.Div("Nothing matches that filter.",
