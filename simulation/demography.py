@@ -42,6 +42,120 @@ from health_engine.npc import NPC
 
 
 # ----------------------------------------------------------------------
+# Fertility schedules (roadmap backlog: "a realistic mean reproductive age")
+# ----------------------------------------------------------------------
+#
+# The engine has always gated reproduction on a flat window plus a straight
+# taper: `clip(1 - 0.6*(age-lo)/(hi-lo), 0.25, 1)`. That is a line, and real
+# age-specific fecundability is a HUMP -- low in adolescence, peaking in the
+# twenties, falling steeply after the mid-thirties. With a line, an 18-year-old
+# is as fecund as a 25-year-old, and the engine's own `life_stage()` calls that
+# 18-year-old an "adolescent" while it reproduces at full rate.
+#
+# Rather than pick one demographic regime and bake it in -- the question of
+# whether this is a pre-industrial or a modern world is still open, and it
+# decides fertility, mortality, marriage age and every dataset choice -- the
+# schedule is named and selectable, and the DEFAULT reproduces the historical
+# behaviour exactly so no calibrated quantity moves.
+#
+#   legacy         the straight taper the engine has always used. Default.
+#   preindustrial  Coale & Trussell 1974 natural fertility, with adolescent
+#                  subfecundity (Wood 1994). No parity-dependent stopping.
+#   modern         postponement: births concentrated in the late twenties and
+#                  thirties, the OECD pattern.
+#
+# These are STYLISED age patterns, not fitted schedules.
+#
+# CAVEAT, because it is easy to misread: the curves are NOT normalised to
+# equal area, so switching schedule changes the overall fertility LEVEL as
+# well as its shape. `preindustrial` in particular integrates to less than
+# `legacy` over the same window, and a natural-fertility population is
+# supposed to have HIGHER total fertility (TFR 6-10, Eaton & Mayer 1953), not
+# lower. Reaching that needs `birth_rate` and `max_children` raised alongside
+# the schedule; the schedule alone only says at WHICH AGES births happen.
+
+@dataclass(frozen=True)
+class FertilitySchedule:
+    """Relative fecundability by maternal age, as interpolation knots."""
+    name: str
+    label: str
+    knots: Tuple[Tuple[float, float], ...]
+    citation: str
+
+
+def _legacy_knots() -> Tuple[Tuple[float, float], ...]:
+    """The original straight taper, sampled so interpolation reproduces it
+    exactly: 1.0 at the window's start, falling to 0.4 at its end, floored
+    at 0.25. Expressed as knots so every schedule goes through one code path."""
+    lo, hi = 18.0, 45.0
+    pts = []
+    for age in (lo, 25.0, 30.0, 35.0, 40.0, hi):
+        frac = (age - lo) / max(1.0, hi - lo)
+        pts.append((age, float(np.clip(1.0 - 0.6 * frac, 0.25, 1.0))))
+    return tuple(pts)
+
+
+FERTILITY_SCHEDULES: Dict[str, FertilitySchedule] = {
+    "legacy": FertilitySchedule(
+        name="legacy", label="Legacy linear taper (default)",
+        knots=_legacy_knots(),
+        citation="the engine's original taper; retained as the calibration baseline"),
+    "preindustrial": FertilitySchedule(
+        name="preindustrial", label="Pre-industrial natural fertility",
+        # Coale & Trussell's standard natural-fertility schedule n(a),
+        # normalised to its 20-24 peak: 1.000, 0.935, 0.853, 0.697, 0.362,
+        # 0.089 across the five-year groups from 20-24 to 45-49. Below 20,
+        # adolescent subfecundity -- ovulatory cycles are frequently
+        # anovulatory for 1-3 years after menarche (Wood 1994).
+        knots=((14.0, 0.10), (16.0, 0.30), (18.0, 0.65), (20.0, 1.00),
+               (25.0, 0.935), (30.0, 0.853), (35.0, 0.697), (40.0, 0.362),
+               (45.0, 0.089), (50.0, 0.0)),
+        citation="Coale & Trussell 1974 (Popul. Index 40:185); Wood 1994"),
+    "modern": FertilitySchedule(
+        name="modern", label="Modern demographic transition",
+        # Postponement rather than natural fertility: the mode sits around
+        # 30 and early-twenties fertility is low by choice, not biology, so
+        # the left arm is far below the natural-fertility curve while the
+        # right arm follows the same biological decline.
+        knots=((16.0, 0.05), (18.0, 0.12), (22.0, 0.35), (26.0, 0.80),
+               (30.0, 1.00), (34.0, 0.85), (38.0, 0.45), (42.0, 0.15),
+               (45.0, 0.03), (50.0, 0.0)),
+        citation="stylised OECD pattern; mean age at first birth ~29-30"),
+}
+
+DEFAULT_FERTILITY_SCHEDULE = "legacy"
+
+
+def relative_fecundity(age: float, schedule: str = DEFAULT_FERTILITY_SCHEDULE
+                       ) -> float:
+    """
+    Relative fecundability at `age` in [0, 1], linearly interpolated between
+    the schedule's knots and flat outside them.
+
+    This multiplies `birth_rate`; it does not replace the hard fertility
+    window, which still applies. An unknown schedule name falls back to the
+    default rather than raising, because it arrives from a dashboard control.
+    """
+    spec = FERTILITY_SCHEDULES.get(schedule) or \
+        FERTILITY_SCHEDULES[DEFAULT_FERTILITY_SCHEDULE]
+    ages = [k[0] for k in spec.knots]
+    vals = [k[1] for k in spec.knots]
+    return float(np.clip(np.interp(float(age), ages, vals), 0.0, 1.0))
+
+
+def mean_reproductive_age(schedule: str = DEFAULT_FERTILITY_SCHEDULE,
+                          lo: int = 15, hi: int = 50) -> float:
+    """
+    The fecundity-weighted mean maternal age a schedule implies, ignoring
+    mortality and pairing. Useful as a one-number summary of what the curve
+    actually says, and what the tests assert against.
+    """
+    ages = np.arange(lo, hi + 1, dtype=float)
+    w = np.array([relative_fecundity(a, schedule) for a in ages])
+    return float((ages * w).sum() / w.sum()) if w.sum() > 0 else float("nan")
+
+
+# ----------------------------------------------------------------------
 # Tunable parameters (each maps to a dashboard control)
 # ----------------------------------------------------------------------
 
@@ -55,6 +169,10 @@ class DemographyParams:
     min_birth_spacing: int = 2        # years between a couple's children
     max_children: int = 6
     pairing_age: int = 18             # minimum age to enter the mating pool
+    # Shape of fecundability with maternal age. "legacy" is the straight taper
+    # the engine has always used and is the default, so every calibrated
+    # quantity is unchanged unless this is deliberately switched.
+    fertility_schedule: str = DEFAULT_FERTILITY_SCHEDULE
     # mortality (Gompertz-Makeham annual hazard: A + B*exp(G*age))
     makeham_A: float = 0.002
     gompertz_B: float = 2.5e-5
@@ -248,10 +366,11 @@ def wants_child(mother: NPC, father: NPC, n_children: int, years_since_last: int
         return False
     if not (in_fertility_window(mother, params) and in_fertility_window(father, params)):
         return False
-    # female fecundity tapers toward the end of the window
-    lo, hi = params.female_fertility
-    frac = (mother.age - lo) / max(1, hi - lo)
-    age_taper = float(np.clip(1.0 - 0.6 * frac, 0.25, 1.0))
+    # female fecundability by age. The "legacy" schedule IS the original
+    # straight taper, so the default call is unchanged to the last bit.
+    age_taper = relative_fecundity(
+        mother.age, getattr(params, "fertility_schedule",
+                            DEFAULT_FERTILITY_SCHEDULE))
     # resource access (in [0,1]) gates fertility: the resource-poor breed less.
     # 1.0 is neutral, so the default call is unchanged.
     p = params.birth_rate * age_taper * carrying_factor(n_alive, params)

@@ -29,6 +29,8 @@ from dash import (ALL, Dash, dcc, html, Input, Output, State, ctx, no_update,
 
 from simulation import (World, DemographyParams, SCENARIOS, scenario_list,
                         SHOCK_KINDS, GLOSSARY)
+from simulation.demography import (DEFAULT_FERTILITY_SCHEDULE,
+                                   FERTILITY_SCHEDULES, mean_reproductive_age)
 from . import genetics_panels as gpanels, inspector, panels
 
 # ---------------------------------------------------------------------
@@ -45,13 +47,16 @@ DEFAULTS = dict(seed=7, n_founders=10, carrying_capacity=150,
 
 def params_from_controls(K, birth, mort, sel, mut, recomb, assort, inbreed,
                          n_demes, migr, equity, smoke, stress, prenat,
-                         depression=1.0) -> DemographyParams:
+                         depression=1.0,
+                         schedule=DEFAULT_FERTILITY_SCHEDULE
+                         ) -> DemographyParams:
     """
     Map the control row onto `DemographyParams`.
 
-    `depression` is last and defaults to 1.0 (the calibrated strength) so that
-    any caller written before roadmap #31 landed still produces the same
-    params it always did.
+    New arguments are appended with defaults that reproduce the previous
+    behaviour, so a caller written before a feature landed still produces the
+    params it always did: `depression` defaults to 1.0 (the calibrated
+    strength, roadmap #31) and `schedule` to the legacy linear taper.
     """
     return DemographyParams(
         carrying_capacity=int(K), birth_rate=float(birth),
@@ -61,7 +66,8 @@ def params_from_controls(K, birth, mort, sel, mut, recomb, assort, inbreed,
         n_demes=int(n_demes), migration_rate=float(migr),
         resource_equity=float(equity), exposure_smoking=float(smoke),
         exposure_stress=float(stress), exposure_prenatal_nutrition=float(prenat),
-        inbreeding_depression=float(depression))
+        inbreeding_depression=float(depression),
+        fertility_schedule=str(schedule or DEFAULT_FERTILITY_SCHEDULE))
 
 
 def build_world(seed, n_founders, params: DemographyParams) -> World:
@@ -736,9 +742,11 @@ def panel(id_, children, visible=False):
                     children=children)
 
 
+# Order MUST match `params_from_controls`' positional signature -- the advance
+# callback splats these straight into it.
 CTRL_INPUTS = ["K", "birth", "mort", "sel", "mut", "recomb", "assort",
                "inbreed", "ndemes", "migr", "equity", "smoke", "stress",
-               "prenat", "depress"]
+               "prenat", "depress", "fertsched"]
 
 # The split-screen: main content, then the persistent inspector drawer.
 # `minmax(0, …)` on the first column stops wide Plotly figures from forcing
@@ -1044,6 +1052,24 @@ app.layout = html.Div(style={
                          "calibrated 1.4 lethal equivalents per gamete "
                          "(Charlesworth & Willis 2009); 0 turns the fitness "
                          "cost off for an A/B run"),
+                labelled("fertility schedule (Reset to apply)",
+                         dcc.Dropdown(
+                             id="fertsched",
+                             options=[{"label": s.label, "value": k}
+                                      for k, s in FERTILITY_SCHEDULES.items()],
+                             value=DEFAULT_FERTILITY_SCHEDULE, clearable=False,
+                             className="dk-dd", style={"fontSize": "12px"}),
+                         "260px",
+                         "shape of fecundability with MATERNAL AGE. "
+                         "‘Legacy’ is the engine's original straight taper and "
+                         "is the calibration baseline. ‘Pre-industrial’ is "
+                         "Coale & Trussell 1974 natural fertility with "
+                         "adolescent subfecundity; ‘Modern’ postpones births "
+                         "into the late twenties and thirties. birth_rate "
+                         "still sets the LEVEL — this only sets its shape"),
+                html.Div(id="fertsched-blurb",
+                         style={"color": MUTED, "fontSize": "11px",
+                                "lineHeight": "1.5", "marginTop": "4px"}),
             ]),
             html.Div(style=CARD, children=[
                 html.Div("COMMUNITY & RESOURCES", style={**LBL, "color": ACCENT, "marginBottom": "8px"}),
@@ -1312,7 +1338,8 @@ def apply_preset(*_clicks):
             p.assortative_strength, p.inbreeding_threshold, p.n_demes,
             p.migration_rate, p.resource_equity, p.exposure_smoking,
             p.exposure_stress, p.exposure_prenatal_nutrition,
-            p.inbreeding_depression]
+            p.inbreeding_depression,
+            getattr(p, "fertility_schedule", DEFAULT_FERTILITY_SCHEDULE)]
     return vals + [DEFAULTS["seed"], scen.n_founders, WORLD.tick, None,
                    f"“{scen.title}” — {scen.blurb}"]
 
@@ -1559,6 +1586,20 @@ def style_drawer_mode(mode):
     return ([tools] * len(DRAWERS)
             + [(off if directory else on)] * len(DRAWERS)
             + [(on if directory else off)] * len(DRAWERS))
+
+
+@app.callback(
+    Output("fertsched-blurb", "children"),
+    Input("fertsched", "value"),
+)
+def describe_fertility_schedule(key):
+    """Say what the chosen curve implies and where it comes from, so the
+    control is a modelling decision rather than an unlabelled preference."""
+    spec = FERTILITY_SCHEDULES.get(key or DEFAULT_FERTILITY_SCHEDULE)
+    if spec is None:
+        return ""
+    return (f"implied mean maternal age {mean_reproductive_age(spec.name):.1f} y "
+            f"· {spec.citation}")
 
 
 def sort_is_descending(n_clicks) -> bool:

@@ -54,13 +54,24 @@ from .snapshots import SnapshotBuffer, capture as snapshot_capture
 from .lineage import LineageRegistry
 from . import metrics as M
 
-# A pool of given names; uniqueness guaranteed by appending a global counter.
-_NAMES = [
-    "Elira", "Tomas", "Ines", "Darius", "Sena", "Kaan", "Mira", "Bora",
-    "Lena", "Arda", "Nadia", "Emre", "Zoe", "Rustam", "Yara", "Deniz",
-    "Ada", "Kerem", "Selin", "Onur", "Leyla", "Baris", "Nora", "Timur",
-    "Ceren", "Efe", "Derya", "Kaya", "Ilay", "Ozan", "Pelin", "Sarp",
+# Given-name pools, one per sex; uniqueness guaranteed by appending a global
+# counter. These are the two halves of the single alternating list that came
+# before, in the same order, so FOUNDER names are unchanged: `_seed_founders`
+# assigns `female if i % 2 == 0` and the old list alternated female/male, so
+# index parity already lined up there. Only BIRTHS were mismatched, because a
+# newborn's name was drawn before `reproduce()` had determined its sex.
+_FEMALE_NAMES = [
+    "Elira", "Ines", "Sena", "Mira", "Lena", "Nadia", "Zoe", "Yara",
+    "Ada", "Selin", "Leyla", "Nora", "Ceren", "Derya", "Ilay", "Pelin",
 ]
+_MALE_NAMES = [
+    "Tomas", "Darius", "Kaan", "Bora", "Arda", "Emre", "Rustam", "Deniz",
+    "Kerem", "Onur", "Baris", "Timur", "Efe", "Kaya", "Ozan", "Sarp",
+]
+
+# Kept so the interleaved order is still recoverable (and for anything that
+# only needs "is this one of ours").
+_NAMES = [n for pair in zip(_FEMALE_NAMES, _MALE_NAMES) for n in pair]
 
 
 @dataclass
@@ -90,6 +101,8 @@ class World:
         self.environment = environment
         self.tick = 0
         self._id = 0
+        # per-sex position in the name pools; the `-N` suffix stays global
+        self._name_seq: Dict[str, int] = {"female": 0, "male": 0}
 
         self.registry = LineageRegistry()
         self.pca = GenomePCA(refit_every=4)
@@ -131,8 +144,17 @@ class World:
 
     # -- naming ----------------------------------------------------------
 
-    def _fresh_name(self) -> str:
-        base = _NAMES[self._id % len(_NAMES)]
+    def _fresh_name(self, sex: str = "female") -> str:
+        """
+        A given name appropriate to `sex`, made unique by a global counter.
+
+        The counter stays global (not per pool) so every name in the world is
+        unique and the `-N` suffix still reads as birth order. Names consume
+        no RNG, so this cannot perturb the genetic stream.
+        """
+        pool = _FEMALE_NAMES if sex == "female" else _MALE_NAMES
+        base = pool[self._name_seq.get(sex, 0) % len(pool)]
+        self._name_seq[sex] = self._name_seq.get(sex, 0) + 1
         self._id += 1
         return f"{base}-{self._id}"
 
@@ -166,7 +188,7 @@ class World:
         # balance the sexes so pairing is possible
         for i in range(n):
             sex = "female" if i % 2 == 0 else "male"
-            name = self._fresh_name()
+            name = self._fresh_name(sex)
             npc = random_founder(name, self.rng, sex=sex,
                                  environment=self.environment)
             npc.name = name
@@ -462,11 +484,17 @@ class World:
 
     def _make_child(self, mother: NPC, father: NPC,
                     birth_env: Environment) -> NPC:
-        name = self._fresh_name()
-        child = reproduce(mother, father, name, self.rng,
+        # The child is conceived BEFORE it is named, because sex is decided
+        # genetically inside `reproduce` (the father's X or Y, roadmap #2) and
+        # the namer has to know it. Naming first is what produced female NPCs
+        # called Emre and male ones called Nora. `reproduce` uses the name
+        # only to populate the dataclass field -- it derives no randomness
+        # from it -- so naming afterwards leaves the genetic stream untouched.
+        child = reproduce(mother, father, "unnamed", self.rng,
                           environment=birth_env,
                           mutation_rate_scale=self.params.mutation_rate_scale,
                           map_scale=self.params.recombination_scale)
+        name = self._fresh_name(child.sex)
         child.name = name
         self.people[name] = child
         ancestry = LineageRegistry.child_ancestry(
