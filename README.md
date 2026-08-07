@@ -63,16 +63,28 @@ versions before.
 ## Run
 
 ```bash
-python health_engine_prototype.py          # full engine demo, ~90 s, writes outputs/*.png
-python health_engine_prototype.py --fast   # ~40 s smoke run (widened tolerances;
+python health_engine_prototype.py          # full engine demo, several minutes:
+                                           #   validation harness + outputs/*.png
+python health_engine_prototype.py --fast   # smoke run (widened tolerances;
                                            #   a rare noise-floor FAIL is expected)
-python -m pytest tests/ -q                 # 133 tests, ~76 s — the rigorous gate
+python -m pytest tests/ -q                 # ~580 tests, ~12 min — the rigorous gate
 python run_dashboard.py                    # live population sim at localhost:8050
 ```
 
 The demo drives the **engine** on a hand-built nine-person pedigree. The
 **population layer** (yearly turnover, demes, migration, lineages) and its
 seven-tab dashboard are separate — that's `run_dashboard.py`.
+
+```bash
+EXTNPC_CATALOGUE=empirical python run_dashboard.py   # opt-in model v2
+```
+
+`EXTNPC_CATALOGUE=empirical` swaps 21 core genes' hand-set allele
+frequencies for measured 1000 Genomes phase 3 EUR values (vendored with
+provenance in `health_engine/data/`). The default is byte-identical to
+every committed figure and pinned by test. The two modes are different
+model versions: world saves record which one they were made under and
+refuse to load across the boundary.
 
 > On Windows, two dev servers can both bind `:8050` and a stale process will
 > silently serve old code. Kill every `:8050` listener before relaunching.

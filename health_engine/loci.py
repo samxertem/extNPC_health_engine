@@ -55,6 +55,8 @@ CAVEATS (roadmap Section 5 -- these are load-bearing)
 
 from __future__ import annotations
 
+import json
+import os
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
@@ -68,6 +70,64 @@ from .genetic_map import AUTOSOMES, AUTOSOME_NUMBERS
 CATALOG_SEED = 20240501
 
 N_PERIPHERAL_LOCI = 450
+
+# ----------------------------------------------------------------------
+# Catalogue mode (session 16): synthetic (default) vs empirical
+# ----------------------------------------------------------------------
+# EXTNPC_CATALOGUE=empirical swaps the CORE genes' hand-set allele
+# frequencies for measured 1000 Genomes phase 3 EUR values, fetched from
+# Ensembl and VENDORED with retrieval date and per-allele provenance in
+# data/empirical_core_frequencies.json. Read once at import, because the
+# entire trait calibration (traits.py) is solved against these
+# frequencies at import time -- a runtime switch would silently desync
+# the calibrated architecture from the catalogue it was solved on.
+#
+# Scope, stated honestly:
+#   * 21 of 53 core genes carry empirical frequencies -- the ones whose
+#     canonical GWAS SNP and effect-allele orientation are unambiguous
+#     (each row's rationale is in the JSON). The rest keep their
+#     synthetic values; coverage is queryable via EMPIRICAL_OVERRIDES.
+#   * Peripheral loci are IDENTICAL in both modes. Their uniform-MAF
+#     spectrum already models an ascertained common-variant panel (see
+#     _sample_peripheral_allele_freq), and no real per-SNP identity
+#     exists to ground them in.
+#   * EUR was chosen over the global average because the engine is a
+#     single panmictic population and the Mendelian disease panel
+#     (diseases.py) is calibrated to N.-European carrier frequencies;
+#     mixing reference populations across layers would be worse than
+#     naming one.
+#   * The two modes are DIFFERENT MODEL VERSIONS: every founder genome,
+#     calibrated trait scale and committed figure belongs to the
+#     synthetic catalogue unless stated. World saves record the mode and
+#     refuse to load across it (worldsave.py).
+#
+# Notable consequences of the empirical values, all real biology:
+#   SLC24A5 at 0.997 -- the light-skin allele is at fixation in EUR, so
+#   the largest-effect pigmentation locus contributes almost no VARIANCE
+#   (fixed differences are not polymorphisms). EDAR-370A at 0.011 -- the
+#   catalogue's flagship pleiotropy is nearly invisible in an EUR-
+#   frequency world, exactly as it is in real European cohorts. GJB2
+#   35delG at 0.0089 -- carrier rate 1/56, matching the deafness
+#   literature instead of the synthetic 0.08.
+CATALOGUE_MODE: str = os.environ.get("EXTNPC_CATALOGUE", "synthetic").strip().lower()
+if CATALOGUE_MODE not in ("synthetic", "empirical"):
+    raise ValueError(
+        f"EXTNPC_CATALOGUE={CATALOGUE_MODE!r}: must be 'synthetic' or 'empirical'")
+
+_EMPIRICAL_PATH = os.path.join(os.path.dirname(__file__), "data",
+                               "empirical_core_frequencies.json")
+
+
+def _load_empirical() -> Dict[str, dict]:
+    with open(_EMPIRICAL_PATH, encoding="utf-8") as fh:
+        bundle = json.load(fh)
+    return bundle["genes"]
+
+
+# symbol -> vendored record, EMPTY in synthetic mode so that nothing
+# downstream can accidentally read empirical values without the flag.
+EMPIRICAL_OVERRIDES: Dict[str, dict] = (
+    _load_empirical() if CATALOGUE_MODE == "empirical" else {})
 
 
 @dataclass(frozen=True)
@@ -324,6 +384,18 @@ def _build_catalog() -> List[Locus]:
 
     # -- core genes ----------------------------------------------------
     for symbol, chrom, bp_mb, alt_freq, dom, weights, note in _CORE_GENES:
+        # Empirical mode: replace the hand-set frequency with the vendored
+        # 1000G EUR value where one exists. The override touches ONLY
+        # alt_freq -- weights, dominance and position are the same model
+        # in both modes -- and the peripheral rng stream below is never
+        # consulted here, so peripheral loci are bit-identical across
+        # modes.
+        if symbol in EMPIRICAL_OVERRIDES:
+            rec = EMPIRICAL_OVERRIDES[symbol]
+            alt_freq = float(rec["eur_freq"])
+            note = (note + " | " if note else "") + (
+                f"empirical: {rec['rsid']} {rec['effect_allele']} "
+                f"EUR {rec['eur_freq']:.4f} (1000G ph3 via Ensembl)")
         entries.append(Locus(
             index=-1, symbol=symbol, chrom=chrom, bp_mb=bp_mb,
             cm=AUTOSOMES[chrom].bp_to_cm(bp_mb),

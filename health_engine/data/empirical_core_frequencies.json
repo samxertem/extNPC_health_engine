@@ -1,0 +1,218 @@
+{
+  "source": "Ensembl REST rest.ensembl.org /variation/homo_sapiens?pops=1",
+  "population": "1000GENOMES:phase_3:EUR",
+  "retrieved": "2026-08-07",
+  "orientation_rule": "effect_allele frequency replaces alt_freq; allele chosen to match the catalogue's existing weight signs, per-gene rationale in 'why'",
+  "genes": {
+    "HERC2": {
+      "rsid": "rs12913832",
+      "effect_allele": "G",
+      "eur_freq": 0.6362,
+      "alleles_seen": {
+        "G": 0.6362,
+        "A": 0.3638
+      },
+      "why": "derived blue-eye allele (Eiberg 2008); catalogue alt drives eye_color +"
+    },
+    "SLC24A5": {
+      "rsid": "rs1426654",
+      "effect_allele": "A",
+      "eur_freq": 0.997,
+      "alleles_seen": {
+        "G": 0.003,
+        "A": 0.997
+      },
+      "why": "derived light-skin Thr111 (Lamason 2005); catalogue alt lightens skin_tone"
+    },
+    "SLC45A2": {
+      "rsid": "rs16891982",
+      "effect_allele": "G",
+      "eur_freq": 0.9384,
+      "alleles_seen": {
+        "G": 0.9384,
+        "C": 0.0616
+      },
+      "why": "derived light 374F (Soejima 2006); catalogue alt lightens"
+    },
+    "MC1R": {
+      "rsid": "rs1805007",
+      "effect_allele": "T",
+      "eur_freq": 0.0716,
+      "alleles_seen": {
+        "C": 0.9284,
+        "T": 0.0716
+      },
+      "why": "R151C red-hair LOF (Valverde 1995); catalogue alt is the fair/recessive allele"
+    },
+    "TYR": {
+      "rsid": "rs1042602",
+      "effect_allele": "A",
+      "eur_freq": 0.3718,
+      "alleles_seen": {
+        "A": 0.3718,
+        "C": 0.6282
+      },
+      "why": "S192Y light-associated (Shriver 2003); catalogue alt lightens"
+    },
+    "EDAR": {
+      "rsid": "rs3827760",
+      "effect_allele": "G",
+      "eur_freq": 0.0109,
+      "alleles_seen": {
+        "G": 0.0109,
+        "A": 0.9891
+      },
+      "why": "370A derived (Fujimoto 2008; Kamberov 2013); catalogue alt is 370A"
+    },
+    "TCHH": {
+      "rsid": "rs11803731",
+      "effect_allele": "T",
+      "eur_freq": 0.2286,
+      "alleles_seen": {
+        "A": 0.7714,
+        "T": 0.2286
+      },
+      "why": "straight-hair allele (Medland 2009); catalogue alt straightens (curl weight -1.1)"
+    },
+    "HMGA2": {
+      "rsid": "rs1042725",
+      "effect_allele": "C",
+      "eur_freq": 0.4632,
+      "alleles_seen": {
+        "C": 0.4632,
+        "T": 0.5368
+      },
+      "why": "tall allele (Weedon 2007); catalogue alt increases height"
+    },
+    "GDF5": {
+      "rsid": "rs143383",
+      "effect_allele": "G",
+      "eur_freq": 0.3718,
+      "alleles_seen": {
+        "G": 0.3718,
+        "A": 0.6282
+      },
+      "why": "tall allele. Literature reports T/C on the minus strand; Ensembl fwd A/G, so the tall C = fwd G (T=A is the shorter/OA-risk MAJOR allele in Europeans, Sanna 2008)"
+    },
+    "FTO": {
+      "rsid": "rs9939609",
+      "effect_allele": "A",
+      "eur_freq": 0.4135,
+      "alleles_seen": {
+        "T": 0.5865,
+        "A": 0.4135
+      },
+      "why": "adiposity-raising allele (Frayling 2007); catalogue alt raises adiposity/bmi"
+    },
+    "MC4R": {
+      "rsid": "rs17782313",
+      "effect_allele": "C",
+      "eur_freq": 0.2396,
+      "alleles_seen": {
+        "C": 0.2396,
+        "T": 0.7604
+      },
+      "why": "BMI-raising allele (Loos 2008)"
+    },
+    "PPARG": {
+      "rsid": "rs1801282",
+      "effect_allele": "G",
+      "eur_freq": 0.1203,
+      "alleles_seen": {
+        "C": 0.8797,
+        "G": 0.1203
+      },
+      "why": "Ala12, insulin-sensitising (Altshuler 2000); catalogue alt weight +insulin_sensitivity"
+    },
+    "TCF7L2": {
+      "rsid": "rs7903146",
+      "effect_allele": "T",
+      "eur_freq": 0.3171,
+      "alleles_seen": {
+        "T": 0.3171,
+        "C": 0.6829
+      },
+      "why": "T2D risk allele (Grant 2006); catalogue alt weight -insulin_sensitivity"
+    },
+    "APOE": {
+      "rsid": "rs429358",
+      "effect_allele": "C",
+      "eur_freq": 0.1551,
+      "alleles_seen": {
+        "T": 0.8449,
+        "C": 0.1551
+      },
+      "why": "epsilon-4 (Corder 1993); catalogue alt worsens lipid_profile"
+    },
+    "LCT": {
+      "rsid": "rs4988235",
+      "effect_allele": "A",
+      "eur_freq": 0.508,
+      "alleles_seen": {
+        "A": 0.508,
+        "G": 0.492
+      },
+      "why": "lactase-persistence -13910*T (Enattah 2002; A on Ensembl fwd strand)"
+    },
+    "IL6": {
+      "rsid": "rs1800795",
+      "effect_allele": "G",
+      "eur_freq": 0.5845,
+      "alleles_seen": {
+        "C": 0.4155,
+        "G": 0.5845
+      },
+      "why": "higher-IL6 promoter allele (Fishman 1998; candidate-era caveat stands)"
+    },
+    "GJB2": {
+      "rsid": "rs80338939",
+      "effect_allele": "CCCCC",
+      "eur_freq": 0.0089,
+      "alleles_seen": {
+        "CCCCCC": 0.9911,
+        "CCCCC": 0.0089
+      },
+      "why": "35delG deafness allele (Denoyelle 1997), represented on Ensembl as the contracted C-run; catalogue alt is the recessive deafness allele"
+    },
+    "GJD2": {
+      "rsid": "rs634990",
+      "effect_allele": "C",
+      "eur_freq": 0.4712,
+      "alleles_seen": {
+        "T": 0.5288,
+        "C": 0.4712
+      },
+      "why": "myopia risk allele (Solouki 2010); catalogue alt weight -vision_acuity"
+    },
+    "COMT": {
+      "rsid": "rs4680",
+      "effect_allele": "A",
+      "eur_freq": 0.5,
+      "alleles_seen": {
+        "A": 0.5,
+        "G": 0.5
+      },
+      "why": "Met158 (weights deliberately negligible; orientation immaterial at 0.05)"
+    },
+    "OXTR": {
+      "rsid": "rs53576",
+      "effect_allele": "G",
+      "eur_freq": 0.6491,
+      "alleles_seen": {
+        "A": 0.3509,
+        "G": 0.6491
+      },
+      "why": "most-studied allele (weights negligible; orientation immaterial)"
+    },
+    "NR3C1": {
+      "rsid": "rs41423247",
+      "effect_allele": "G",
+      "eur_freq": 0.6203,
+      "alleles_seen": {
+        "G": 0.6203,
+        "C": 0.3797
+      },
+      "why": "BclI minor allele (weights negligible)"
+    }
+  }
+}

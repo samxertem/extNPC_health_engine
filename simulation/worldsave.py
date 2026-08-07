@@ -48,6 +48,12 @@ import numpy as np
 
 SAVE_FORMAT_VERSION = 1
 
+
+def _catalogue_mode() -> str:
+    """The locus-catalogue mode this process is running under."""
+    from health_engine.loci import CATALOGUE_MODE
+    return CATALOGUE_MODE
+
 _ALLOWED_MODULE_PREFIXES = ("health_engine.", "simulation.")
 
 
@@ -189,6 +195,12 @@ def world_state(world, note: str = "") -> dict:
         "manifest": manifest(world, note),
         "seed": int(world.seed),
         "tick": int(world.tick),
+        # Which locus catalogue this world's genotypes mean anything under
+        # (session 16). A genome is an array of dosages; the frequencies
+        # that give those dosages meaning live in loci.py, and the
+        # empirical flag changes them. Loading across modes would neither
+        # raise nor warn -- every statistic would just quietly be wrong.
+        "catalogue": _catalogue_mode(),
         "params": encode(world.params),
         "environment": encode(world.environment),
         # the bit-generator STATE, not the seed
@@ -254,6 +266,16 @@ def load_world_save(blob: bytes):
     if fmt != SAVE_FORMAT_VERSION:
         raise ValueError(f"unsupported save format {fmt!r}; this build reads "
                          f"version {SAVE_FORMAT_VERSION}")
+
+    # Saves from before the flag existed are all synthetic-catalogue saves,
+    # so a missing key defaults to "synthetic" and they keep loading.
+    saved_mode = state.get("catalogue", "synthetic")
+    if saved_mode != _catalogue_mode():
+        raise ValueError(
+            f"this save was made under the {saved_mode!r} locus catalogue "
+            f"but the current process runs {_catalogue_mode()!r} "
+            f"(EXTNPC_CATALOGUE). The genotypes are not comparable across "
+            f"catalogues; restart with the matching mode to load it.")
 
     params = decode(state["params"])
     world = World(n_founders=0, seed=state["seed"], params=params)
