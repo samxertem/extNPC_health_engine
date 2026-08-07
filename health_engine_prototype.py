@@ -428,6 +428,13 @@ def main() -> None:
         viz.plot_directional_dominance(
             os.path.join(out, "directional_dominance.png"),
             n=500 if FAST else 1500),
+        viz.plot_mendelian_diseases(
+            os.path.join(out, "mendelian_diseases.png"),
+            n=800 if FAST else 3000),
+        viz.plot_load_purging(
+            os.path.join(out, "load_purging.png"),
+            n_lines=60 if FAST else 150,
+            n_control=500 if FAST else 1500),
         viz.plot_cnv_dosage(os.path.join(out, "cnv_dosage.png"),
                             n=800 if FAST else 2500),
         viz.plot_development(os.path.join(out, "development.png")),

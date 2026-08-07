@@ -260,6 +260,37 @@ GLOSSARY: Dict[str, Dict[str, str]] = {
                 "is why consanguinity is a risk rather than a certainty.",
         "cite": "Charlesworth & Willis 2009; Haldane 1937",
     },
+    "lethal_equivalents": {
+        "title": "Realised lethal equivalents B(t)",
+        "text": "Morton's B re-measured every year from the load alleles the "
+                "LIVING actually carry, against the founding constant 1.4. "
+                "It falls when inbreeding exposes rare recessives as "
+                "homozygotes and selection removes them — genetic PURGING — "
+                "but READ IT CAREFULLY: in a population this small, drift "
+                "loses rare alleles too, and drift is not purging. The line "
+                "alone cannot separate them; validation law [9e] can, because "
+                "it runs a large random-mating control. Sampling noise is "
+                "~0.06 at 50 alive and ~0.13 at 10, so a single-year move is "
+                "not a trend. The estimator carries Nei's 2n/(2n−1) "
+                "correction; without it a founding cohort would read 5% "
+                "purged before anyone was born.",
+        "cite": "Crnokrak & Barrett 2002; Hedrick & García-Dorado 2016; "
+                "Nei 1978",
+    },
+    "mendelian_diseases": {
+        "title": "Named Mendelian recessive disorders",
+        "text": "Nine real autosomal recessive disorders (cystic fibrosis, "
+                "SMA, PKU, …) labelled onto the load loci whose frequency and "
+                "severity best match the literature. An 'affected' individual "
+                "is homozygous at that locus — the survival cost it was "
+                "always paying now has a name. Carriers are silent but "
+                "transmissible; about 1 in 6 outbred individuals carries at "
+                "least one panel allele. A first-cousin child's risk of a "
+                "named recessive diagnosis is ~7× the outbred rate — "
+                "consanguinity multiplies RARE-recessive incidence many-fold "
+                "while common-trait shifts stay small.",
+        "cite": "Modell & Darr 2002; Bittles & Black 2010; Lazarin 2013",
+    },
     "mean_relatedness": {
         "title": "Mean couple relatedness",
         "text": "Average realized genomic relatedness (GCTA-style) between "

@@ -322,3 +322,33 @@ def test_a_save_of_an_empty_world_reloads():
     restored = load_world_save(build_world_save(empty))
     assert len(restored.people) == 0
     restored.step()                     # and is still a working world
+
+
+# ---------------------------------------------------------------------
+# Provenance: which model version produced these numbers (session 16)
+# ---------------------------------------------------------------------
+
+def test_manifest_records_the_locus_catalogue(world):
+    """Two exports with the same seed under different catalogues are
+    different model versions, and nothing in the numbers themselves says
+    so. The manifest has to."""
+    m = EX.manifest(world)
+    from health_engine.loci import CATALOGUE_MODE
+    assert m["catalogue"] == CATALOGUE_MODE == "synthetic"
+
+
+def test_readme_and_caveats_cover_the_new_columns(world):
+    """A named diagnosis and a purging series are both easy to over-read.
+    The bundle must ship the caveat next to the data, not only in the
+    report."""
+    m = EX.manifest(world)
+    caveats = " ".join(m["caveats"]).lower()
+    assert "mendelian_diagnoses" in caveats
+    assert "cystic fibrosis" in caveats          # the documented misfit
+    assert "lethal_equivalents" in caveats
+    assert "purging" in caveats
+
+    blob = EX.build_csv_bundle(world)
+    readme = zipfile.ZipFile(io.BytesIO(blob)).read("README.txt").decode()
+    assert "mendelian_carrier_of" in readme
+    assert "lethal_equivalents" in readme

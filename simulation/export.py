@@ -48,8 +48,8 @@ import numpy as np
 
 # The engine-ready save lives next door; re-exported so callers have one
 # import for "get this run out of the dashboard".
-from .worldsave import (SAVE_FORMAT_VERSION, build_world_save,  # noqa: F401
-                        load_world_save, world_state)
+from .worldsave import (SAVE_FORMAT_VERSION, _catalogue_mode,  # noqa: F401
+                        build_world_save, load_world_save, world_state)
 
 # Phenotype fields worth a column each. The full dict is ~39 traits; these are
 # the ones with an interpretation someone would actually model.
@@ -142,6 +142,13 @@ def people_rows(world, living_only: bool = False) -> List[dict]:
             "relative_viability": npc.relative_viability(),
             "hidden_load_alleles": _load_carried(npc),
             "expressed_load_homozygotes": _load_expressed(npc),
+            # Named recessive disorders (diseases.py): affected = homozygous
+            # at a labelled panel locus, carrier = heterozygous. Semicolon-
+            # joined so the column stays one CSV field.
+            "mendelian_diagnoses": ";".join(
+                d.name for d in npc.mendelian_diagnoses()),
+            "mendelian_carrier_of": ";".join(
+                d.name for d in npc.mendelian_carrier_of()),
             "cnv_count": len(npc.cnv_variants() or []),
             # physiology / epigenetics
             "inflammation_state": npc.inflammation_state,
@@ -249,6 +256,10 @@ def manifest(world, note: str = "") -> dict:
         "libraries": versions,
         "seed": int(world.seed),
         "tick": int(world.tick),
+        # Which locus catalogue these genotypes mean anything under. Two
+        # exports with the same seed and different catalogues are different
+        # model versions, and nothing in the numbers themselves says so.
+        "catalogue": _catalogue_mode(),
         "params": {k: _safe(v) for k, v in asdict(world.params).items()},
         "summary": {
             "n_living": len(alive),
@@ -272,6 +283,16 @@ def manifest(world, note: str = "") -> dict:
             "stature actually expressed at the individual's current age (#13); "
             "the two differ for anyone still growing, and after ~40 through "
             "modelled height loss.",
+            "mendelian_diagnoses names the recessive disorders an individual "
+            "expresses (homozygous at a labelled load locus). The engine's "
+            "carrier frequency for each is its assigned locus's, not the "
+            "literature's -- cystic fibrosis is a documented misfit, since "
+            "mutation-selection balance cannot sustain q=0.02 at s~1. See "
+            "health_engine/diseases.py before using these epidemiologically.",
+            "lethal_equivalents in history.csv is Morton's B re-measured from "
+            "the living each year (purging). In a population of ~70 its "
+            "single-year noise is ~0.05; only multi-generation trends are "
+            "interpretable.",
         ],
     }
 
@@ -339,9 +360,17 @@ people.csv     one row per individual who has ever lived.
                expectation, the second a realisation.
                `trait_*` are MATURE phenotypes. `height_at_age_cm` is the
                stature expressed at the current age (#13).
+               `mendelian_diagnoses` / `mendelian_carrier_of` are the named
+               recessive disorders expressed (homozygous) and carried
+               (heterozygous, silent) at the labelled load loci. Read
+               diseases.py first: the engine's carrier frequencies are its
+               assigned loci's, and CF is a documented misfit.
 
 history.csv    one row per simulated year; the series behind every chart in
-               the dashboard.
+               the dashboard. `lethal_equivalents` is Morton's B re-measured
+               from the living each year -- it FALLS as a closed population
+               purges recessive load, but its single-year noise in a village
+               of ~70 is ~0.05, so read the trend and not the wiggle.
 
 pedigree.csv   one row per parent-child edge (child, parent, role). Loads
                directly into kinship2 / pedigreemm / networkx.

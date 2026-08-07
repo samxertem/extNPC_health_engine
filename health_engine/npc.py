@@ -216,6 +216,27 @@ class NPC:
             return 1.0
         return self.load.viability()
 
+    def mendelian_diagnoses(self) -> List:
+        """
+        Named recessive disorders this NPC expresses (diseases.py): the
+        panel loci of the deleterious load that are homozygous. A pure
+        read-out -- the fitness cost of each was already inside
+        `viability()` before the locus had a name. Empty if the load layer
+        is inactive.
+        """
+        if self.load is None:
+            return []
+        from .diseases import diagnoses
+        return diagnoses(self.load)
+
+    def mendelian_carrier_of(self) -> List:
+        """Named recessive disorders carried heterozygous -- silent but
+        transmissible. The visible tip of `load.n_carried`."""
+        if self.load is None:
+            return []
+        from .diseases import carrier_of
+        return carrier_of(self.load)
+
     def relative_viability(self) -> float:
         """
         Viability relative to an average outbred individual -- the number a

@@ -56,6 +56,25 @@ def test_fst_tile_reads_as_undefined_in_a_single_deme_world():
     assert "single-deme" in tile["glossary"]
 
 
+def test_lethal_equivalents_tile_is_honest_about_a_missing_measurement():
+    """A snapshot ring from before session 16 has no B(t) column, and an
+    empty world writes 0.0. Printing '0.000' would claim the population
+    carries no load, which is a measurement nobody made."""
+    tile = _tile({"tick": [1]}, _Params(), key="lethal_equivalents")
+    assert tile["value"] == "—"
+    assert tile["delta"] == 0.0
+    tile = _tile({"tick": [1], "lethal_equivalents": [0.0]}, _Params(),
+                 key="lethal_equivalents")
+    assert tile["value"] == "—"
+
+
+def test_lethal_equivalents_tile_reports_the_measured_value():
+    tile = _tile({"tick": [1, 2], "lethal_equivalents": [1.402, 1.381]},
+                 _Params(), key="lethal_equivalents")
+    assert tile["value"] == "1.381"
+    assert tile["delta"] == pytest.approx(1.381 - 1.402)
+
+
 def test_fst_tile_reports_the_estimate_once_there_is_structure():
     tile = _tile({"tick": [1, 2], "fst": [0.01, 0.042]}, _Params(n_demes=4))
     assert tile["value"] == "0.042"
@@ -232,6 +251,91 @@ def test_the_two_costs_of_inbreeding_are_shown_side_by_side(inbred_world):
     assert "relative viability" in text
     assert "expected stature cost" in text
     assert "expected lung cost" in text
+
+
+def test_drawer_conditions_row_shows_names_not_a_count(inbred_world):
+    """'conditions: 2' made the reader open the character sheet to learn
+    WHAT the individual has. The drawer must name them."""
+    with_conds = [p for p in inbred_world.living if p.medical_conditions]
+    if not with_conds:
+        pytest.skip("nobody alive has an acquired condition in this world")
+    npc = with_conds[0]
+    text = _text(inspector.summary_card(inbred_world, npc.name))
+    for cond in {c.name for c in npc.medical_conditions}:
+        assert cond.replace("_", " ") in text
+    # and the bare count must NOT be what is shown
+    assert f"conditions {len(npc.medical_conditions)} " not in text
+
+
+def test_drawer_names_a_mendelian_diagnosis_when_there_is_one(inbred_world):
+    """Recompute affectedness independently at the panel loci; whoever is
+    homozygous must be named in the drawer, and nobody else may be."""
+    from health_engine.diseases import PANEL_LOCI, DISEASES
+
+    for npc in inbred_world.living:
+        dosage = npc.load.dosage[PANEL_LOCI]
+        text = _text(inspector.summary_card(inbred_world, npc.name))
+        for d, g in zip(DISEASES, dosage):
+            if g == 2:
+                assert d.label in text, f"{npc.name} affected but unnamed"
+            else:
+                assert f"dx {d.spec.gene}" not in text
+
+
+def test_drawer_renders_a_forced_diagnosis(inbred_world):
+    """The affected branch must not be tested only when the fixture happens
+    to produce a homozygote: force one, assert the name renders, restore."""
+    from health_engine.diseases import DISEASES
+
+    npc = next(iter(inbred_world.living))
+    d0 = DISEASES[0]
+    before = npc.load.haplotypes[:, d0.locus].copy()
+    try:
+        npc.load.haplotypes[:, d0.locus] = 1
+        text = _text(inspector.summary_card(inbred_world, npc.name))
+        assert d0.label in text
+        assert f"dx {d0.spec.gene}" in text
+    finally:
+        npc.load.haplotypes[:, d0.locus] = before
+
+
+def test_character_sheet_mendelian_section_tells_the_truth(inbred_world):
+    """The MENDELIAN section must equal the engine's own read-out: every
+    diagnosis named with its gene, carriers listed, and the healthy case
+    saying so rather than staying blank."""
+    from dashboard import app as dash_app
+
+    previous = dash_app.WORLD
+    try:
+        dash_app.WORLD = inbred_world
+        for npc in list(inbred_world.living)[:12]:
+            text = _text(dash_app.char_health(npc.name))
+            dx = npc.mendelian_diagnoses()
+            carriers = npc.mendelian_carrier_of()
+            assert "MENDELIAN" in text
+            if dx:
+                for d in dx:
+                    assert d.label in text and d.spec.gene in text
+            else:
+                assert "no recessive disorder expressed" in text
+            if carriers:
+                for d in carriers:
+                    assert d.label in text
+    finally:
+        dash_app.WORLD = previous
+
+
+def test_export_carries_the_named_diagnoses(inbred_world):
+    """people.csv must agree with the engine, so an analysis outside the
+    dashboard sees the same diagnoses the drawer shows."""
+    from simulation.export import people_rows
+
+    rows = {r["name"]: r for r in people_rows(inbred_world)}
+    for npc in inbred_world.living:
+        expected = ";".join(d.name for d in npc.mendelian_diagnoses())
+        assert rows[npc.name]["mendelian_diagnoses"] == expected
+        expected_c = ";".join(d.name for d in npc.mendelian_carrier_of())
+        assert rows[npc.name]["mendelian_carrier_of"] == expected_c
 
 
 def test_the_inbreeding_chart_carries_the_stature_cost_on_hover(inbred_world):

@@ -402,10 +402,36 @@ def char_health(name):
     else:
         clist = [html.Div("no chronic conditions",
                           style={"color": GOOD, "fontSize": "13px"})]
+    # Named Mendelian recessives (diseases.py). Affected = homozygous at a
+    # labelled load locus; the survival cost was already inside viability,
+    # this section says which disorder it is. Carriers are shown because
+    # they are the reservoir consanguinity draws on -- ~1 in 6 outbred
+    # individuals carries at least one panel allele.
+    dx = npc.mendelian_diagnoses()
+    carriers = npc.mendelian_carrier_of()
+    if dx:
+        glist = [html.Div([
+            html.Span("◆ ", style={"color": CRIT}),
+            html.Span(d.label, style={"color": INK2}),
+            html.Span(f"  {d.spec.gene} · OMIM {d.spec.omim} · "
+                      f"{d.spec.onset} onset",
+                      style={"color": MUTED, "fontSize": "11px"})],
+            style={"fontSize": "13px", "marginBottom": "4px"}) for d in dx]
+    else:
+        glist = [html.Div("no recessive disorder expressed",
+                          style={"color": GOOD, "fontSize": "13px"})]
+    if carriers:
+        glist.append(html.Div(
+            "carrier of: " + ", ".join(d.label for d in carriers),
+            style={"color": MUTED, "fontSize": "11px", "marginTop": "6px"},
+            title="Heterozygous at the labelled load locus: silent for this "
+                  "individual, but transmissible — the reservoir "
+                  "consanguinity draws on."))
     accel = npc.epigenetic_age_acceleration
     return html.Div(style={"display": "grid",
                            "gridTemplateColumns": "repeat(2, minmax(0, 1fr))", "gap": "10px"}, children=[
         _section(f"CONDITIONS ({len(conds)})", clist),
+        _section(f"MENDELIAN — RECESSIVE PANEL ({len(dx)})", glist),
         _section("BIOLOGICAL AGEING", [
             _row("chronological age", f"{npc.age} yrs"),
             _row("epigenetic age", f"{npc.epigenetic_age:.1f} yrs"),

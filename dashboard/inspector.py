@@ -163,6 +163,17 @@ def _inbreeding_rows(F: float, npc, cnvs: List[dict]) -> List:
         if npc.load.n_homozygous:
             rows.append(_kv("expressed load", f"{npc.load.n_homozygous} loci",
                             CRIT))
+        # Named Mendelian recessives (diseases.py): the panel loci of the
+        # load that are homozygous get their real-disorder names. The
+        # anonymous "expressed load" count above stays -- the panel names
+        # nine loci out of 2000, so the two rows answer different questions.
+        for dx in npc.mendelian_diagnoses():
+            rows.append(_kv(f"dx {dx.spec.gene}", dx.label, CRIT, small=True))
+        carriers = npc.mendelian_carrier_of()
+        if carriers:
+            rows.append(_kv("carrier of",
+                            ", ".join(d.spec.gene for d in carriers),
+                            small=True))
     for v in cnvs:
         rows.append(_kv(f"CNV {v['region']}",
                         f"{v['kind']} ({v['copies']} copies, {v['parent_of_origin']})",
@@ -295,8 +306,15 @@ def summary_card(world, name: Optional[str],
                 CRIT if npc.epigenetic_age_acceleration > 3 else INK),
             _kv("inflammation", f"{npc.inflammation_state:+.2f}",
                 CRIT if npc.inflammation_state > 0.6 else INK),
-            _kv("conditions", len(npc.medical_conditions),
-                CRIT if npc.medical_conditions else INK),
+            # Names, not a count: "conditions: 2" made the reader open the
+            # full character sheet to learn WHAT the individual has, which
+            # is exactly the sort of unanswered claim this drawer is for.
+            _kv("conditions",
+                (", ".join(sorted({c.name.replace("_", " ")
+                                   for c in npc.medical_conditions}))
+                 if npc.medical_conditions else "none"),
+                CRIT if npc.medical_conditions else INK,
+                small=bool(npc.medical_conditions)),
             _kv("partner", (meta.partner or "—").split("-")[0]),
             _kv("children", meta.n_children),
         ]

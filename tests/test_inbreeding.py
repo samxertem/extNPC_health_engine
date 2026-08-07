@@ -22,6 +22,8 @@ from health_engine.inbreeding import (SPECTRUM, DeleteriousLoad, Pedigree,
                                       directional_dominance, excess_mortality,
                                       first_cousin_excess_mortality,
                                       lethal_equivalents, realised_inbreeding,
+                                      realised_lethal_equivalents,
+                                      realised_load_frequencies,
                                       sample_founder_load, transmit_load)
 from health_engine.npc import random_founder, reproduce
 
@@ -471,3 +473,93 @@ def test_inbreeding_avoidance_lowers_pedigree_F_in_a_live_world():
         return float(np.mean([ped.inbreeding(n.name) for n in w.living]))
 
     assert mean_F(0.0625) < mean_F(0.5) + 1e-9
+
+
+# ======================================================================
+# 5. Purging: realised B and the sib-line law (session 16)
+# ======================================================================
+
+def test_realised_frequencies_measure_the_founding_spectrum():
+    """A founder cohort segregates at the spectrum's q, so the realised
+    read-outs must land on the founding values within sampling error."""
+    rng = np.random.default_rng(20260810)
+    loads = [sample_founder_load(rng) for _ in range(3000)]
+    q_hat = realised_load_frequencies(loads)
+    # pooled over 2000 loci the mean frequency is tight
+    assert abs(q_hat.mean() - SPECTRUM.q.mean()) < 5e-4
+    b_hat = realised_lethal_equivalents(loads)
+    assert abs(b_hat - SPECTRUM.lethal_equivalents) < 0.05
+
+
+def test_realised_B_corrects_the_finite_sample_bias():
+    """p_hat*q_hat underestimates pq by 1/(2n) (Nei 1978), so a NAIVE
+    realised B reads ~5% purged in a 10-founder cohort before a single
+    child is born. This is the same class of defect session 11 found in
+    G_ST, and it matters for the same reason: the bias scales with sample
+    size, so it would be read as a biological trend in exactly the small
+    populations this engine simulates."""
+    true_B = SPECTRUM.lethal_equivalents
+    for n, tol in ((10, 0.05), (50, 0.02)):
+        rng = np.random.default_rng(1)
+        corrected, naive = [], []
+        for _ in range(40):
+            loads = [sample_founder_load(rng) for _ in range(n)]
+            corrected.append(realised_lethal_equivalents(loads))
+            naive.append(realised_lethal_equivalents(loads, unbiased=False))
+        # corrected estimator is centred on the truth
+        assert abs(np.mean(corrected) / true_B - 1.0) < tol, n
+        # the naive one is low, by the predicted 1/(2n)
+        assert np.mean(naive) < np.mean(corrected)
+        assert np.mean(naive) / true_B == pytest.approx(1 - 1 / (2 * n),
+                                                        abs=0.015)
+
+
+def test_realised_readout_is_a_pure_measurement():
+    """No RNG, no mutation: the read-out must not touch the genotypes."""
+    rng = np.random.default_rng(4)
+    loads = [sample_founder_load(rng) for _ in range(20)]
+    before = [ld.haplotypes.copy() for ld in loads]
+    realised_load_frequencies(loads)
+    realised_lethal_equivalents(loads)
+    for ld, b in zip(loads, before):
+        assert np.array_equal(ld.haplotypes, b)
+    assert realised_lethal_equivalents([]) == 0.0
+    assert realised_load_frequencies([]).size == 0
+
+
+def test_purging_law_sib_lines_fall_and_control_holds():
+    """Validation [9e] end to end at a test-sized run: the full-sib arm
+    sheds a clear fraction of B, the random-mating control stays near the
+    founding value under the identical survival rule, and the severe
+    component falls at least as fast as the mild one."""
+    r = V.load_purging(n_lines=80, n_control=600, generations=8,
+                       rng=np.random.default_rng(20260811))
+    assert r.passes()
+    assert r.b_inbred[-1] < r.founding_B * 0.85
+    assert abs(r.b_control[-1] - r.founding_B) / r.founding_B < 0.10
+    assert r.severe_B_drop > r.mild_B_drop
+    # extinction is expected and must be reported, not hidden
+    assert 0 < r.lines_surviving < r.n_lines
+    assert r.lines_alive[0] == r.n_lines
+    assert r.lines_alive[-1] == r.lines_surviving
+
+
+def test_snapshot_carries_realised_lethal_equivalents():
+    """The history row must equal the engine's own read-out on the same
+    living individuals -- and report 0.0 (rendered as an em-dash upstream)
+    when there is nobody to measure."""
+    from simulation import World
+    from simulation.metrics import snapshot
+
+    w = World(n_founders=12, seed=9)
+    for _ in range(25):
+        w.step()
+    row = w.history[-1]
+    loads = [p.load for p in w.living if p.load is not None]
+    assert row["lethal_equivalents"] == pytest.approx(
+        realised_lethal_equivalents(loads))
+    # a founder cohort starts at the founding B, within village-scale noise
+    assert abs(w.history[0]["lethal_equivalents"]
+               - SPECTRUM.lethal_equivalents) < 0.2
+    empty = snapshot(0, [], 0, 0, 0, 0.0)
+    assert empty["lethal_equivalents"] == 0.0

@@ -847,6 +847,77 @@ def full_report(rng: np.random.Generator,
     add("    lands at 1.4% of V_P for height -- independently estimated at")
     add("    essentially zero (Zhu 2015), which nothing here was told.")
 
+    # 9d. Named Mendelian recessive incidence (diseases.py)
+    add("\n[9d] Mendelian recessive incidence   P(affected) = q^2 + F p q")
+    add("    Nine real recessive disorders (CF, SMA, PKU, ...) labelled onto the")
+    add("    load loci whose (q, s) best match the literature. Same pedigrees as")
+    add("    [9b], read at the named loci: mean diagnoses per child must regress")
+    add("    on F with slope sum(pq) and intercept sum(q^2) -- exactly linear,")
+    add("    no approximation. Assignment deviations are printed, not hidden:")
+    from .diseases import panel_summary
+    for line in panel_summary().splitlines():
+        add("      " + line)
+    mi = mendelian_incidence(n_per_level=1200 if fast else 4000, rng=rng)
+    add(f"    {'F':>9}{'diagnoses/child':>17}{'+/- sem':>10}{'closed form':>13}")
+    from .diseases import expected_affected_count as _eac
+    for F, m, se in zip(mi.levels, mi.mean_count, mi.sem_count):
+        add(f"    {F:>9.4f}{m:>17.5f}{se:>10.5f}{_eac(F):>13.5f}")
+    add(f"    slope on F  : {mi.observed_slope:.4f} +/- {mi.stderr:.4f}"
+        f"   (closed form {mi.expected_slope:.4f})")
+    add(f"    intercept   : {mi.observed_intercept:.5f}"
+        f"   (closed form {mi.expected_intercept:.5f})")
+    add(f"    outbred carrier share (>=1 panel allele): {mi.carrier_share:.3f}"
+        f"   (closed form {mi.expected_carrier_share:.3f})")
+    rr_txt = ("n/a (0 outbred affecteds)" if np.isnan(mi.first_cousin_rr)
+              else f"{mi.first_cousin_rr:.1f}")
+    add(f"    first-cousin relative risk: observed {rr_txt}"
+        f"   (closed form {mi.expected_first_cousin_rr:.1f}; reported, not"
+        " gated -- a ratio of small Poisson counts)")
+    add(f"    -> {'PASS' if mi.passes() else 'FAIL'}")
+    add("\n    The ~7x first-cousin relative risk is the epidemiological")
+    add("    signature: consanguinity multiplies RARE-recessive incidence")
+    add("    many-fold while common-variant traits move by only F sum 2pq d")
+    add("    (Modell & Darr 2002). Same F, two responses, both in this engine.")
+    add("    Cystic fibrosis is the documented misfit -- q = 0.02 with s ~ 1")
+    add("    cannot hold under pure mutation-selection balance, which is why")
+    add("    the literature needs heterozygote advantage to explain CF. The")
+    add("    spectrum agreeing with that impossibility is a feature; see")
+    add("    diseases.py.")
+
+    # 9e. Purging of the recessive load
+    add("\n[9e] Genetic purging   B(t) from realised allele frequencies")
+    add("    The load the population CARRIES is not a constant: sustained")
+    add("    inbreeding exposes rare recessives as homozygotes, selection")
+    add("    removes them, and B -- re-measured each generation from the")
+    add("    realised frequencies of the individuals actually alive -- falls.")
+    add("    Full-sib lines vs a random-mating control under the IDENTICAL")
+    add("    survival rule, so the fall is attributable to the mating system.")
+    pg = load_purging(n_lines=60 if fast else 150,
+                      n_control=500 if fast else 1500,
+                      generations=8, rng=rng)
+    add(f"    {'generation':>12}{'B sib lines':>13}{'B control':>12}{'lines alive':>13}")
+    for g, (bi, bc, la) in enumerate(zip(pg.b_inbred, pg.b_control,
+                                         pg.lines_alive)):
+        add(f"    {g:>12}{bi:>13.4f}{bc:>12.4f}{la:>13}")
+    drop = 1.0 - pg.b_inbred[-1] / pg.founding_B
+    add(f"    founding B  : {pg.founding_B:.4f}")
+    add(f"    sib-line drop: {100 * drop:.1f}%   control drift: "
+        f"{100 * (pg.b_control[-1] / pg.founding_B - 1.0):+.1f}%")
+    add(f"    severe component (s > 0.3): -{100 * pg.severe_B_drop:.1f}%"
+        f"   mild (s <= 0.3): -{100 * pg.mild_B_drop:.1f}%")
+    add(f"    line extinction: {pg.n_lines - pg.lines_surviving} of "
+        f"{pg.n_lines}")
+    add(f"    -> {'PASS' if pg.passes() else 'FAIL'}")
+    add("\n    Purging strips the SEVERE, nearly-recessive component and")
+    add("    barely touches the mild one -- Hedrick & Garcia-Dorado 2016's")
+    add("    central point, emerging here from nothing but the h-s")
+    add("    relationship the spectrum was built with (Deng & Lynch 1996).")
+    add("    Half the lines go extinct on the way: purging is measured on")
+    add("    survivors, and only on them, which is the classic misreading")
+    add("    of purging data (Crnokrak & Barrett 2002). The world's history")
+    add("    now carries the same read-out as `lethal_equivalents`, so a")
+    add("    long-running inbred village shows its own B falling.")
+
     # 10. Copy-number dosage response (roadmap #12)
     add("\n[10] CNV gene dosage   shift = (copies/2 - 1) * sum_j E[val_j]")
     add("    One cohort of genomes read at three copy numbers -- same genotypes,")
@@ -1445,6 +1516,264 @@ def inbreeding_depression(n_per_level: int = 4000,
         predicted_het_offset=predicted_offset,
         first_cousin_excess=1.0 - mean_w[i_fc] / mean_w[0],
         n_per_level=n_per_level,
+    )
+
+
+@dataclass
+class MendelianIncidenceResult:
+    """
+    Named-disease incidence under inbreeding, measured at the panel loci.
+
+    The claim being tested: for each named disease at frequency q, the
+    probability of an affected child is q^2 + F p q (Wright 1922) --
+    EXACTLY linear in F, no approximation -- so the mean number of panel
+    diagnoses per child regresses on pedigree F with slope sum(pq) and
+    intercept sum(q^2). Nothing in `transmit_load` or `diagnoses` computes
+    either quantity, so recovering them is a measurement, exactly as [9b]
+    recovers B.
+    """
+    levels: List[float]                  # pedigree F, one per template
+    mean_count: List[float]              # panel diagnoses per child
+    sem_count: List[float]
+    observed_slope: float
+    expected_slope: float                # sum_j p_j q_j over the panel
+    observed_intercept: float
+    expected_intercept: float            # sum_j q_j^2
+    stderr: float                        # se of the slope, delta method
+    carrier_share: float                 # outbred cohort, >=1 panel allele het
+    expected_carrier_share: float
+    first_cousin_rr: float               # observed, NaN if outbred count is 0
+    expected_first_cousin_rr: float
+    n_per_level: int
+
+    def passes(self, k: float = 3.5, rel_floor: float = 0.10) -> bool:
+        """
+        Slope within k standard errors (or a 10% relative floor -- the
+        intercept is ~1e-3, so the outbred cohort contributes Poisson counts
+        of order a few and the se is honest but small-sample), AND the
+        most-inbred cohort separated from the outbred one by > 3 sigma.
+        The observed first-cousin relative risk is REPORTED, not gated:
+        its denominator is a handful of outbred affecteds, and a ratio of
+        small Poisson counts is too noisy to be a criterion at any n this
+        harness can afford. [9c] learned the same lesson about strict
+        monotonicity.
+        """
+        err = abs(self.observed_slope - self.expected_slope)
+        slope_ok = err <= max(k * self.stderr, rel_floor * self.expected_slope)
+        sep = (self.mean_count[-1] - self.mean_count[0]) / max(
+            np.hypot(self.sem_count[-1], self.sem_count[0]), 1e-12)
+        return slope_ok and sep > 3.0
+
+
+def mendelian_incidence(n_per_level: int = 4000,
+                        rng: Optional[np.random.Generator] = None
+                        ) -> MendelianIncidenceResult:
+    """
+    Replay the same depth-matched pedigree templates as [9b], but read each
+    child's genotype at the nine NAMED disease loci (diseases.py) instead
+    of its whole-spectrum viability.
+
+    Uses the ENGINE's panel frequencies for the closed form, because those
+    are what the simulated genotypes segregate at -- the engine-vs-
+    literature frequency deviations are a separate, deliberately visible
+    table (`diseases.panel_summary`), not something this law launders.
+    """
+    from .diseases import (DISEASES, PANEL_LOCI, expected_affected_count,
+                           expected_carrier_share, relative_risk)
+    from .inbreeding import SPECTRUM
+
+    rng = np.random.default_rng(20260807) if rng is None else rng
+    sp = SPECTRUM
+
+    levels: List[float] = []
+    means: List[float] = []
+    sems: List[float] = []
+    carrier_share = 0.0
+
+    for label, F in _INBREEDING_TEMPLATES:
+        counts = np.empty(n_per_level)
+        n_carrier = 0
+        for i in range(n_per_level):
+            kid = _inbred_child(label, rng, sp)
+            g = kid.dosage[PANEL_LOCI]
+            counts[i] = float(np.count_nonzero(g == 2))
+            if np.any(g == 1):
+                n_carrier += 1
+        levels.append(F)
+        means.append(float(counts.mean()))
+        sems.append(float(counts.std(ddof=1) / np.sqrt(n_per_level)))
+        if label == "outbred":
+            carrier_share = n_carrier / n_per_level
+
+    x = np.array(levels)
+    y = np.array(means)
+    slope, intercept = np.polyfit(x, y, 1)
+    sxx = float(np.sum((x - x.mean()) ** 2))
+    var_slope = float(np.sum(((x - x.mean()) ** 2) * np.array(sems) ** 2)) / sxx ** 2
+
+    q = np.array([d.q for d in DISEASES])
+    i_fc = levels.index(1.0 / 16.0)
+    rr = means[i_fc] / means[0] if means[0] > 0 else float("nan")
+
+    return MendelianIncidenceResult(
+        levels=levels,
+        mean_count=means,
+        sem_count=sems,
+        observed_slope=float(slope),
+        expected_slope=float(np.sum((1.0 - q) * q)),
+        observed_intercept=float(intercept),
+        expected_intercept=float(np.sum(q ** 2)),
+        stderr=float(np.sqrt(var_slope)),
+        carrier_share=carrier_share,
+        expected_carrier_share=expected_carrier_share(),
+        first_cousin_rr=rr,
+        expected_first_cousin_rr=relative_risk(1.0 / 16.0),
+        n_per_level=n_per_level,
+    )
+
+
+@dataclass
+class PurgingResult:
+    """
+    Purging of the recessive load under sustained inbreeding.
+
+    The design is the purging literature's own: replicate full-sib mating
+    LINES, where every generation the pair's offspring face viability
+    selection and two survivors continue the line (Ballou 1997; Crnokrak &
+    Barrett 2002), against a large random-mating CONTROL population under
+    the identical survival rule. B is re-measured each generation from the
+    realised allele frequencies of the individuals actually alive --
+    `realised_lethal_equivalents`, the same read-out the world's history
+    now carries. Nothing in the transmission or survival code touches B.
+    """
+    generations: int
+    n_lines: int
+    n_control: int
+    b_inbred: List[float]            # realised B per generation, sib lines
+    b_control: List[float]           # same, random-mating control
+    b_severe: List[float]            # the s>0.3 component of the inbred arm
+    b_mild: List[float]              # ... and the s<=0.3 component
+    lines_alive: List[int]           # surviving lines per generation
+    founding_B: float
+    lines_surviving: int             # line extinction is itself a purging datum
+    severe_B_drop: float             # fractional fall of the s>0.3 component
+    mild_B_drop: float               # ... and of the s<=0.3 component
+
+    def passes(self, min_drop: float = 0.15, control_tol: float = 0.10) -> bool:
+        """
+        The inbred arm's B must fall by a clear margin while the control
+        holds near its founding value under the SAME survival rule -- so
+        the fall is attributable to inbreeding exposing recessives, not to
+        selection alone. The severe component must fall at least as fast
+        as the mild one (Hedrick & Garcia-Dorado 2016: purging acts on
+        large-effect recessives; small-effect load barely responds).
+        """
+        drop = 1.0 - self.b_inbred[-1] / self.founding_B
+        control_ok = abs(self.b_control[-1] - self.founding_B) / self.founding_B \
+            <= control_tol
+        return (drop >= min_drop and control_ok
+                and self.severe_B_drop >= self.mild_B_drop - 0.02)
+
+
+def load_purging(n_lines: int = 150, n_control: int = 1500,
+                 generations: int = 8,
+                 rng: Optional[np.random.Generator] = None) -> PurgingResult:
+    """
+    Run the two arms and measure B(t) from realised genotypes.
+
+    Survival is Bernoulli on ABSOLUTE viability -- baseline mutation load
+    included -- applied identically in both arms, so the arms differ only
+    in their mating system. A line whose pair cannot produce two survivors
+    in 12 attempts goes extinct, which is not a nuisance but a finding:
+    real sib-mating lines die out at exactly this stage, and dropping them
+    is what the purging literature calls the survivorship component.
+    """
+    from .inbreeding import (SPECTRUM, realised_lethal_equivalents,
+                             sample_founder_load, transmit_load)
+
+    rng = np.random.default_rng(20260809) if rng is None else rng
+    sp = SPECTRUM
+
+    def survives(load) -> bool:
+        return bool(rng.random() < load.viability(sp))
+
+    def component_B(loads, severe: bool) -> float:
+        """
+        B restricted to the severe or mild half of the DFE, with the same
+        2n/(2n-1) correction `realised_lethal_equivalents` applies. It
+        matters here even though the panel plots ratios: lines go extinct,
+        so n FALLS across generations, and an uncorrected estimator would
+        add a small downward drift that looks like extra purging.
+        """
+        from .inbreeding import realised_load_frequencies
+        mask = sp.s > 0.3 if severe else sp.s <= 0.3
+        q_hat = realised_load_frequencies(loads)
+        pq = (1.0 - q_hat) * q_hat
+        n_gametes = 2 * len(loads)
+        if n_gametes > 1:
+            pq = pq * n_gametes / (n_gametes - 1.0)
+        return float(np.sum((sp.s * pq * (1.0 - 2.0 * sp.h))[mask]))
+
+    # ---- inbred arm: replicate full-sib lines -------------------------
+    lines = [(sample_founder_load(rng, sp), sample_founder_load(rng, sp))
+             for _ in range(n_lines)]
+    pool = [ld for pair in lines for ld in pair]
+    b_inbred = [realised_lethal_equivalents(pool, sp)]
+    b_severe = [component_B(pool, True)]
+    b_mild = [component_B(pool, False)]
+    lines_alive = [len(lines)]
+
+    for _ in range(generations):
+        nxt = []
+        for mother, father in lines:
+            survivors = []
+            for _ in range(12):
+                child = transmit_load(mother, father, rng, sp)
+                if survives(child):
+                    survivors.append(child)
+                if len(survivors) == 2:
+                    break
+            if len(survivors) == 2:
+                nxt.append((survivors[0], survivors[1]))
+        lines = nxt
+        pool = [ld for pair in lines for ld in pair]
+        b_inbred.append(realised_lethal_equivalents(pool, sp)
+                        if pool else float("nan"))
+        b_severe.append(component_B(pool, True) if pool else float("nan"))
+        b_mild.append(component_B(pool, False) if pool else float("nan"))
+        lines_alive.append(len(lines))
+
+    sev0, mild0 = b_severe[0], b_mild[0]
+    sev1, mild1 = b_severe[-1], b_mild[-1]
+
+    # ---- control arm: one large random-mating population --------------
+    control = [sample_founder_load(rng, sp) for _ in range(n_control)]
+    b_control = [realised_lethal_equivalents(control, sp)]
+    for _ in range(generations):
+        nxt = []
+        while len(nxt) < n_control:
+            i, j = rng.integers(0, len(control), 2)
+            if i == j:
+                continue
+            child = transmit_load(control[i], control[j], rng, sp)
+            if survives(child):
+                nxt.append(child)
+        control = nxt
+        b_control.append(realised_lethal_equivalents(control, sp))
+
+    return PurgingResult(
+        generations=generations,
+        n_lines=n_lines,
+        n_control=n_control,
+        b_inbred=b_inbred,
+        b_control=b_control,
+        b_severe=b_severe,
+        b_mild=b_mild,
+        lines_alive=lines_alive,
+        founding_B=sp.lethal_equivalents,
+        lines_surviving=len(lines),
+        severe_B_drop=1.0 - sev1 / sev0 if sev0 > 0 else 0.0,
+        mild_B_drop=1.0 - mild1 / mild0 if mild0 > 0 else 0.0,
     )
 
 

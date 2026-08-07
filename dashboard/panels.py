@@ -406,6 +406,19 @@ def kpi_data(cols: Dict[str, List[float]], params) -> List[dict]:
              value=f"{_last(cols,'mean_viability', 1.0):.3f}",
              delta=delta("mean_viability"), fmt="f3", accent=CAT[0],
              glossary=GLOSSARY["mean_viability"]["text"]),
+        # Purging read-out: B at the REALISED load frequencies of the
+        # living, against the founding 1.4. A pre-existing snapshot ring
+        # (or an empty world) has no measurement, and prints an em-dash
+        # rather than a 0.000 that would claim one.
+        dict(key="lethal_equivalents", label="LOAD B(t)",
+             value=(f"{_last(cols,'lethal_equivalents', 0.0):.3f}"
+                    if _last(cols, "lethal_equivalents", 0.0) > 0.0 else "—"),
+             delta=(delta("lethal_equivalents")
+                    if _last(cols, "lethal_equivalents", 0.0) > 0.0 else 0.0),
+             fmt=("f3" if _last(cols, "lethal_equivalents", 0.0) > 0.0
+                  else "none"),
+             accent=CAT[4],
+             glossary=GLOSSARY["lethal_equivalents"]["text"]),
     ]
     return tiles
 

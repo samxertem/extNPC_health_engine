@@ -1123,6 +1123,202 @@ def plot_directional_dominance(out_path: str, trait: str = "height_cm",
     return _save(fig, out_path)
 
 
+def plot_mendelian_diseases(out_path: str, n: int = 3000,
+                            seed: int = 20260807) -> str:
+    """
+    Named Mendelian recessives (diseases.py): three claims, one per panel.
+
+    Left: the assignment, in the open. Each disease's engine allele
+    frequency against the literature's, log-log, with the y = x line.
+    Points on the line are faithful hosts; cystic fibrosis sits visibly
+    off it because mutation-selection balance CANNOT hold q = 0.02 at
+    s ~ 1 -- the same impossibility that makes the literature invoke
+    heterozygote advantage for CF. An honest model misses where the
+    theory it is built from misses.
+
+    Middle: the law. Mean named diagnoses per child against pedigree F,
+    simulated cohorts on the same depth-matched pedigrees as [9b], with
+    the exact closed form q^2 + Fpq summed over the panel. Linear in F
+    with no approximation.
+
+    Right: the epidemiological consequence. Relative risk of a named
+    recessive diagnosis by mating type -- the many-fold amplification of
+    rare-recessive incidence that consanguinity studies actually report
+    (Modell & Darr 2002), next to the modest trait-scale shifts of [9c].
+    """
+    from .diseases import (DISEASES, PANEL_LOCI, expected_affected_count,
+                           relative_risk)
+    from .inbreeding import SPECTRUM
+    from .validation import _INBREEDING_TEMPLATES, _inbred_child
+
+    rng = np.random.default_rng(seed)
+    sp = SPECTRUM
+
+    levels, means, sems = [], [], []
+    for label, F in _INBREEDING_TEMPLATES:
+        counts = np.empty(n)
+        for i in range(n):
+            g = _inbred_child(label, rng, sp).dosage[PANEL_LOCI]
+            counts[i] = float(np.count_nonzero(g == 2))
+        levels.append(F)
+        means.append(float(counts.mean()))
+        sems.append(float(counts.std(ddof=1) / np.sqrt(n)))
+
+    fig, (axL, axM, axR) = plt.subplots(1, 3, figsize=(15, 4.6))
+
+    q_lit = np.array([d.spec.q_lit for d in DISEASES])
+    q_eng = np.array([d.q for d in DISEASES])
+    lims = (0.003, 0.03)
+    axL.plot(lims, lims, "--", color="#2c6fa8", lw=1.6, label="engine = literature")
+    axL.plot(q_lit, q_eng, "o", color="#c0504d", ms=7)
+    # Explicit offsets where the panel is crowded: SMN1, PAH and CYP21A2
+    # all sit near q ~ 0.009 and their default labels overprint.
+    _off = {"a1at_deficiency": (-8, -13), "congenital_adrenal_hyperplasia":
+            (-38, -4), "spinal_muscular_atrophy": (6, -11)}
+    for d in DISEASES:
+        axL.annotate(d.spec.gene, xy=(d.spec.q_lit, d.q),
+                     xytext=_off.get(d.name, (7, 4)),
+                     textcoords="offset points", fontsize=7.5, color="#5a6570")
+    axL.set_xscale("log")
+    axL.set_yscale("log")
+    axL.set_xlim(lims)
+    axL.set_ylim(lims)
+    axL.set_xlabel("literature allele frequency  q")
+    axL.set_ylabel("assigned load-locus frequency  q")
+    axL.set_title("The assignment, in the open\n(CFTR off the line: MSB cannot "
+                  "hold q=0.02 at s~1)", fontsize=10)
+    axL.legend(fontsize=8, frameon=False, loc="upper left")
+    axL.grid(alpha=0.25, which="both")
+
+    F = np.array(levels)
+    grid = np.linspace(0, 0.27, 60)
+    axM.plot(grid, [expected_affected_count(f) for f in grid], "--",
+             color="#2c6fa8", lw=2, label=r"closed form  $\sum_j q_j^2 + Fp_jq_j$")
+    axM.errorbar(F, means, yerr=sems, fmt="o", color="#c0504d", ms=7,
+                 capsize=3, label=f"simulated cohorts (n={n} each)")
+    for x, y, lab in zip(F, means, ["outbred", "half 1st cous.", "1st cousins",
+                                    "double 1st cous.", "full sibs"]):
+        axM.annotate(lab, xy=(x, y), xytext=(9, -3),
+                     textcoords="offset points", fontsize=7.5, color="#5a6570")
+    axM.set_xlabel("pedigree inbreeding coefficient  F")
+    axM.set_ylabel("named diagnoses per child")
+    axM.set_title("Named-disease incidence is exactly linear in F\n"
+                  "(Wright 1922 inbred genotype frequencies)", fontsize=10)
+    axM.legend(fontsize=8, frameon=False, loc="upper left")
+    axM.grid(alpha=0.25)
+
+    labels = ["outbred", "half 1st\ncousins", "1st\ncousins",
+              "double 1st\ncousins", "full\nsibs"]
+    rr_closed = [relative_risk(f) for f in levels]
+    rr_obs = [m / means[0] if means[0] > 0 else np.nan for m in means]
+    # A ratio of small Poisson counts must wear its noise: the outbred
+    # denominator is a handful of affecteds even at n = 3000, so the
+    # observed RR carries a delta-method error bar rather than pretending
+    # to a precision the middle panel actually owns. Validation [9d]
+    # reports RR for the same reason and gates on the slope instead.
+    rr_err = [rr * np.hypot(sems[0] / means[0], se / m)
+              if means[0] > 0 and m > 0 else np.nan
+              for m, se, rr in zip(means, sems, rr_obs)]
+    xpos = np.arange(len(levels))
+    axR.bar(xpos - 0.2, rr_closed, 0.4, color="#2c6fa8", alpha=0.8,
+            label="closed form")
+    axR.bar(xpos + 0.2, rr_obs, 0.4, color="#c0504d", alpha=0.8,
+            yerr=rr_err, capsize=3, ecolor="#5a6570",
+            label="observed (Poisson-noisy denominator)")
+    axR.axhline(1.0, color="#5a6570", lw=0.8)
+    axR.set_xticks(xpos)
+    axR.set_xticklabels(labels, fontsize=8)
+    axR.set_ylabel("relative risk of a named recessive diagnosis")
+    axR.set_title("Consanguinity multiplies rare-recessive risk\nmany-fold "
+                  "(Modell & Darr 2002)", fontsize=10)
+    axR.legend(fontsize=8, frameon=False, loc="upper left")
+    axR.grid(alpha=0.25, axis="y")
+
+    fig.suptitle("Named Mendelian recessives on the load layer -- "
+                 "labels on calibrated loci, zero new parameters "
+                 "(diseases.py; validation [9d])", fontsize=11)
+    fig.tight_layout(rect=(0, 0, 1, 0.93))
+    return _save(fig, out_path)
+
+
+def plot_load_purging(out_path: str, n_lines: int = 150,
+                      n_control: int = 1500, generations: int = 8,
+                      seed: int = 20260809) -> str:
+    """
+    Purging of the recessive load (validation [9e]).
+
+    Left: B(t), re-measured each generation from the realised allele
+    frequencies of the individuals actually alive. Full-sib lines fall
+    ~30% in eight generations; a large random-mating control under the
+    IDENTICAL survival rule holds near the founding 1.4 -- so the fall is
+    attributable to inbreeding exposing recessives, not to selection alone.
+
+    Middle: WHERE purging acts. The severe component (s > 0.3, nearly
+    fully recessive) is stripped fast; the mild component barely moves.
+    That asymmetry is Hedrick & Garcia-Dorado 2016's central point, and it
+    emerges here from nothing but the h-s relationship the spectrum was
+    built with.
+
+    Right: what purging costs. Line extinction per generation -- the
+    survivorship component every sib-mating experiment reports. The lines
+    that purged are the ones that survived; conflating the two is the
+    classic misreading of purging data.
+    """
+    from .validation import load_purging
+
+    r = load_purging(n_lines=n_lines, n_control=n_control,
+                     generations=generations,
+                     rng=np.random.default_rng(seed))
+    gens = np.arange(r.generations + 1)
+
+    fig, (axL, axM, axR) = plt.subplots(1, 3, figsize=(15, 4.6))
+
+    axL.axhline(r.founding_B, ls="--", color="#5a6570", lw=1.4,
+                label=f"founding B = {r.founding_B:.2f}")
+    axL.plot(gens, r.b_control, "o-", color="#2c6fa8", ms=5,
+             label=f"random mating (n={r.n_control})")
+    axL.plot(gens, r.b_inbred, "o-", color="#c0504d", ms=5,
+             label=f"full-sib lines ({r.n_lines} started)")
+    axL.set_xlabel("generation of the mating scheme")
+    axL.set_ylabel("realised lethal equivalents  B(t)")
+    drop = 100 * (1 - r.b_inbred[-1] / r.founding_B)
+    axL.set_title(f"Sustained inbreeding purges the load: "
+                  f"-{drop:.0f}% in {r.generations} generations\n"
+                  "(control holds under the identical survival rule)",
+                  fontsize=10)
+    axL.legend(fontsize=8, frameon=False, loc="lower left")
+    axL.grid(alpha=0.25)
+
+    axM.plot(gens, np.array(r.b_severe) / r.b_severe[0], "o-",
+             color="#c0504d", ms=5,
+             label=f"severe, s > 0.3  (-{100 * r.severe_B_drop:.0f}%)")
+    axM.plot(gens, np.array(r.b_mild) / r.b_mild[0], "o-",
+             color="#2c6fa8", ms=5,
+             label=f"mild, s <= 0.3  (-{100 * r.mild_B_drop:.0f}%)")
+    axM.set_xlabel("generation of sib mating")
+    axM.set_ylabel("component of B, relative to start")
+    axM.set_ylim(0, 1.1)
+    axM.set_title("Purging strips the severe, nearly-recessive load\n"
+                  "and barely touches the mild (Hedrick & Garcia-Dorado)",
+                  fontsize=10)
+    axM.legend(fontsize=8, frameon=False, loc="lower left")
+    axM.grid(alpha=0.25)
+
+    axR.bar(gens, r.lines_alive, color="#9aa5b1", width=0.7)
+    axR.set_xlabel("generation of sib mating")
+    axR.set_ylabel("lines still alive")
+    axR.set_title(f"The price: {r.n_lines - r.lines_surviving} of "
+                  f"{r.n_lines} lines went extinct\n(purging is measured "
+                  "on the survivors, and only on them)", fontsize=10)
+    axR.grid(alpha=0.25, axis="y")
+
+    fig.suptitle("Genetic purging (validation [9e]) -- B re-measured from "
+                 "realised allele frequencies; Crnokrak & Barrett 2002",
+                 fontsize=11)
+    fig.tight_layout(rect=(0, 0, 1, 0.93))
+    return _save(fig, out_path)
+
+
 def plot_cnv_dosage(out_path: str, region: str = "15q11-q13",
                     n: int = 2500, seed: int = 20261001) -> str:
     """

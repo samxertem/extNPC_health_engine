@@ -64,6 +64,7 @@ def snapshot(tick: int, living: List[NPC], n_births: int, n_deaths: int,
                "n_migrations": int(n_migrations),
                "mean_inbreeding": 0.0, "max_inbreeding": 0.0,
                "pct_inbred": 0.0, "mean_viability": 1.0, "load_carried": 0.0,
+               "lethal_equivalents": 0.0,
                "n_cnv_carriers": 0, "n_infant_deaths": int(n_infant_deaths)}
         for t in TRACKED_TRAITS:
             row[f"trait_{t}"] = 0.0
@@ -107,6 +108,18 @@ def snapshot(tick: int, living: List[NPC], n_births: int, n_deaths: int,
     # and the reservoir inbreeding draws on.
     carried = [p.load.n_carried for p in living if p.load is not None]
     row["load_carried"] = float(np.mean(carried)) if carried else 0.0
+    # Purging read-out: B evaluated at the REALISED load frequencies of the
+    # living, against the founding constant 1.4. Falls when sustained
+    # inbreeding lets selection strip exposed recessives (Crnokrak &
+    # Barrett 2002). In a ~70-person village the single-tick noise is
+    # ~0.05, so only the multi-generation trend is a claim -- the glossary
+    # entry says so.
+    loads = [p.load for p in living if p.load is not None]
+    if loads:
+        from health_engine.inbreeding import realised_lethal_equivalents
+        row["lethal_equivalents"] = realised_lethal_equivalents(loads)
+    else:
+        row["lethal_equivalents"] = 0.0
     row["n_cnv_carriers"] = int(sum(1 for p in living if p.cnv_variants()))
     row["n_infant_deaths"] = int(n_infant_deaths)
 
