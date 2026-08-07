@@ -27,6 +27,9 @@ from health_engine.loci import (ALT_FREQ, CATALOGUE_MODE, EMPIRICAL_OVERRIDES,
 _DEFAULT_ALT_FREQ_MD5 = "e94aa5f46271a103a991e358ce5cc35c"
 
 
+@pytest.mark.skipif(CATALOGUE_MODE != "synthetic",
+                    reason="asserts the DEFAULT catalogue; the process was "
+                           "started with EXTNPC_CATALOGUE=empirical")
 def test_default_mode_is_synthetic_and_byte_identical():
     assert CATALOGUE_MODE == "synthetic"
     assert EMPIRICAL_OVERRIDES == {}
@@ -100,6 +103,9 @@ def test_empirical_mode_recalibrates_itself():
     assert float(B) == pytest.approx(1.4, abs=1e-6)
 
 
+@pytest.mark.skipif(CATALOGUE_MODE != "synthetic",
+                    reason="the cross-mode simulation below assumes the "
+                           "process itself is running the default catalogue")
 def test_saves_refuse_to_load_across_catalogue_modes():
     from simulation import World
     from simulation import worldsave

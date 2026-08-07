@@ -331,10 +331,16 @@ def test_a_save_of_an_empty_world_reloads():
 def test_manifest_records_the_locus_catalogue(world):
     """Two exports with the same seed under different catalogues are
     different model versions, and nothing in the numbers themselves says
-    so. The manifest has to."""
+    so. The manifest has to.
+
+    Asserted against whatever mode the process is actually running, not
+    against "synthetic" -- the point is that the manifest TRACKS the
+    catalogue, and hardcoding one mode would make this test fail under
+    the very flag it exists to describe."""
     m = EX.manifest(world)
     from health_engine.loci import CATALOGUE_MODE
-    assert m["catalogue"] == CATALOGUE_MODE == "synthetic"
+    assert m["catalogue"] == CATALOGUE_MODE
+    assert CATALOGUE_MODE in ("synthetic", "empirical")
 
 
 def test_readme_and_caveats_cover_the_new_columns(world):

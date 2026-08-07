@@ -76,7 +76,7 @@ The demo drives the **engine** on a hand-built nine-person pedigree. The
 seven-tab dashboard are separate — that's `run_dashboard.py`.
 
 ```bash
-EXTNPC_CATALOGUE=empirical python run_dashboard.py   # opt-in model v2
+EXTNPC_CATALOGUE=empirical python run_dashboard.py   # EXPERIMENTAL — see below
 ```
 
 `EXTNPC_CATALOGUE=empirical` swaps 21 core genes' hand-set allele
@@ -85,6 +85,16 @@ provenance in `health_engine/data/`). The default is byte-identical to
 every committed figure and pinned by test. The two modes are different
 model versions: world saves record which one they were made under and
 refuse to load across the boundary.
+
+> **Empirical mode is experimental and must not be used for results.**
+> Full suite under the flag: 6 failed / 574 passed / 3 skipped, against
+> 582 passed / 1 skipped on the default. `skin_tone` is genuinely
+> miscalibrated: SLC24A5 carries its largest weight and is at q = 0.997
+> in Europeans, so it contributes no variance, the calibration overshoots
+> compensating, and the trait ends up ~95% heritable against a declared
+> 85%. Fixing it means rethinking that trait's architecture for that
+> population, not widening a tolerance. See the KNOWN FAILURES block in
+> `health_engine/loci.py`.
 
 > On Windows, two dev servers can both bind `:8050` and a stale process will
 > silently serve old code. Kill every `:8050` listener before relaunching.

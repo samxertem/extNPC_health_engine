@@ -74,6 +74,12 @@ N_PERIPHERAL_LOCI = 450
 # ----------------------------------------------------------------------
 # Catalogue mode (session 16): synthetic (default) vs empirical
 # ----------------------------------------------------------------------
+# *** EMPIRICAL MODE IS EXPERIMENTAL AND NOT VALIDATED. DO NOT USE IT TO
+# *** PRODUCE RESULTS. It fails 6 tests that the default passes, and at
+# *** least one trait is genuinely miscalibrated under it -- see
+# *** "KNOWN FAILURES" below. The DEFAULT (synthetic) catalogue is the
+# *** validated one and is byte-identical to every committed figure.
+#
 # EXTNPC_CATALOGUE=empirical swaps the CORE genes' hand-set allele
 # frequencies for measured 1000 Genomes phase 3 EUR values, fetched from
 # Ensembl and VENDORED with retrieval date and per-allele provenance in
@@ -81,6 +87,33 @@ N_PERIPHERAL_LOCI = 450
 # entire trait calibration (traits.py) is solved against these
 # frequencies at import time -- a runtime switch would silently desync
 # the calibrated architecture from the catalogue it was solved on.
+#
+# KNOWN FAILURES (measured 2026-08-07, full suite under the flag:
+# 6 failed / 574 passed / 3 skipped, against 582 passed / 1 skipped on
+# the default. It was 9 failed before three of my own tests were made
+# mode-aware; those three assert the default catalogue and now skip):
+#
+#   * skin_tone is MISCALIBRATED. SLC24A5 carries the trait's largest
+#     weight (-1.80) and sits at q = 0.997 in Europeans, so 2pq = 0.006
+#     and it contributes almost no variance. The calibration compensates
+#     by scaling the remaining loci and overshoots: V_A goes 0.748 ->
+#     0.947 against a declared h2 of 0.85, and V_A + V_D = 0.987 leaves
+#     essentially no environmental variance. The trait becomes ~95%
+#     heritable instead of 85%.
+#   * Three test_traits.py laws about major-effect loci and selection
+#     response fail as a direct consequence -- correctly, because the
+#     architecture really has changed.
+#   * A neuroticism breeder's-equation overshoot at ~6.5 sigma
+#     (predicted R = 0.557, observed 0.650, se 0.014).
+#   * Two dashboard fixtures drift -- different genomes mean that world
+#     has no consanguineous birth, so the stature-cost rows have nothing
+#     to render. An artefact of the fixture, not an engine fault.
+#
+# The fix is NOT to widen a tolerance. A trait whose major locus is near
+# fixation in the chosen population needs its architecture rethought for
+# that population -- which is the real scientific content of grounding a
+# catalogue in data, and is deliberately left as open work rather than
+# papered over.
 #
 # Scope, stated honestly:
 #   * 21 of 53 core genes carry empirical frequencies -- the ones whose
