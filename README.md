@@ -88,13 +88,22 @@ refuse to load across the boundary.
 
 > **Empirical mode is experimental and must not be used for results.**
 > Full suite under the flag: 6 failed / 574 passed / 3 skipped, against
-> 582 passed / 1 skipped on the default. `skin_tone` is genuinely
-> miscalibrated: SLC24A5 carries its largest weight and is at q = 0.997
-> in Europeans, so it contributes no variance, the calibration overshoots
-> compensating, and the trait ends up ~95% heritable against a declared
-> 85%. Fixing it means rethinking that trait's architecture for that
-> population, not widening a tolerance. See the KNOWN FAILURES block in
-> `health_engine/loci.py`.
+> 582 passed / 1 skipped on the default. Real EUR frequencies change the
+> *shape* of the genotypic distribution — `eye_color`'s kurtosis flips
+> sign, −0.771 → +0.978 — and redistribute variance sharply for traits
+> whose variance is concentrated in a few loci: SLC24A5 keeps its −1.80
+> weight and loses 98.7% of its variance contribution, because at
+> q = 0.997 there is nearly nothing left to vary. Tests asserting the
+> synthetic architecture's shape then fail correctly. See the KNOWN
+> FAILURES block in `health_engine/loci.py`.
+
+```bash
+python -m health_engine.catalogue_compare   # synthetic vs EUR, side by side
+```
+
+Runs the engine under both catalogues and prints a markdown table of what
+moves and why — built for the thesis comparison. Costs two subprocess
+imports; touches no figure and consumes no RNG.
 
 > On Windows, two dev servers can both bind `:8050` and a stale process will
 > silently serve old code. Kill every `:8050` listener before relaunching.

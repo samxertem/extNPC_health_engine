@@ -93,21 +93,38 @@ N_PERIPHERAL_LOCI = 450
 # the default. It was 9 failed before three of my own tests were made
 # mode-aware; those three assert the default catalogue and now skip):
 #
-#   * skin_tone is MISCALIBRATED. SLC24A5 carries the trait's largest
-#     weight (-1.80) and sits at q = 0.997 in Europeans, so 2pq = 0.006
-#     and it contributes almost no variance. The calibration compensates
-#     by scaling the remaining loci and overshoots: V_A goes 0.748 ->
-#     0.947 against a declared h2 of 0.85, and V_A + V_D = 0.987 leaves
-#     essentially no environmental variance. The trait becomes ~95%
-#     heritable instead of 85%.
-#   * Three test_traits.py laws about major-effect loci and selection
-#     response fail as a direct consequence -- correctly, because the
-#     architecture really has changed.
+#   * THE SHAPE OF THE GENOTYPIC DISTRIBUTION CHANGES QUALITATIVELY.
+#     eye_color's genotypic kurtosis flips SIGN, -0.771 -> +0.978. At an
+#     intermediate frequency a major locus splits the population into
+#     comparable genotype classes and the distribution is bimodal
+#     (platykurtic); at an extreme frequency the SAME locus with the SAME
+#     effect leaves almost everyone in one class with a rare tail, and the
+#     distribution becomes peaked (leptokurtic). This matters here because
+#     the engine deliberately uses empirical quantiles rather than
+#     norm.ppf for categorical thresholds precisely because of that
+#     non-normality.
+#   * Variance REDISTRIBUTES sharply for concentrated traits. Effect sizes
+#     are untouched; only 2pq moves. SLC24A5 keeps its -1.80 weight and
+#     loses 98.7% of its variance contribution (2pq 0.455 -> 0.006);
+#     EDAR loses 95%, GJB2 88%. See catalogue_compare.py for the table.
+#   * Three test_traits.py laws that assert the SYNTHETIC architecture's
+#     shape (bimodality from a major locus, a dominant major gene making
+#     selection response undershoot, GxE tails) fail as a direct and
+#     CORRECT consequence -- the architecture really has changed.
 #   * A neuroticism breeder's-equation overshoot at ~6.5 sigma
-#     (predicted R = 0.557, observed 0.650, se 0.014).
+#     (predicted R = 0.557, observed 0.650, se 0.014). Neuroticism's own
+#     additive variance is unchanged, so this one is NOT yet explained and
+#     is the loose end most worth pulling.
 #   * Two dashboard fixtures drift -- different genomes mean that world
 #     has no consanguineous birth, so the stature-cost rows have nothing
 #     to render. An artefact of the fixture, not an engine fault.
+#
+# NOT established, and previously overclaimed here: that any trait's
+# HERITABILITY is miscalibrated. `analytic_heritability` returns its
+# declared target under both catalogues -- but that is a closed form which
+# returns the target by construction, so it is evidence of nothing either
+# way. Whether the realised h2 still matches is an open question and needs
+# a midparent-offspring regression run under the flag.
 #
 # The fix is NOT to widen a tolerance. A trait whose major locus is near
 # fixation in the chosen population needs its architecture rethought for

@@ -136,3 +136,75 @@ def test_saves_refuse_to_load_across_catalogue_modes():
     legacy = gzip.compress(json.dumps(state).encode())
     w3 = worldsave.load_world_save(legacy)
     assert len(w3.people) == len(w.people)
+
+
+# ---------------------------------------------------------------------
+# The synthetic-vs-empirical comparison (thesis artifact)
+# ---------------------------------------------------------------------
+
+@pytest.mark.skipif(CATALOGUE_MODE != "synthetic",
+                    reason="the comparison spawns both arms itself")
+def test_catalogue_comparison_reproduces_the_concentration_law():
+    """
+    The comparison's headline claim: traits whose additive variance is
+    CONCENTRATED in few loci are fragile to allele-frequency
+    misspecification, and omnigenic traits are robust to it.
+
+    Asserted as an ordering rather than as magnitudes, because the
+    magnitudes depend on which 21 genes happen to be grounded.
+    """
+    from health_engine.catalogue_compare import compare
+
+    c = compare()
+    rows = {r["trait"]: r for r in c.trait_rows()}
+
+    # Omnigenic traits: unchanged to four decimal places. NOT exactly 1 --
+    # height_cm lands at 1.0000075, because it really does contain a
+    # grounded locus (GDF5 moves 0.300 -> 0.372, a 24% frequency change)
+    # and dilutes it to 7.5 parts per million across ~67 effective loci.
+    # That dilution is the robustness being asserted, so the tolerance is
+    # 1e-4 rather than exact equality.
+    for t in ("height_cm", "neuroticism", "bmi", "lung_capacity"):
+        assert rows[t]["v_a_ratio"] == pytest.approx(1.0, abs=1e-4), t
+        assert rows[t]["effective_loci_syn"] > 20, t
+
+    # Concentrated traits: they move, and they are the ones that move.
+    for t in ("skin_tone", "eye_color"):
+        assert abs(rows[t]["v_a_ratio"] - 1.0) > 0.10, t
+        assert rows[t]["effective_loci_syn"] < 5, t
+
+    fragile = set(c.fragile_traits())
+    assert {"skin_tone", "eye_color"} <= fragile
+    assert not ({"height_cm", "neuroticism"} & fragile)
+
+
+@pytest.mark.skipif(CATALOGUE_MODE != "synthetic",
+                    reason="the comparison spawns both arms itself")
+def test_effect_size_is_unchanged_while_variance_collapses():
+    """
+    The point the table exists to make: no effect size moves, yet
+    SLC24A5 loses ~99% of its variance contribution, because V_A = sum
+    a^2 * 2pq and at q = 0.997 there is almost nothing left to vary.
+    """
+    from health_engine.catalogue_compare import compare
+
+    c = compare()
+    loci = {r["locus"]: r for r in c.locus_rows()}
+    slc = loci["SLC24A5"]
+    assert slc["freq_emp"] > 0.99
+    assert slc["variance_ratio"] < 0.05
+    # and the weight itself is identical in both arms
+    from health_engine.loci import LOCUS_BY_SYMBOL
+    assert LOCUS_BY_SYMBOL["SLC24A5"].weights["skin_tone"] == pytest.approx(-1.80)
+
+
+@pytest.mark.skipif(CATALOGUE_MODE != "synthetic",
+                    reason="the comparison spawns both arms itself")
+def test_comparison_report_ships_its_caveats():
+    """A table that travels without its caveats is worse than no table."""
+    from health_engine.catalogue_compare import report
+
+    text = report()
+    assert "SLC24A5" in text
+    for caveat in ("EUR only", "EXPERIMENTAL", "partial swap"):
+        assert caveat in text, caveat
