@@ -1,0 +1,15 @@
+{
+  "name": "com.samal.extnpc",
+  "version": "0.1.0",
+  "displayName": "extNPC World Viewer",
+  "description": "Reads a world bundle exported by the extNPC health engine and renders its villagers. A viewer: it performs no biology and computes no phenotype. Every number it shows came from a file the engine wrote.",
+  "unity": "6000.0",
+  "dependencies": {
+    "com.unity.nuget.newtonsoft-json": "3.2.1",
+    "com.unity.inputsystem": "1.7.0"
+  },
+  "keywords": ["simulation", "genetics", "visualisation"],
+  "author": {
+    "name": "samxertem"
+  }
+}

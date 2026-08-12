@@ -1,0 +1,23 @@
+{
+  "name": "ExtNPC.Tests",
+  "rootNamespace": "ExtNPC.Tests",
+  "references": [
+    "ExtNPC.Runtime",
+    "UnityEngine.TestRunner",
+    "UnityEditor.TestRunner",
+    "Unity.Nuget.Newtonsoft-Json"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "nunit.framework.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
