@@ -55,6 +55,17 @@ def _rows(zf, name):
 
 def test_the_bundle_contains_every_promised_file(bundle):
     assert set(bundle.namelist()) == {
+        "people.csv", "history.csv", "pedigree.csv",
+        "frames.csv", "demes.csv", "flows.csv", "events.csv",
+        "manifest.json", "README.txt"}
+
+
+def test_the_analysis_only_bundle_omits_the_frame_tables(world):
+    """The longitudinal tables are much the largest part of a long run, so a
+    caller who only wants the cross-section can say so -- and the older,
+    smaller file set is still a tested promise rather than a memory."""
+    blob = EX.build_csv_bundle(world, include_frames=False)
+    assert set(zipfile.ZipFile(io.BytesIO(blob)).namelist()) == {
         "people.csv", "history.csv", "pedigree.csv", "manifest.json",
         "README.txt"}
 
@@ -358,3 +369,173 @@ def test_readme_and_caveats_cover_the_new_columns(world):
     readme = zipfile.ZipFile(io.BytesIO(blob)).read("README.txt").decode()
     assert "mendelian_carrier_of" in readme
     assert "lethal_equivalents" in readme
+
+
+# =====================================================================
+# Longitudinal tables -- the world-viewer feed (UNITY_PLAN.md stage 1)
+# =====================================================================
+# These are a pure re-serialisation of the snapshot ring. The standard of
+# proof is therefore not "are the numbers right" -- snapshots.py owns that --
+# but "did anything get invented, dropped, or silently reshaped on the way
+# out", plus the honest limits being stated where a consumer will see them.
+
+
+@pytest.fixture(scope="module")
+def spatial_world():
+    """Three demes with migration, so flows.csv is not trivially empty."""
+    w = World(n_founders=16, seed=5,
+              params=DemographyParams(n_demes=3, migration_rate=0.10))
+    for _ in range(25):
+        w.step()
+    return w
+
+
+def test_frames_hold_exactly_the_living_of_every_retained_year(spatial_world):
+    """One row per living person per frame -- nobody invented, nobody lost."""
+    rows = EX.frame_rows(spatial_world)
+    assert len(rows) == sum(f["n_alive"] for f in spatial_world.snapshots)
+
+    per_tick = {}
+    for r in rows:
+        per_tick[r["tick"]] = per_tick.get(r["tick"], 0) + 1
+    for frame in spatial_world.snapshots:
+        assert per_tick[frame["tick"]] == frame["n_alive"]
+
+
+def test_the_frame_schema_matches_what_snapshots_actually_emits(spatial_world):
+    """FRAME_COLUMNS is declared, not derived, so that an empty table still
+    writes a header. That only stays true if the declaration keeps up with
+    snapshots.py -- this is the test that notices when it does not."""
+    emitted = list(EX.frame_rows(spatial_world)[0].keys())
+    assert emitted == EX.FRAME_COLUMNS, (
+        "simulation/snapshots.py changed its per-person fields; update "
+        "export.FRAME_COLUMNS and bump BUNDLE_SCHEMA if a column changed "
+        "meaning.")
+
+    demes = list(EX.deme_frame_rows(spatial_world)[0].keys())
+    assert demes == EX.DEME_COLUMNS
+
+
+def test_frames_carry_age_expressed_stature_not_the_mature_value(spatial_world):
+    """A child must not be exported adult-sized. `people.csv` carries the
+    mature `trait_height_cm`; the frame carries what the body actually is."""
+    growing = [r for r in EX.frame_rows(spatial_world) if r["age"] < 12]
+    assert growing, "no children in the run -- test proves nothing"
+    people = {r["name"]: r for r in EX.people_rows(spatial_world)}
+    assert any(r["height"] < people[r["name"]]["trait_height_cm"] - 1.0
+               for r in growing)
+
+
+def test_flows_are_present_with_structure_and_empty_without(spatial_world, world):
+    """Migration routes exist only when there is somewhere to migrate. The
+    single-deme default has none, and that is a correct empty, not a bug."""
+    assert EX.flow_rows(spatial_world), "3 demes with migration produced no flows"
+    assert EX.flow_rows(world) == []
+
+
+def test_an_empty_table_still_writes_its_header(world):
+    """A zero-byte file is indistinguishable from a truncated download. A
+    consumer must be able to read 'zero rows' instead of guessing."""
+    files = EX._bundle_files(world)
+    for name, columns in (("flows.csv", EX.FLOW_COLUMNS),
+                          ("events.csv", EX.EVENT_COLUMNS)):
+        text = files[name]
+        assert text, f"{name} is empty with no header"
+        assert text.splitlines()[0] == ",".join(columns)
+
+
+def test_the_directory_export_is_identical_to_the_zip(spatial_world, tmp_path):
+    """One definition, two containers. If these can drift, a viewer and an
+    analysis download can disagree about the same run."""
+    out = EX.export_world_dir(spatial_world, tmp_path / "w", note="pytest")
+    blob = zipfile.ZipFile(io.BytesIO(
+        EX.build_csv_bundle(spatial_world, note="pytest")))
+
+    on_disk = {p.name for p in out.iterdir()}
+    assert on_disk == set(blob.namelist())
+    for name in on_disk:
+        if name == "manifest.json":
+            continue                      # carries an export timestamp
+        assert (out / name).read_text(encoding="utf-8") == \
+            blob.read(name).decode("utf-8"), f"{name} differs"
+
+
+def test_the_directory_export_does_not_translate_line_endings(spatial_world, tmp_path):
+    """Written with newline="" so the same world exported on Windows and
+    Linux is byte-identical. Without it the text layer inserts CRLF."""
+    out = EX.export_world_dir(spatial_world, tmp_path / "w")
+    assert b"\r\n" not in (out / "frames.csv").read_bytes()
+
+
+def test_the_manifest_says_what_the_frames_cover(spatial_world):
+    """The snapshot ring is capped, so a long run silently loses its earliest
+    years. A viewer that assumed year 0 would mislabel its own timeline."""
+    m = EX.manifest(spatial_world)["frames"]
+    assert m["n_frames"] == len(spatial_world.snapshots)
+    assert m["first_tick"] == spatial_world.snapshots.first_tick
+    assert m["last_tick"] == spatial_world.snapshots.last_tick
+    assert m["truncated"] is False          # 25 ticks, cap is 600
+    assert m["max_frames"] == 600
+
+
+def test_truncation_is_reported_when_the_ring_overflows():
+    """Forced with a tiny cap rather than by running 600 years. The flag must
+    be true exactly when early frames were dropped."""
+    from simulation.snapshots import SnapshotBuffer
+    w = World(n_founders=10, seed=3)
+    w.snapshots = SnapshotBuffer(max_frames=5)
+    for _ in range(20):
+        w.step()
+
+    m = EX.manifest(w)["frames"]
+    assert m["truncated"] is True
+    assert m["n_frames"] == 5
+    assert m["first_tick"] > 0
+    assert EX.frame_rows(w)[0]["tick"] == m["first_tick"]
+
+
+def test_the_readme_states_the_frame_tables_limits(spatial_world):
+    """The caveats must ship next to the data, not only in the plan."""
+    readme = EX._readme(spatial_world).lower()
+    assert "frames.csv" in readme
+    assert "living only" in readme            # a death is a disappearance
+    assert "truncated" in readme              # the ring cap
+    assert "not genomes" in readme            # no dead person's genetics
+    assert "expressed at that age" in readme  # not mature stature
+
+
+def test_the_bundle_declares_a_schema_version(spatial_world):
+    """A consumer outside Python cannot notice a silently reshaped table."""
+    assert EX.manifest(spatial_world)["bundle_schema"] == EX.BUNDLE_SCHEMA
+
+
+def test_exporting_frames_does_not_mutate_the_world(spatial_world):
+    """The whole point: reading the ring is read-only."""
+    before = (spatial_world.tick, len(spatial_world.people),
+              len(spatial_world.snapshots), spatial_world.rng.bit_generator.state)
+    EX.frame_rows(spatial_world)
+    EX.deme_frame_rows(spatial_world)
+    EX.flow_rows(spatial_world)
+    after = (spatial_world.tick, len(spatial_world.people),
+             len(spatial_world.snapshots), spatial_world.rng.bit_generator.state)
+    assert before == after
+
+
+def test_the_directory_export_survives_an_empty_and_an_extinct_world(tmp_path):
+    """A world with no one in it must still produce a readable bundle: a
+    viewer should render an empty village, not fail to parse. This is the
+    case the header-on-empty-tables rule exists for."""
+    empty = World(n_founders=0, seed=1)
+    out = EX.export_world_dir(empty, tmp_path / "empty")
+    frames = (out / "frames.csv").read_text(encoding="utf-8")
+    assert frames.splitlines() == [",".join(EX.FRAME_COLUMNS)]   # header, no rows
+
+    extinct = World(n_founders=6, seed=2)
+    for _ in range(5):
+        extinct.step()
+    extinct.living.clear()
+    out = EX.export_world_dir(extinct, tmp_path / "extinct")
+    # the dead are gone from the live frame but their earlier years remain
+    rows = (out / "frames.csv").read_text(encoding="utf-8").splitlines()
+    assert len(rows) > 1
+    assert EX.manifest(extinct)["frames"]["n_frames"] == len(extinct.snapshots)
