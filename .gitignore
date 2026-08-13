@@ -49,6 +49,27 @@ dash_err.log
 *.log
 
 # ---------------------------------------------------------------------
+# reads/ — PENDING REMOVAL BEFORE THIS REPO GOES PUBLIC
+# ---------------------------------------------------------------------
+# reads/ holds working notes (REPORT.md, CLAUDE_PROJECT_ROADMAP.md,
+# UNITY_PLAN.md) and the in-progress thesis article. It is NOT meant to be
+# published.
+#
+# THIS ENTRY IS CURRENTLY INERT. .gitignore does not apply to files git
+# already tracks, and reads/ is tracked in 18 of the repository's commits.
+# Two separate things are therefore still outstanding:
+#
+#   1. stop tracking it:   git rm -r --cached reads
+#   2. erase it from the existing history, because `git log -p -- reads/`
+#      recovers every version of it otherwise. That needs a filter-repo
+#      rewrite across all commits plus a force-push.
+#
+# Step 2 is the one that matters. Until it is done, MAKING THIS REPOSITORY
+# PUBLIC PUBLISHES THE NOTES AND THE ARTICLE PDF, whatever the current tree
+# looks like.
+reads/
+
+# ---------------------------------------------------------------------
 # LaTeX build artifacts (reads/article.tex)
 # ---------------------------------------------------------------------
 # The .tex source and the built .pdf are both worth tracking; the
