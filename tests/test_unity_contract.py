@@ -53,6 +53,7 @@ _METHOD_TO_TABLE = {
     "LoadEvents": "events.csv",
     "LoadHistory": "history.csv",
     "LoadPeople": "people.csv",
+    "LoadDiseases": "diseases.csv",
 }
 
 _REQUIRE = re.compile(r'RequireIndex\("([^"]+)"\)')
@@ -165,7 +166,8 @@ def test_the_declared_schemas_match_the_exported_headers(headers):
     for table, columns in (("frames.csv", EX.FRAME_COLUMNS),
                            ("demes.csv", EX.DEME_COLUMNS),
                            ("flows.csv", EX.FLOW_COLUMNS),
-                           ("events.csv", EX.EVENT_COLUMNS)):
+                           ("events.csv", EX.EVENT_COLUMNS),
+                           ("diseases.csv", EX.DISEASE_COLUMNS)):
         assert headers[table] == set(columns), (
             f"{table} header does not match its declared schema")
 
@@ -371,6 +373,312 @@ def test_the_input_shim_exists_and_covers_both_backends():
     code = code_only(src)
     assert _NEW_INPUT.search(code), "shim never reads the new backend"
     assert _LEGACY_INPUT.search(code), "shim never reads the legacy backend"
+
+
+# ---------------------------------------------------------------------
+# Stage 4: the inspector must describe a villager the way the dashboard does
+# ---------------------------------------------------------------------
+# UNITY_PLAN.md invariant 6 and the Stage 4 acceptance criterion: "a villager
+# must not be described differently by the two UIs". The risk register rates
+# this MEDIUM and names the mechanism -- drift. Nobody edits both files.
+#
+# The mitigation is that every label, threshold and rounding rule lives in one
+# C# file, InspectorFormat.cs, each naming the Python line it mirrors. These
+# tests are what make that a claim rather than a comment: they read BOTH
+# sources as text and compare the numbers and the strings directly, so a
+# threshold changed on one side and not the other is a red test rather than a
+# quiet disagreement in a drawer nobody has open.
+
+_INSPECTOR_PY = Path(__file__).parent.parent / "dashboard" / "inspector.py"
+_PANELS_PY = Path(__file__).parent.parent / "dashboard" / "panels.py"
+_FORMAT_CS = UNITY_ROOT / "Runtime" / "View" / "InspectorFormat.cs"
+_INSPECTOR_CS = UNITY_ROOT / "Runtime" / "View" / "VillagerInspector.cs"
+
+# (0.25, "full sib / parent-offspring"),   -- Python
+_PY_LADDER = re.compile(r'\(\s*([0-9.]+)\s*,\s*"([^"]+)"\s*\)')
+# (0.25f,    "full sib / parent-offspring"),   -- C#
+_CS_LADDER = re.compile(r'\(\s*([0-9.]+)f\s*,\s*"([^"]+)"\s*\)')
+
+
+def _stage4_present():
+    return _FORMAT_CS.exists() and _INSPECTOR_CS.exists()
+
+
+def _py_f_labels():
+    """`_F_LABELS` out of dashboard/inspector.py, read as text.
+
+    Deliberately not `from dashboard.inspector import _F_LABELS`: that module
+    imports dash at the top, and a parity test that silently skips wherever
+    dash is absent is a parity test that does not run on the machine most
+    likely to have drifted.
+    """
+    src = _INSPECTOR_PY.read_text(encoding="utf-8")
+    m = re.search(r"_F_LABELS[^=]*=\s*\[(.*?)\]", src, re.S)
+    assert m, "_F_LABELS not found in dashboard/inspector.py"
+    return [(float(t), lab) for t, lab in _PY_LADDER.findall(m.group(1))]
+
+
+def _cs_f_labels():
+    src = code_only(_FORMAT_CS.read_text(encoding="utf-8"))
+    m = re.search(r"FLabels\s*=\s*\{(.*?)\};", src, re.S)
+    assert m, "FLabels table not found in InspectorFormat.cs"
+    return [(float(t), lab) for t, lab in _CS_LADDER.findall(m.group(1))]
+
+
+def test_stage_four_sources_exist():
+    """Guard: every parity rule below is vacuous without these two files."""
+    if not _stage4_present():
+        pytest.skip("Stage 4 inspector not present")
+    assert _INSPECTOR_PY.exists(), "dashboard/inspector.py is the parity source"
+
+
+def test_the_relationship_ladder_is_identical_on_both_sides():
+    """
+    The wording AND the thresholds, in order.
+
+    Pedigree F is meaningless to most readers as a bare number, so both UIs
+    label it with the mating that produces it. If Unity said "first cousins"
+    where the dashboard said "uncle-niece", the two would be making different
+    claims about the same villager's parents -- which is a scientific
+    disagreement wearing the clothes of a formatting bug.
+    """
+    if not _stage4_present():
+        pytest.skip("Stage 4 inspector not present")
+    py, cs = _py_f_labels(), _cs_f_labels()
+    assert py, "no ladder parsed from inspector.py -- the regex has rotted"
+    assert cs == py, (
+        f"the relationship ladders disagree.\n"
+        f"  dashboard/inspector.py : {py}\n"
+        f"  InspectorFormat.cs     : {cs}")
+
+
+def test_the_relationship_ladder_is_descending():
+    """A guard on the ladder itself: the scan returns the FIRST match, so an
+    out-of-order entry silently shadows every threshold below it."""
+    if not _stage4_present():
+        pytest.skip("Stage 4 inspector not present")
+    thresholds = [t for t, _ in _cs_f_labels()]
+    assert thresholds == sorted(thresholds, reverse=True), (
+        f"C# ladder is not descending: {thresholds}. The first match wins, so "
+        f"an out-of-order row makes the rows under it unreachable.")
+
+
+def test_the_inbreeding_colour_thresholds_match_the_dashboard():
+    """`_f_color` marks first cousins (0.0625) critical and second cousins
+    (0.015625) warning. Two UIs colouring the same F differently is the
+    version of drift a reader is least likely to notice and most likely to
+    quote."""
+    if not _stage4_present():
+        pytest.skip("Stage 4 inspector not present")
+
+    py_src = code_only(_INSPECTOR_PY.read_text(encoding="utf-8"))
+    m = re.search(r"def _f_color.*?(?=\ndef )", py_src, re.S)
+    assert m, "_f_color not found in dashboard/inspector.py"
+    py_thresholds = sorted(float(x) for x in re.findall(r"[0-9]*\.[0-9]+",
+                                                        m.group(0)))
+
+    cs_src = code_only(_FORMAT_CS.read_text(encoding="utf-8"))
+    m = re.search(r"FColor\s*\(float f\)\s*\{(.*?)\n        \}", cs_src, re.S)
+    assert m, "FColor not found in InspectorFormat.cs"
+    cs_thresholds = sorted(float(x) for x in re.findall(r"([0-9]*\.[0-9]+)f",
+                                                        m.group(1)))
+
+    assert cs_thresholds == py_thresholds, (
+        f"_f_color thresholds {py_thresholds} but FColor uses {cs_thresholds}")
+
+
+def test_the_palette_hexes_match_the_dashboard():
+    """Colours are named in InspectorFormat as hex STRINGS precisely so this
+    comparison is possible; an (r,g,b) triple could not be checked against
+    '#d03b3b' without a human doing the conversion."""
+    if not _stage4_present():
+        pytest.skip("Stage 4 inspector not present")
+
+    panels = _PANELS_PY.read_text(encoding="utf-8")
+    cs = _FORMAT_CS.read_text(encoding="utf-8")
+
+    for py_name, cs_name in (("INK", "InkHex"), ("INK2", "Ink2Hex"),
+                             ("MUTED", "MutedHex"), ("GRID", "GridHex"),
+                             ("SURFACE", "SurfaceHex"), ("PLANE", "PlaneHex"),
+                             ("GOOD", "GoodHex"), ("CRIT", "CritHex"),
+                             ("WARN", "WarnHex"), ("ACCENT", "AccentHex")):
+        m = re.search(rf'^{py_name}\s*=\s*"(#[0-9a-fA-F]{{6}})"', panels, re.M)
+        assert m, f"{py_name} not found in dashboard/panels.py"
+        expected = m.group(1).lower()
+
+        m2 = re.search(rf'{cs_name}\s*=\s*"(#[0-9a-fA-F]{{6}})"', cs)
+        assert m2, f"{cs_name} not found in InspectorFormat.cs"
+        assert m2.group(1).lower() == expected, (
+            f"{py_name} is {expected} in the dashboard but {cs_name} is "
+            f"{m2.group(1)} in the viewer")
+
+
+def test_the_viewer_never_formats_a_percentage_with_the_dotnet_specifier():
+    """
+    A parity trap with no symptom.
+
+    Python's f"{p:.0%}" gives "50%". C#'s ToString("P0", InvariantCulture)
+    gives "50 %" -- invariant culture's percent pattern inserts a space. Both
+    look right in isolation, and the acceptance criterion for this stage is a
+    CHARACTER-FOR-CHARACTER match, so the near-miss is the whole failure.
+    Percentages are formatted as F0 on a x100 value instead.
+    """
+    if not _stage4_present():
+        pytest.skip("Stage 4 inspector not present")
+
+    # BOTH spellings, because the first version of this rule only caught the
+    # composite one and a deliberate sabotage using ToString("P0", Inv) --
+    # much the likelier way to write it -- sailed straight through.
+    composite = re.compile(r'\{\s*\d+\s*:\s*[Pp]\d*\s*\}')   # "{0:P0}"
+    direct = re.compile(r'ToString\s*\(\s*"[Pp]\d*"')        # ToString("P0", ..)
+
+    for path in (_FORMAT_CS, _INSPECTOR_CS):
+        src = code_only(path.read_text(encoding="utf-8"))
+        hits = composite.findall(src) + direct.findall(src)
+        assert not hits, (
+            f"{path.name} formats with the .NET percent specifier {hits}. "
+            f"That renders '50 %' where the dashboard renders '50%'.")
+
+
+def test_the_inspector_does_not_rebuild_the_settlement_name_table():
+    """`community.deme_label` maps an id onto a fixed name table. A copy of
+    that table in C# is a second definition that goes stale the moment a name
+    is appended -- so the label travels in demes.csv instead."""
+    if not _stage4_present():
+        pytest.skip("Stage 4 inspector not present")
+    from simulation.community import DEME_NAMES
+
+    src = code_only(_INSPECTOR_CS.read_text(encoding="utf-8"))
+    for name in DEME_NAMES[:6]:
+        assert f'"{name}"' not in src, (
+            f"VillagerInspector.cs contains the settlement name '{name}'. "
+            f"Read demes.csv's `label` column instead of rebuilding "
+            f"community.DEME_NAMES in C#.")
+
+
+def test_the_settlement_label_is_actually_exported(headers):
+    """The other half of the rule above: forbidding the C# copy is only
+    reasonable if the column really is there to read."""
+    assert "label" in headers["demes.csv"], (
+        "demes.csv has no `label` column, so the viewer has no way to name a "
+        "settlement without reimplementing community.deme_label")
+
+
+def test_the_disease_panel_resolves_every_slug_people_csv_can_emit():
+    """
+    people.csv names disorders by slug; the dashboard shows the GENE and the
+    display name (inspector.py:171). Neither is derivable from the slug, so
+    diseases.csv has to carry every slug that can appear -- otherwise the
+    viewer falls back to printing 'gjb2_deafness' at a reader who was promised
+    'dx GJB2'.
+    """
+    from health_engine.diseases import DISEASES
+
+    rows = EX.disease_rows()
+    by_name = {r["name"]: r for r in rows}
+    assert len(rows) == len(DISEASES)
+    for d in DISEASES:
+        assert d.spec.name in by_name, f"{d.spec.name} missing from diseases.csv"
+        assert by_name[d.spec.name]["gene"] == d.spec.gene
+        assert by_name[d.spec.name]["label"] == d.spec.label
+
+
+def test_the_disease_table_records_both_frequencies():
+    """q_lit and q_engine are both exported because they DISAGREE -- the
+    engine's frequency for a disorder is its assigned spectrum locus's, and
+    cystic fibrosis is a documented misfit. A table carrying only one of them
+    would let a reader assume there was nothing to know."""
+    rows = {r["name"]: r for r in EX.disease_rows()}
+    cf = rows["cystic_fibrosis"]
+    assert cf["q_lit"] > 0 and cf["q_engine"] > 0
+    assert cf["q_lit"] != cf["q_engine"], (
+        "q_lit == q_engine for cystic fibrosis, which contradicts the "
+        "documented misfit in health_engine/diseases.py -- either the "
+        "assignment changed or this column is not what it claims")
+
+
+def test_every_people_column_the_inspector_reads_exists(headers):
+    """
+    The same rule the loader is held to, now for the panel.
+
+    The inspector reaches into people.csv by name through GetRaw / GetTrait,
+    which is exactly the failure this module was written for: `GetRaw
+    ("hidden_load_allele")` compiles, and from C#'s side the absent column is
+    indistinguishable from the engine having stopped exporting it.
+    """
+    if not _stage4_present():
+        pytest.skip("Stage 4 inspector not present")
+    src = code_only(_INSPECTOR_CS.read_text(encoding="utf-8"))
+
+    wanted = set(re.findall(r'GetRaw\("([^"]+)"\)', src))
+    wanted |= {"trait_" + t for t in re.findall(r'GetTrait\("([^"]+)"\)', src)}
+    assert wanted, "no people.csv column requests parsed from the inspector"
+
+    missing = sorted(wanted - headers["people.csv"])
+    assert not missing, (
+        f"VillagerInspector.cs reads people.csv column(s) {missing}, which the "
+        f"engine does not export.")
+
+
+def test_the_inspector_refuses_peoplecsv_in_historical_mode():
+    """
+    §2.1, the constraint snapshots.py imposes and the viewer inherits.
+
+    people.csv is CROSS-SECTIONAL -- each row is the individual as they are
+    NOW, or as they were at death. Joining it to a year-40 frame would
+    describe a year-40 villager with year-90 genetics and show no seam at all.
+    The guard is one method, so this asserts the guard is still in it.
+    """
+    if not _stage4_present():
+        pytest.skip("Stage 4 inspector not present")
+    src = code_only(_INSPECTOR_CS.read_text(encoding="utf-8"))
+    m = re.search(r"PersonRow LivePerson\(\)\s*\{(.*?)\n        \}", src, re.S)
+    assert m, "VillagerInspector.LivePerson not found"
+    assert "IsHistorical" in m.group(1), (
+        "LivePerson() no longer checks IsHistorical, so the inspector can "
+        "join today's people.csv row onto a past tick's frame")
+
+
+def test_the_inspector_marks_historical_mode_visibly():
+    """Silent degradation is the failure mode: a thinner panel reads as a
+    villager with less going on, not a year with less recorded."""
+    if not _stage4_present():
+        pytest.skip("Stage 4 inspector not present")
+    src = _INSPECTOR_CS.read_text(encoding="utf-8")
+    assert "historical view" in src, (
+        "no historical-mode banner in VillagerInspector.cs")
+
+
+def test_the_stature_cost_of_inbreeding_is_exported_not_recomputed(headers):
+    """
+    The engine's second cost of inbreeding, and a column rather than a
+    calculation on purpose.
+
+    `predicted_depression` is a model (Joshi 2015 directional dominance), not a
+    formatting rule. A viewer that reproduced it in C# would be doing biology,
+    which UNITY_PLAN.md invariant 5 forbids outright.
+    """
+    assert "stature_cost_cm" in headers["people.csv"]
+    if not _stage4_present():
+        return
+    for path in (_FORMAT_CS, _INSPECTOR_CS):
+        src = code_only(path.read_text(encoding="utf-8"))
+        for forbidden in ("predicted_depression", "PredictedDepression",
+                          "lethal_equivalents"):
+            assert forbidden not in src, (
+                f"{path.name} looks like it reimplements {forbidden}; the "
+                f"value is exported as a column and must be read")
+
+
+def test_the_stature_cost_is_zero_for_the_outbred_and_negative_otherwise():
+    """A check on the column's meaning, not just its presence. Directional
+    dominance makes inbred individuals SHORTER, so a positive value would mean
+    the sign convention had flipped somewhere between the engine and the
+    column."""
+    assert EX._stature_cost(0.0) == 0.0
+    assert EX._stature_cost(0.0625) < 0.0
+    assert EX._stature_cost(0.25) < EX._stature_cost(0.0625), (
+        "a more inbred individual must carry a larger stature cost")
 
 
 @pytest.mark.parametrize("path", _RUNTIME_CS, ids=lambda p: p.name)

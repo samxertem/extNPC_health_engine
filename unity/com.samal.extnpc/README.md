@@ -1,12 +1,25 @@
-# extNPC World Viewer — Unity package
+<h1 align="center">extNPC World Viewer</h1>
 
-Reads a world bundle exported by the extNPC health engine and shows it.
+<p align="center"><em>Reads a world bundle exported by the extNPC health engine, and shows it.</em></p>
+
+<p align="center">
+  <img alt="unity" src="https://img.shields.io/badge/unity-6000.0%2B-4ea3ff">
+  <img alt="tests" src="https://img.shields.io/badge/tests-34%20passing-0ca30c">
+  <img alt="upm"   src="https://img.shields.io/badge/UPM-com.samal.extnpc-1a1a19">
+</p>
+
+---
 
 **This package is a viewer.** It performs no biology, draws no random numbers,
 and derives no phenotype. If a number reaches the screen there is a CSV cell it
 came from. Anything the engine did not export is not available here, and the
 correct fix for that is to export it from the engine — never to compute it in
 C#. See `reads/UNITY_PLAN.md` Part 0 for the full contract.
+
+Those are not aspirations. A test in the engine repo fails if `HSVToRGB`
+appears anywhere in this package, if any runtime file touches `Random`, if a
+number is parsed without `InvariantCulture`, or if the viewer reaches for
+`people.csv`'s mature stature where the frame's age-expressed value belongs.
 
 ## Requirements
 
@@ -64,9 +77,10 @@ entering play mode.
 | `history.csv` | population scalars per year |
 | `pedigree.csv` | parent–child edges |
 | `frames.csv` | **living villagers per year** — the viewer's primary feed |
-| `demes.csv` | settlements per year |
+| `demes.csv` | settlements per year, with the settlement's `label` |
 | `flows.csv` | migration routes per year (empty with one deme — correctly) |
 | `events.csv` | shocks, plagues, bottlenecks |
+| `diseases.csv` | the Mendelian panel as a **reference table** — slug → gene, name, OMIM, citation |
 
 ## Three limits you cannot code around
 
@@ -97,6 +111,32 @@ expressed *at that age*; `people.csv` carries the *mature* phenotype. Reaching
 for the wrong one draws children adult-sized — the exact defect session 13
 found in the dashboard's BMI readout. Also tested.
 
+**Wording lives in `InspectorFormat.cs`, and only there.** Every label, unit,
+rounding rule and colour threshold the inspector uses names the
+`dashboard/inspector.py` line it mirrors. Do not format a number at a call
+site: `tests/test_unity_contract.py` compares that file's tables against the
+Python source directly, and a threshold changed on one side only is a red
+test rather than a quiet disagreement. The trap worth knowing about — Python's
+`f"{p:.0%}"` renders `50%`, C#'s `ToString("P0", InvariantCulture)` renders
+`50 %`. Mirroring a formatter means mirroring its *output*, not calling the
+method with a similar name.
+
+## The inspector (Stage 4)
+
+`VillagerInspector` draws the selected villager as an IMGUI panel and works in
+two modes, loudly:
+
+- **Live year** — headline stats from `frames.csv` plus the deep sheet from
+  `people.csv`: realised F, hidden and expressed load, named Mendelian
+  diagnoses (`dx GJB2` → *GJB2 nonsyndromic deafness*, resolved through
+  `diseases.csv`), carrier status, heterozygosity, conditions, and the 25
+  `trait_*` mature phenotypes.
+- **Any earlier year** — frame fields only, behind a `⏱ historical view`
+  banner. `people.csv` is *cross-sectional*: joining it to a past frame would
+  describe a year-40 villager with year-90 genetics and show no seam. The
+  banner exists so a thinner panel reads as *a year with less recorded*, not
+  *a villager with less going on*.
+
 ## Division of labour with the dashboard
 
 The Dash dashboard keeps every chart, distribution, validation figure and
@@ -107,7 +147,29 @@ bundle so they cannot disagree about a villager.
 ## Testing
 
 `Tests/` runs in Unity's Test Runner and covers the CSV dialect, locale-proof
-number parsing, and manifest handling.
+number parsing, manifest handling, and the inspector's formatters.
+
+**Unity will not run them until the project opts in.** Tests inside a *package*
+are invisible to the Test Runner unless the consuming project lists the package
+in `testables`, as a sibling of `dependencies` in `Packages/manifest.json`:
+
+```json
+"testables": [ "com.samal.extnpc" ]
+```
+
+Without it the Test Runner reports **`total="0" result="Passed"`** — zero tests,
+green. That is the most dangerous possible output: it is indistinguishable at a
+glance from a suite that ran and passed, and it is what you get by default. If
+the EditMode list does not show an `ExtNPC.Tests` node with ~35 tests under it,
+nothing in this package has been checked, whatever colour the bar is.
+
+`Tests/ParityFixture.generated.cs` is **generated** by
+`tests/test_unity_parity_fixture.py` in the engine repo, from
+`dashboard/inspector.py`'s real formatters. Every `Expected` string in it is
+text the Dash drawer actually prints. `ParityFixtureTests.cs` replays all of it
+against `InspectorFormat` — once normally, once under `de-DE`. Do not edit the
+generated file; regenerate it with `EXTNPC_UPDATE_PARITY='<reason>'`, which
+requires a reason of at least 12 characters and records it in the header.
 
 The column contract is tested from the *engine* side instead, in
 `tests/test_unity_contract.py`: it reads this package's source as text and

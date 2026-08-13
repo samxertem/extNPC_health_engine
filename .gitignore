@@ -49,6 +49,22 @@ dash_err.log
 *.log
 
 # ---------------------------------------------------------------------
+# LaTeX build artifacts (reads/article.tex)
+# ---------------------------------------------------------------------
+# The .tex source and the built .pdf are both worth tracking; the
+# intermediate files are not. (*.log is already ignored above.)
+*.aux
+*.toc
+*.out
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.blg
+
+# ---------------------------------------------------------------------
 # NOTE ON `outputs/`
 # ---------------------------------------------------------------------
 # outputs/*.png IS tracked on purpose (~3 MB). Those figures are the
@@ -58,3 +74,23 @@ dash_err.log
 # history next to the code that produced it, so a reviewer can check
 # that they still match. Regenerate with:
 #     python health_engine_prototype.py
+
+# Exported world bundles for the Unity viewer are NOT tracked: they are
+# regenerable output, not evidence, and frames.csv alone runs to tens of
+# megabytes on a long run. Regenerate with:
+#     python export_for_unity.py
+outputs/unity/
+
+# ---------------------------------------------------------------------
+# Unity
+# ---------------------------------------------------------------------
+# `unity/com.samal.extnpc` IS tracked — it is source. A Unity *project*
+# that consumes the package is not part of this repo; these patterns cover
+# the case where one gets created here anyway.
+unity/**/Library/
+unity/**/Temp/
+unity/**/Logs/
+unity/**/UserSettings/
+unity/**/obj/
+*.csproj
+*.sln

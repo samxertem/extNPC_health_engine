@@ -55,7 +55,7 @@ def _rows(zf, name):
 
 def test_the_bundle_contains_every_promised_file(bundle):
     assert set(bundle.namelist()) == {
-        "people.csv", "history.csv", "pedigree.csv",
+        "people.csv", "history.csv", "pedigree.csv", "diseases.csv",
         "frames.csv", "demes.csv", "flows.csv", "events.csv",
         "manifest.json", "README.txt"}
 
@@ -63,11 +63,15 @@ def test_the_bundle_contains_every_promised_file(bundle):
 def test_the_analysis_only_bundle_omits_the_frame_tables(world):
     """The longitudinal tables are much the largest part of a long run, so a
     caller who only wants the cross-section can say so -- and the older,
-    smaller file set is still a tested promise rather than a memory."""
+    smaller file set is still a tested promise rather than a memory.
+
+    diseases.csv stays in: it is a REFERENCE table of nine rows, and it is what
+    people.csv's mendelian_* slugs resolve against. Dropping it would leave the
+    cross-sectional bundle naming disorders it gives no way to look up."""
     blob = EX.build_csv_bundle(world, include_frames=False)
     assert set(zipfile.ZipFile(io.BytesIO(blob)).namelist()) == {
-        "people.csv", "history.csv", "pedigree.csv", "manifest.json",
-        "README.txt"}
+        "people.csv", "history.csv", "pedigree.csv", "diseases.csv",
+        "manifest.json", "README.txt"}
 
 
 def test_people_table_includes_the_dead(world, bundle):

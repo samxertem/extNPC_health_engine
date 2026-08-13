@@ -1,0 +1,123 @@
+using System.Globalization;
+using System.Threading;
+using ExtNPC.View;
+using NUnit.Framework;
+using UnityEngine;
+
+namespace ExtNPC.Tests
+{
+    /// <summary>
+    /// The dashboard's actual output, replayed against the viewer's formatters.
+    ///
+    /// `ParityFixture.generated.cs` is written by
+    /// tests/test_unity_parity_fixture.py, which runs
+    /// dashboard/inspector.py's REAL formatters over a grid of values. Every
+    /// Expected string in it is text the Dash drawer genuinely prints. This
+    /// test feeds the same inputs to <see cref="InspectorFormat"/> and requires
+    /// the same text back.
+    ///
+    /// That closes the loop the text-comparison tests cannot. Those check that
+    /// the two sides hold the same TABLE; this checks that the two sides
+    /// RENDER it the same, which is where the near-misses live -- "50 %" for
+    /// "50%", a comma decimal separator, a lost en dash, a rounded arrow.
+    ///
+    /// Every case is also replayed under de-DE. The formatting half of the
+    /// culture rule is the half this project has already been bitten by.
+    /// </summary>
+    public class ParityFixtureTests
+    {
+        private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
+
+        [Test]
+        public void TheFixtureIsNotEmpty()
+        {
+            // Guard: an empty or unregenerated fixture would make every
+            // assertion below pass without comparing anything.
+            Assert.Greater(ParityFixture.Cases.Length, 60,
+                "the parity fixture looks empty -- regenerate it with " +
+                "EXTNPC_UPDATE_PARITY='<reason>' from the engine repo");
+        }
+
+        [Test]
+        public void EveryFormatterMatchesTheDashboardsOutput()
+        {
+            AssertAllCases();
+        }
+
+        [Test]
+        public void EveryFormatterMatchesTheDashboardUnderACommaDecimalLocale()
+        {
+            var previous = Thread.CurrentThread.CurrentCulture;
+            try
+            {
+                Thread.CurrentThread.CurrentCulture = new CultureInfo("de-DE");
+                AssertAllCases();
+            }
+            finally
+            {
+                Thread.CurrentThread.CurrentCulture = previous;
+            }
+        }
+
+        private static void AssertAllCases()
+        {
+            int checkedCount = 0;
+            foreach (var c in ParityFixture.Cases)
+            {
+                string actual = Render(c);
+                Assert.AreEqual(c.Expected, actual,
+                    $"{c.Fn}({c.A.ToString(Inv)}, {c.B.ToString(Inv)}) — the " +
+                    $"dashboard prints '{c.Expected}' and the viewer prints " +
+                    $"'{actual}'. A villager must not be described differently " +
+                    $"by the two UIs.");
+                checkedCount++;
+            }
+            Assert.AreEqual(ParityFixture.Cases.Length, checkedCount);
+        }
+
+        /// <summary>
+        /// Dispatch a fixture row to the formatter it names.
+        ///
+        /// An unknown name FAILS rather than being skipped: a case added on the
+        /// Python side that this switch does not handle would otherwise be
+        /// silently unchecked, which is the same vacuous-pass failure the
+        /// fixture exists to prevent.
+        /// </summary>
+        private static string Render(ParityFixture.Case c)
+        {
+            switch (c.Fn)
+            {
+                case "FmtF": return InspectorFormat.FmtF(c.A);
+                case "RelationshipLabel": return InspectorFormat.RelationshipLabel(c.A);
+                case "FColor": return Hex(InspectorFormat.FColor(c.A));
+                case "Signed2": return InspectorFormat.Signed2(c.A);
+                case "Signed4": return InspectorFormat.Signed4(c.A);
+                case "Fixed2": return InspectorFormat.Fixed2(c.A);
+                case "Fixed3": return InspectorFormat.Fixed3(c.A);
+                case "SignedYears": return InspectorFormat.SignedYears(c.A);
+                case "Percent0": return InspectorFormat.Percent0(c.A);
+                case "StatureCost": return InspectorFormat.StatureCost(c.A);
+                case "Height": return InspectorFormat.Height(c.A);
+                case "HeightLive": return InspectorFormat.HeightLive(c.A, c.B);
+                case "Bmi": return InspectorFormat.Bmi(c.A, c.B != 0f);
+                case "NormStress":
+                    return InspectorFormat.Norm(
+                        c.A, InspectorFormat.StressMeterLo,
+                        InspectorFormat.StressMeterHi).ToString("F6", Inv);
+                case "NormHeterozygosity":
+                    return InspectorFormat.Norm(c.A, 0f, 0.6f).ToString("F6", Inv);
+                default:
+                    Assert.Fail(
+                        $"parity fixture names a formatter this test does not " +
+                        $"dispatch: '{c.Fn}'. Add it here rather than letting " +
+                        $"the case go unchecked.");
+                    return null;
+            }
+        }
+
+        /// <summary>"#rrggbb", lower case, matching what dashboard/panels.py
+        /// writes and what _f_color returns.</summary>
+        private static string Hex(Color c) =>
+            "#" + ColorUtility.ToHtmlStringRGB(c).ToLowerInvariant();
+    }
+}

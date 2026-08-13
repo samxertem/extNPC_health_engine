@@ -1,13 +1,37 @@
-# extNPC Health Engine
+<h1 align="center">extNPC Health Engine</h1>
 
-A reproduction, inheritance and medical-issues engine for the **extNPC** NPC
-framework (Uludagli et al.), rebuilt on real quantitative genetics.
+<p align="center">
+  <em>A reproduction, inheritance and medical-issues engine for the</em>
+  <strong>extNPC</strong> <em>NPC framework (Uludagli et al.),<br>
+  rebuilt on real quantitative genetics.</em>
+</p>
+
+<p align="center">
+  <img alt="version"  src="https://img.shields.io/badge/version-0.6.0-1a1a19">
+  <img alt="tests"    src="https://img.shields.io/badge/tests-735%20passing-0ca30c">
+  <img alt="roadmap"  src="https://img.shields.io/badge/roadmap-32%2F32%20closed-0ca30c">
+  <img alt="python"   src="https://img.shields.io/badge/python-3.14.5-3987e5">
+  <img alt="unity"    src="https://img.shields.io/badge/unity-6000.0%2B-4ea3ff">
+</p>
+
+---
 
 The goal is not a game system that *feels* genetic. It is a simulator whose
 emergent output can be checked against the closed-form laws of population
 genetics — and which says so honestly when it cannot.
 
-**Version 0.5.0** · 264 tests passing · roadmap 32/32 items — engine complete
+That second half is the part most of this repository is about. Every claim
+below is attached to a test that could fail, every known weakness is written
+down rather than left to be discovered, and where the model disagrees with the
+literature it says so in the same breath as the number.
+
+### Three layers
+
+| | | |
+|---|---|---|
+| 🧬 **Engine** | `health_engine/` | one individual: genome, meiosis, phenotype, epigenetics, physiology |
+| 🌍 **Population** | `simulation/` | many individuals over time: birth, pairing, death, demes, migration |
+| 📊 **Surfaces** | `dashboard/` · `unity/` | a Dash analysis deck, and a Unity world viewer that reads exported bundles |
 
 ---
 
@@ -67,8 +91,9 @@ python health_engine_prototype.py          # full engine demo, several minutes:
                                            #   validation harness + outputs/*.png
 python health_engine_prototype.py --fast   # smoke run (widened tolerances;
                                            #   a rare noise-floor FAIL is expected)
-python -m pytest tests/ -q                 # ~580 tests, ~12 min — the rigorous gate
+python -m pytest tests/ -q                 # 735 tests, ~10 min — the rigorous gate
 python run_dashboard.py                    # live population sim at localhost:8050
+python export_for_unity.py                 # write a world bundle for the viewer
 ```
 
 The demo drives the **engine** on a hand-built nine-person pedigree. The
@@ -110,6 +135,49 @@ imports; touches no figure and consumes no RNG.
 
 ---
 
+## The Unity world viewer
+
+`unity/com.samal.extnpc` is a UPM package that renders an exported world.
+**It is a viewer, and the distinction is enforced rather than promised:** it
+performs no biology, draws no random numbers, and derives no phenotype. If a
+number reaches the screen, there is a CSV cell it was read from.
+
+```bash
+python export_for_unity.py --years 90 --founders 16 --demes 3 --migration 0.08
+```
+
+That writes a plain-file bundle — `manifest.json`, `people.csv`, `history.csv`,
+`pedigree.csv`, `frames.csv`, `demes.csv`, `flows.csv`, `events.csv`,
+`diseases.csv`. Add the package to a Unity 6 project, point
+`ExtNpcWorldLoader` at the folder, and press play.
+
+**Why files and not a live socket.** Measured on this machine: engine import
+12.4 s, tick cost ~1.7 ms per living person per year — a 600-person village
+runs near a second per simulated year. That is a batch job, not something to
+animate against. Exporting once and viewing many times removes the engine from
+the interactive loop entirely, which is what makes the viewer smooth: the
+architecture, not the renderer.
+
+**The division of labour is fixed.** The dashboard keeps every chart,
+distribution, validation figure and thesis plot. Unity does agents in space and
+time — things a chart cannot show. Neither reimplements the other, and both
+read the same bundle, so they cannot disagree about a villager.
+
+That last claim is tested rather than intended. `tests/test_unity_contract.py`
+reads the C# source as text and asserts every column it requests exists in a
+real export; `tests/test_unity_parity_fixture.py` runs the dashboard's *own*
+formatters over a grid and generates the strings a C# test then has to
+reproduce, under two locales. The pair has already caught what neither a code
+review nor a working scene would have — that Python rounds half-to-even while
+.NET rounds half-away-from-zero, so an eighth of ancestry rendered `13%` in
+Unity against `12%` in the dashboard.
+
+Full contract, invariants and staged plan: `reads/UNITY_PLAN.md`.
+Character-generation research (MPFB2, licensing, the 5–10% facial-variance
+ceiling): `reads/MPFB_UNITY_INVESTIGATION.md`.
+
+---
+
 ## Layout
 
 ```
@@ -142,9 +210,20 @@ simulation/           the population layer — many individuals over time
   chronicle.py          narrates notable events from the metrics stream
   metrics.py, embedding.py
 
+  export.py             the world bundle: CSV tables + a provenance manifest
+  snapshots.py          per-tick ring buffer — the viewer's longitudinal feed
+
 dashboard/            live Plotly/Dash command deck (7 tabs) + canvas RTS map
-tests/                133 tests
-reads/                CLAUDE_PROJECT_ROADMAP.md (the spec) and REPORT.md (the log)
+  inspector.py          the character drawer; the parity source for Unity
+
+unity/com.samal.extnpc  UPM package: reads a bundle, renders the village
+  Runtime/Data/         RFC-4180 CSV reader, locale-proof parsing, manifest
+  Runtime/View/         villagers, deme rings, orbit camera, the inspector
+  Tests/                34 NUnit tests, incl. a generated dashboard-parity fixture
+
+tests/                735 tests
+reads/                CLAUDE_PROJECT_ROADMAP.md (the spec), REPORT.md (the log),
+                      UNITY_PLAN.md, MPFB_UNITY_INVESTIGATION.md
 outputs/              validation figures, regenerated by the demo
 ```
 
@@ -311,6 +390,26 @@ Per-session detail is in `reads/REPORT.md`.
 **The roadmap is closed.** Session 11 landed the last three items: #31
 inbreeding depression (`inbreeding.py`), #12 structural variants
 (`cnv.py`) and #13 developmental trajectory (`development.py`).
+
+### The display thrust — off the roadmap, additive only
+
+A Unity front-end was added in sessions 17–18 under a hard constraint: **no
+file in `health_engine/` may be modified, and `simulation/` may only gain
+things.** That is not a promise but a test — `tests/test_export_golden.py`
+freezes a seeded world's full history and an md5 over `people.csv`'s columns,
+and it was verified by *breaking* it: one stray `self.rng.random()` in
+`World.step()` diverged the population by tick 2 and failed both guards.
+
+| | |
+|---|---|
+| Stage 0–1 | golden tripwire · `export_world_dir()` · frames/demes/flows tables |
+| Stage 2–3 | UPM package, bundle loader · villagers on the map |
+| Stage 4 | the inspector, at parity with the dashboard drawer |
+| Stage 5 | time scrubbing — **the one stage left in Phase A** |
+
+The md5-over-frozen-columns trick is what makes it work: a stage may *add* a
+column and stay green, while renaming, reordering or changing any pre-existing
+one fails and names it.
 
 What remains is not roadmap work. It is the scientific debt listed under
 [Known limitations](#known-limitations) — session 15 closed the largest item,

@@ -61,6 +61,40 @@ namespace ExtNPC.Data
         public string Dominant;         // dominant bloodline
         public float Dominance;         // its share, 0..1
         public Color32 DominantColor;
+
+        /// <summary>The settlement's name, as simulation/community.deme_label
+        /// spells it. Carried in the data rather than rebuilt in C#: the
+        /// mapping is a fixed name table, and a copy of it here would go stale
+        /// the moment a name is added. Empty on bundles exported before the
+        /// column existed.</summary>
+        public string Label;
+    }
+
+    /// <summary>
+    /// One entry of the Mendelian disease panel, from diseases.csv.
+    ///
+    /// A REFERENCE table, not per-person data: nine rows describing the
+    /// disorders health_engine/diseases.py models, joined to an individual
+    /// through the slugs in people.csv's mendelian_diagnoses /
+    /// mendelian_carrier_of columns.
+    ///
+    /// It exists because people.csv carries only the slug ("gjb2_deafness")
+    /// while the dashboard shows the gene and the disorder's display name
+    /// ("dx GJB2" -> "GJB2 nonsyndromic deafness"). Deriving one from the other
+    /// is not possible, and hardcoding the panel in C# would be a second
+    /// definition of a catalogue that is explicitly append-only.
+    /// </summary>
+    public sealed class DiseaseRow
+    {
+        public string Name;             // snake_case slug, the join key
+        public string Label;            // display name
+        public string Gene;
+        public string Omim;             // phenotype MIM number
+        public string Onset;            // infancy | childhood | adult
+        public float QLit;              // literature allele frequency
+        public float QEngine;           // the frequency this run actually used
+        public float SLit;              // untreated homozygote fitness cost
+        public string Citation;
     }
 
     /// <summary>One active migration route at one tick, from flows.csv.
@@ -137,7 +171,17 @@ namespace ExtNPC.Data
         public string GetRaw(string column) =>
             Raw != null && Raw.TryGetValue(column, out string v) ? v : null;
 
+        /// <summary>
+        /// A trait_* column as a number, or NaN if it is absent or categorical.
+        ///
+        /// TryFloat rather than Float on purpose. Not every exported trait is
+        /// continuous — eye_color, handedness and chronotype are strings — and
+        /// the throwing parser turned "this trait is a category" into a
+        /// BundleFormatException, i.e. a whole-panel failure triggered by
+        /// asking an ordinary question about an ordinary villager.
+        /// </summary>
         public float GetTrait(string trait) =>
-            CsvParse.Float(GetRaw("trait_" + trait), float.NaN);
+            CsvParse.TryFloat(GetRaw("trait_" + trait), out float v)
+                ? v : float.NaN;
     }
 }

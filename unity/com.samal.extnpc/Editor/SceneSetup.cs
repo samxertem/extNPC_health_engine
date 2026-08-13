@@ -18,6 +18,10 @@ namespace ExtNPC.Editor
             var root = new GameObject("extNPC World");
             var loader = root.AddComponent<ExtNpcWorldLoader>();
             var renderer = root.AddComponent<WorldRenderer>();
+            // Added by default rather than left as an option: the renderer
+            // already raises VillagerSelected, so without this the villagers
+            // are clickable and clicking them appears to do nothing.
+            root.AddComponent<VillagerInspector>();
 
             // Default to the engine repo's own export location, resolved
             // relative to the Unity project. Wrong as often as right, but it

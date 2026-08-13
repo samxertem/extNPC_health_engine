@@ -164,6 +164,12 @@ class SnapshotBuffer:
     def __len__(self) -> int:
         return len(self._frames)
 
+    def __iter__(self):
+        """Frames oldest-first. Exists so an exporter can walk the ring in
+        one pass -- `at()` scans linearly, so tick-by-tick lookup over the
+        whole buffer would be quadratic. Read-only, like everything here."""
+        return iter(self._frames)
+
     def append(self, frame: dict) -> None:
         self._frames.append(frame)
 

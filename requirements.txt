@@ -1,7 +1,7 @@
 # extNPC Health Engine — pinned dependencies
 #
-# Versions are the ones the 133-test suite was last verified green against
-# (2026-08-03, Python 3.14.5, Windows 11). Pinned exactly rather than with
+# Versions are the ones the 735-test suite was last verified green against
+# (2026-08-13, Python 3.14.5, Windows 11). Pinned exactly rather than with
 # `>=` on purpose: this project's central claim is that a seeded run is
 # reproducible, and numpy in particular has changed RNG and floating-point
 # reduction behaviour across minor versions before. A reviewer re-running the
@@ -10,8 +10,9 @@
 #   python -m pip install -r requirements.txt
 #
 # Verified with:
-#   python -m pytest tests/ -q          -> 133 passed
+#   python -m pytest tests/ -q          -> 735 passed, 1 skipped
 #   python health_engine_prototype.py   -> writes outputs/*.png
+#   python export_for_unity.py          -> writes a world bundle for the viewer
 
 # --- engine core (health_engine/, simulation/) ------------------------
 numpy==2.4.4          # genomes, meiosis, every trait computation

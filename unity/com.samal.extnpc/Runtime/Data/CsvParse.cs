@@ -46,6 +46,34 @@ namespace ExtNPC.Data
             }
         }
 
+        /// <summary>
+        /// Non-throwing <see cref="Float"/>, for cells whose type is not known
+        /// in advance.
+        ///
+        /// The inspector needs this: people.csv's trait_* columns are a mix of
+        /// continuous values (height_cm, bmi) and categorical strings
+        /// (eye_color, handedness), and the viewer must render a category
+        /// verbatim rather than guess a number for it. Returns false — never
+        /// throws — for blanks and for anything non-numeric, so "this is a
+        /// word" is an answer rather than a load failure.
+        /// </summary>
+        public static bool TryFloat(string s, out float value)
+        {
+            value = 0f;
+            if (IsBlank(s)) return false;
+            if (float.TryParse(s, NumberStyles.Float, Inv, out value)) return true;
+            switch (s.Trim().ToLowerInvariant())
+            {
+                case "nan": value = float.NaN; return true;
+                case "inf":
+                case "+inf":
+                case "infinity": value = float.PositiveInfinity; return true;
+                case "-inf":
+                case "-infinity": value = float.NegativeInfinity; return true;
+                default: return false;
+            }
+        }
+
         public static int Int(string s, int fallback = 0)
         {
             if (IsBlank(s)) return fallback;

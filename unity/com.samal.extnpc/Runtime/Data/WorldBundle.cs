@@ -26,6 +26,12 @@ namespace ExtNPC.Data
         /// <summary>Living villagers per retained tick, indexed by tick.</summary>
         public Dictionary<int, FrameRow[]> Frames { get; private set; }
 
+        /// <summary>The Mendelian disease panel, by slug. A reference table:
+        /// nine rows describing what health_engine/diseases.py models, joined
+        /// to people.csv's mendelian_* columns. Empty for bundles exported
+        /// before it existed.</summary>
+        public Dictionary<string, DiseaseRow> Diseases { get; private set; }
+
         public Dictionary<int, DemeRow[]> Demes { get; private set; }
         public Dictionary<int, FlowRow[]> Flows { get; private set; }
         public List<EventRow> Events { get; private set; }
@@ -67,6 +73,7 @@ namespace ExtNPC.Data
             b.Demes = LoadDemes(Path.Combine(directory, "demes.csv"), pool);
             b.Flows = LoadFlows(Path.Combine(directory, "flows.csv"));
             b.Events = LoadEvents(Path.Combine(directory, "events.csv"));
+            b.Diseases = LoadDiseases(Path.Combine(directory, "diseases.csv"));
 
             var ticks = new List<int>(b.Frames.Keys);
             ticks.Sort();
@@ -190,6 +197,11 @@ namespace ExtNPC.Data
                         int iDom = r.RequireIndex("dominant");
                         int iShare = r.RequireIndex("dominance");
                         int iCol = r.RequireIndex("dominant_color");
+                        // Optional: bundles exported before the settlement name
+                        // travelled in the data simply do not have it, and the
+                        // inspector falls back to the deme id rather than
+                        // refusing to load an otherwise valid world.
+                        int iLabel = r.IndexOf("label");
                         var grey = new Color32(136, 136, 136, 255);
 
                         while (r.ReadRow())
@@ -209,6 +221,7 @@ namespace ExtNPC.Data
                                 Dominant = pool.Get(f[iDom]),
                                 Dominance = CsvParse.Float(f[iShare]),
                                 DominantColor = CsvParse.Color(f[iCol], grey),
+                                Label = iLabel >= 0 ? pool.Get(f[iLabel]) : "",
                             };
                             if (!byTick.TryGetValue(tick, out var list))
                                 byTick[tick] = list = new List<DemeRow>();
@@ -283,6 +296,55 @@ namespace ExtNPC.Data
                 }
             }
             return rows;
+        }
+
+        private static Dictionary<string, DiseaseRow> LoadDiseases(string path)
+        {
+            var byName = new Dictionary<string, DiseaseRow>(StringComparer.Ordinal);
+            if (!File.Exists(path)) return byName;
+
+            using (var r = CsvReader.FromFile(path))
+            {
+                if (r.IsEmpty) return byName;
+                int iName = r.RequireIndex("name");
+                int iLabel = r.RequireIndex("label");
+                int iGene = r.RequireIndex("gene");
+                int iOmim = r.RequireIndex("omim");
+                int iOnset = r.RequireIndex("onset");
+                int iQLit = r.RequireIndex("q_lit");
+                int iQEng = r.RequireIndex("q_engine");
+                int iSLit = r.RequireIndex("s_lit");
+                int iCite = r.RequireIndex("citation");
+
+                while (r.ReadRow())
+                {
+                    var f = r.Current;
+                    var d = new DiseaseRow
+                    {
+                        Name = f[iName],
+                        Label = f[iLabel],
+                        Gene = f[iGene],
+                        Omim = f[iOmim],
+                        Onset = f[iOnset],
+                        QLit = CsvParse.Float(f[iQLit]),
+                        QEngine = CsvParse.Float(f[iQEng]),
+                        SLit = CsvParse.Float(f[iSLit]),
+                        Citation = f[iCite],
+                    };
+                    byName[d.Name] = d;
+                }
+            }
+            return byName;
+        }
+
+        /// <summary>The panel entry for a slug from people.csv's
+        /// mendelian_diagnoses / mendelian_carrier_of, or null. Null is a
+        /// normal answer for a bundle exported without diseases.csv, and
+        /// callers show the slug rather than inventing a gene name.</summary>
+        public DiseaseRow Disease(string slug)
+        {
+            if (string.IsNullOrEmpty(slug) || Diseases == null) return null;
+            return Diseases.TryGetValue(slug, out var d) ? d : null;
         }
 
         private static List<HistoryRow> LoadHistory(string path)
