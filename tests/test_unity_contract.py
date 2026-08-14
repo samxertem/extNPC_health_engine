@@ -58,7 +58,13 @@ _METHOD_TO_TABLE = {
 
 _REQUIRE = re.compile(r'RequireIndex\("([^"]+)"\)')
 _GETRAW = re.compile(r'\bG\("([^"]+)"\)')
-_METHOD = re.compile(r'private static \w[\w<>,\[\] ]* (\w+)\(')
+# Any static method, whatever its accessibility. It was `private static` only,
+# which was enough while every rule here read a loader; the rounding rule reads
+# a public one. Widening it can only make a slice TIGHTER -- the boundaries are
+# method definitions and methods do not nest -- so the existing rules are
+# unaffected, which the rest of this module's 176 checks confirm.
+_METHOD = re.compile(r'(?:public|private|internal|protected) static '
+                     r'\w[\w<>,\[\] ]* (\w+)\(')
 
 
 _BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.S)
@@ -1073,3 +1079,73 @@ def test_history_and_traits_are_parsed_at_double_width():
     assert re.search(r"double GetTrait\(string trait\) =>\s*"
                      r"CsvParse\.TryDouble", rows), (
         "PersonRow.GetTrait no longer returns a double")
+
+
+# ---------------------------------------------------------------------
+# The two ways this package's C# tests stop being evidence
+# ---------------------------------------------------------------------
+# Both of these were true at once, and neither is visible from anything the
+# C# suite itself asserts -- the first because it stops the suite existing,
+# the second because it is what the suite was getting wrong.
+
+def test_the_test_assembly_is_editor_only():
+    """
+    ExtNPC.Tests must declare `includePlatforms: ["Editor"]`.
+
+    THIS IS NOT STYLE. With an empty includePlatforms the assembly is an
+    all-platforms one, and Unity's Test Runner matches it against PLAYMODE.
+    An EditMode run then finds nothing and reports
+
+        <test-run testcasecount="0" ... result="Passed">
+
+    -- zero tests, exit code 0, green. It compiles the whole time, so
+    ExtNPC.Tests.dll sits in Library/ScriptAssemblies looking healthy. The
+    package shipped in that state for two sessions: the "34 passing" and
+    "53 passing" badges were counted by hand from [Test] attributes, and the
+    number a Test Runner would have shown was 0.
+
+    (It is also simply correct. These are formatter and cursor tests, and an
+    all-platforms test assembly gets compiled into player builds.)
+    """
+    import json
+
+    asmdef = json.loads((UNITY_ROOT / "Tests" / "ExtNPC.Tests.asmdef")
+                        .read_text(encoding="utf-8"))
+    assert asmdef.get("includePlatforms") == ["Editor"], (
+        f"ExtNPC.Tests.asmdef has includePlatforms="
+        f"{asmdef.get('includePlatforms')!r}. Anything but [\"Editor\"] makes "
+        f"the suite invisible to an EditMode run, which reports zero tests "
+        f"AND PASSES. Run `python run_unity_tests.py` to see the real count.")
+
+
+def test_the_python_rounding_rule_is_not_delegated():
+    """
+    InspectorFormat must not round through `Math.Round(value, digits, ...)`,
+    and must not simply hand the raw value to the formatter.
+
+    Both were tried and both were wrong, in opposite directions, and each was
+    right four times in five:
+
+      * Math.Round(double, int, ...) scales by a power of TEN and rounds the
+        product, so it judges midpoints on a number that is not the one being
+        printed. -1.385 is stored as -1.38500000000000000888..., past the
+        midpoint, so Python gives -1.39 -- but -1.385 * 100 rounds to exactly
+        -138.5 and ToEven picks -1.38.
+      * Deferring to the formatter is correct on .NET Core 3.0+ and wrong on
+        Unity's Mono, which rounds to ~15 significant digits first:
+        -0.72499999999999997779 prints as -0.73 where Python gives -0.72.
+
+    The C# fixture covers this with real values, but only when someone runs
+    Unity. This is the four-second version.
+    """
+    src = code_only(_FORMAT_CS.read_text(encoding="utf-8"))
+
+    body = _method_body(src, "PyRound")
+    assert not re.search(r"Math\.Round\s*\([^)]*,\s*digits", body), (
+        "PyRound rounds through Math.Round(value, digits, ...), which decides "
+        "midpoints on value*10^digits rather than on the value. See the "
+        "-1.385 case in the parity fixture.")
+    assert "ExactHalfEven" in body, (
+        "PyRound no longer routes near-midpoint values through an exact "
+        "half-to-even path; Unity's Mono formatter cannot be trusted to round "
+        "the binary value, so the rounding must happen before it.")
