@@ -32,7 +32,49 @@ import os
 import time
 
 from simulation import DemographyParams, World
+from simulation.events import SHOCK_KINDS
 from simulation.export import export_world_dir
+
+
+def _parse_shocks(specs):
+    """`["plague@30", "famine@55:0.8"]` -> `{year: (kind, magnitude)}`.
+
+    WHY THIS EXISTS. `events.csv` is written from `world.event_log`, and the
+    only thing that ever appends to that log is a shock draining out of
+    `world.shock_queue` (world.py:224) -- which until now only the dashboard's
+    buttons could fill. So every bundle this script produced had an empty
+    events table, and the viewer's timeline markers were a feature nothing
+    could exercise. A file that is always empty is indistinguishable from a
+    file that is broken.
+
+    Nothing new is simulated: this queues exactly what the dashboard queues,
+    through the same `World.queue_shock`. A run without `--shock` is
+    unchanged, which is what keeps the golden fixture and every other test
+    looking at the same world they always did.
+    """
+    out = {}
+    for spec in specs:
+        try:
+            kind, _, rest = spec.partition("@")
+            year_s, _, mag_s = rest.partition(":")
+            kind = kind.strip().lower()
+            year = int(year_s)
+            magnitude = float(mag_s) if mag_s else 0.6
+        except ValueError:
+            raise SystemExit(f"bad --shock '{spec}'; expected KIND@YEAR[:MAG]")
+        if kind not in SHOCK_KINDS:
+            raise SystemExit(f"unknown shock kind '{kind}'; "
+                             f"known: {', '.join(sorted(SHOCK_KINDS))}")
+        if year < 1:
+            raise SystemExit(f"--shock year must be >= 1, got {year}")
+        if year in out:
+            # The queue is drained one per tick, so two shocks aimed at the
+            # same year would silently land in different ones -- and the
+            # timeline would mark a year nothing was asked to happen in.
+            raise SystemExit(f"two shocks scheduled for year {year}; the "
+                             f"engine drains one shock per tick")
+        out[year] = (kind, magnitude)
+    return out
 
 
 def main() -> None:
@@ -55,7 +97,12 @@ def main() -> None:
                     help="free-text note recorded in manifest.json")
     ap.add_argument("--no-frames", action="store_true",
                     help="omit the longitudinal tables (analysis-only bundle)")
+    ap.add_argument("--shock", action="append", default=[], metavar="KIND@YEAR[:MAG]",
+                    help="schedule a shock, e.g. plague@30 or famine@55:0.8. "
+                         "Repeatable. Kinds: " + ", ".join(sorted(SHOCK_KINDS)))
     args = ap.parse_args()
+
+    shocks = _parse_shocks(args.shock)
 
     params = DemographyParams(n_demes=args.demes,
                               migration_rate=args.migration)
@@ -65,7 +112,16 @@ def main() -> None:
     t0 = time.perf_counter()
     world = World(n_founders=args.founders, seed=args.seed, params=params)
     for year in range(args.years):
+        # Queued on the tick BEFORE the step that drains it, so the shock lands
+        # in the year the caller named: World.step() increments tick first and
+        # then pops the queue.
+        scheduled = shocks.get(year + 1)
+        if scheduled is not None:
+            world.queue_shock(*scheduled)
         world.step()
+        if scheduled is not None:
+            print(f"    year {world.tick:4d}  {scheduled[0]} "
+                  f"(magnitude {scheduled[1]:.2f})")
         if (year + 1) % 20 == 0:
             print(f"    year {year + 1:4d}  living {len(world.living):4d}")
     t_sim = time.perf_counter() - t0
