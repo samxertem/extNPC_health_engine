@@ -74,6 +74,70 @@ namespace ExtNPC.Data
             }
         }
 
+        /// <summary>
+        /// A cell as a <b>double</b>, which is what every DISPLAYED number in
+        /// this package is parsed to.
+        ///
+        /// WHY NOT float. Python holds these values as binary64 and formats
+        /// from that; parsing the same text to binary32 here gives a slightly
+        /// different number, and at a rounding boundary the two print different
+        /// text. That is not hypothetical -- measured on a 40-year export,
+        /// <b>77 of 1323</b> `stress` values and <b>64 of 1323</b> `aerobic`
+        /// values rendered differently in the viewer than in the dashboard:
+        ///
+        ///     stress "-1.385"  ->  float64 -1.39   float32 -1.38
+        ///     aerobic "39.305" ->  float64  39.30  float32  39.31
+        ///
+        /// The mechanism is that snapshots.py rounds these columns to three
+        /// decimals and the drawer prints two, so an exact 3-dp midpoint is the
+        /// ordinary case and binary32 pushes about half of them the other way.
+        /// Both numbers look entirely plausible, which is why this survived
+        /// Stage 4's character-for-character acceptance criterion: the parity
+        /// fixture compares FORMATTERS, and both sides were formatting
+        /// correctly -- they were being handed different numbers.
+        ///
+        /// Parsing the same decimal text to binary64 on both sides is
+        /// bit-identical, so the disagreement disappears rather than being
+        /// made rarer. Geometry (x, y) stays float: it is never printed.
+        /// </summary>
+        public static double Double(string s, double fallback = 0.0)
+        {
+            if (IsBlank(s)) return fallback;
+            if (double.TryParse(s, NumberStyles.Float, Inv, out double v)) return v;
+
+            switch (s.Trim().ToLowerInvariant())
+            {
+                case "nan": return double.NaN;
+                case "inf":
+                case "+inf":
+                case "infinity": return double.PositiveInfinity;
+                case "-inf":
+                case "-infinity": return double.NegativeInfinity;
+                default:
+                    throw new BundleFormatException($"not a number: '{s}'");
+            }
+        }
+
+        /// <summary>Non-throwing <see cref="Double"/>. Same role as
+        /// <see cref="TryFloat"/>: a categorical trait_* cell is a word, and
+        /// "this is a word" must be an answer rather than a load failure.</summary>
+        public static bool TryDouble(string s, out double value)
+        {
+            value = 0.0;
+            if (IsBlank(s)) return false;
+            if (double.TryParse(s, NumberStyles.Float, Inv, out value)) return true;
+            switch (s.Trim().ToLowerInvariant())
+            {
+                case "nan": value = double.NaN; return true;
+                case "inf":
+                case "+inf":
+                case "infinity": value = double.PositiveInfinity; return true;
+                case "-inf":
+                case "-infinity": value = double.NegativeInfinity; return true;
+                default: return false;
+            }
+        }
+
         public static int Int(string s, int fallback = 0)
         {
             if (IsBlank(s)) return fallback;

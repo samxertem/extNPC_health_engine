@@ -150,17 +150,17 @@ namespace ExtNPC.Data
                         Age = CsvParse.Int(f[iAge]),
                         Deme = CsvParse.Int(f[iDeme]),
                         Lineage = pool.Get(f[iLin]),
-                        Purity = CsvParse.Float(f[iPur]),
+                        Purity = CsvParse.Double(f[iPur]),
                         Generation = CsvParse.Int(f[iGen]),
                         Children = CsvParse.Int(f[iKids]),
-                        Stress = CsvParse.Float(f[iStress]),
-                        EpiAccel = CsvParse.Float(f[iEpi]),
-                        Aerobic = CsvParse.Float(f[iAero]),
+                        Stress = CsvParse.Double(f[iStress]),
+                        EpiAccel = CsvParse.Double(f[iEpi]),
+                        Aerobic = CsvParse.Double(f[iAero]),
                         Conditions = CsvParse.Int(f[iCond]),
-                        PedigreeF = CsvParse.Float(f[iF]),
-                        Viability = CsvParse.Float(f[iViab]),
+                        PedigreeF = CsvParse.Double(f[iF]),
+                        Viability = CsvParse.Double(f[iViab]),
                         Cnv = CsvParse.Int(f[iCnv]),
-                        HeightCm = CsvParse.Float(f[iH]),
+                        HeightCm = CsvParse.Double(f[iH]),
                         LifeStage = pool.Get(f[iStage]),
                     };
                     if (!byTick.TryGetValue(tick, out var list))
@@ -365,8 +365,8 @@ namespace ExtNPC.Data
                         if (i == iTick || CsvParse.IsBlank(f[i])) continue;
                         // history.csv is all-numeric by construction; a column
                         // that is not is skipped rather than crashing the load.
-                        if (float.TryParse(f[i], NumberStyles.Float,
-                                CultureInfo.InvariantCulture, out float v))
+                        if (double.TryParse(f[i], NumberStyles.Float,
+                                CultureInfo.InvariantCulture, out double v))
                         {
                             row.Values[cols[i]] = v;
                         }
@@ -411,9 +411,9 @@ namespace ExtNPC.Data
                         Father = G("father"),
                         Deme = CsvParse.Int(G("deme")),
                         DemeLabel = G("deme_label"),
-                        PedigreeF = CsvParse.Float(G("pedigree_f")),
-                        RealisedF = CsvParse.Float(G("realised_f")),
-                        RelativeViability = CsvParse.Float(G("relative_viability")),
+                        PedigreeF = CsvParse.Double(G("pedigree_f")),
+                        RealisedF = CsvParse.Double(G("realised_f")),
+                        RelativeViability = CsvParse.Double(G("relative_viability")),
                         MendelianDiagnoses = CsvParse.List(G("mendelian_diagnoses")),
                         MendelianCarrierOf = CsvParse.List(G("mendelian_carrier_of")),
                         MedicalConditions = CsvParse.List(G("medical_conditions")),

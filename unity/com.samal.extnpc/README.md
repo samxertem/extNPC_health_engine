@@ -137,6 +137,29 @@ two modes, loudly:
   banner exists so a thinner panel reads as *a year with less recorded*, not
   *a villager with less going on*.
 
+## Numbers are parsed at the width Python holds them
+
+Every column this package **prints** is parsed with `CsvParse.Double`, not
+`CsvParse.Float`. Geometry (`x`, `y`) stays float because it is never shown as
+text.
+
+This is not tidiness. Python holds these values as binary64 and formats from
+that; parsing the same text into binary32 gives a slightly different number,
+and at a rounding boundary the two print different text. Measured on a 40-year
+export, **77 of 1323 `stress` values and 64 of 1323 `aerobic` values** rendered
+differently in the viewer than in the dashboard:
+
+```
+stress  "-1.385"  ->  float64 -1.39   float32 -1.38
+aerobic "39.305"  ->  float64  39.30  float32  39.31
+```
+
+`snapshots.py` rounds those columns to three decimals and the drawer prints
+two, so an exact 3-dp midpoint is the *ordinary* case rather than an exotic
+one. Both numbers look right, and the parity fixture could not see it: the
+formatters were correct on both sides — they were being handed different
+numbers.
+
 ## Division of labour with the dashboard
 
 The Dash dashboard keeps every chart, distribution, validation figure and

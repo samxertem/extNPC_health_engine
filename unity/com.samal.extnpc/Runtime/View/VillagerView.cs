@@ -77,7 +77,10 @@ namespace ExtNPC.View
         {
             Row = row;
 
-            float heightM = Mathf.Max(row.HeightCm, 1f) * 0.01f;
+            // Cast at the geometry seam: stature is carried as a double so
+            // the inspector prints exactly what the dashboard prints, and a
+            // position does not need the precision.
+            float heightM = (float)(System.Math.Max(row.HeightCm, 1.0) * 0.01);
 
             // Sex is encoded as SHAPE, not colour: colour is spoken for by
             // lineage, and a second meaning on the same channel makes both

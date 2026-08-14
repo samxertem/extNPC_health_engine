@@ -51,9 +51,16 @@ namespace ExtNPC.View
         /// Applied through EVERY fixed-decimal formatter below. Rounding at
         /// some of them would be worse than rounding at none: the failures
         /// would then depend on which field you were looking at.
+        ///
+        /// PUBLIC because Stage 5's <see cref="TimelineFormat"/> mirrors
+        /// dashboard/panels.py's KPI tiles and needs the identical rule. A
+        /// second copy of it would be a second rounding mode, which is the
+        /// failure this method exists to have fixed once.
         /// </summary>
-        private static double Py(float value, int digits) =>
-            System.Math.Round((double)value, digits, System.MidpointRounding.ToEven);
+        public static double PyRound(double value, int digits) =>
+            System.Math.Round(value, digits, System.MidpointRounding.ToEven);
+
+        private static double Py(double value, int digits) => PyRound(value, digits);
 
         // ------------------------------------------------------------------
         // palette -- dashboard/panels.py:26-44
@@ -110,26 +117,26 @@ namespace ExtNPC.View
         /// <summary>Plain-language reading of a pedigree inbreeding
         /// coefficient. Mirrors inspector.relationship_label (inspector.py:108),
         /// including its 1e-9 tolerances.</summary>
-        public static string RelationshipLabel(float f)
+        public static string RelationshipLabel(double f)
         {
             foreach (var (threshold, label) in FLabels)
             {
-                if (f >= threshold - 1e-9f) return label;
+                if (f >= threshold - 1e-9) return label;
             }
-            return f <= 1e-9f ? "outbred" : "distant kin";
+            return f <= 1e-9 ? "outbred" : "distant kin";
         }
 
         /// <summary>inspector.py:116 `_fmt_f` -- four decimals, but a bare "0"
         /// at zero. Four matters: a first-cousin child (0.0625) and a
         /// second-cousin child (0.0156) are indistinguishable at two, and
         /// telling them apart is the entire point of showing F.</summary>
-        public static string FmtF(float f) =>
-            f == 0f ? "0" : Py(f, 4).ToString("F4", Inv);
+        public static string FmtF(double f) =>
+            f == 0.0 ? "0" : Py(f, 4).ToString("F4", Inv);
 
         /// <summary>inspector.py:120 `_f_color`. Thresholds are the standard
         /// consanguinity marks: first cousins (0.0625) critical, second
         /// cousins (0.015625) warning.</summary>
-        public static Color FColor(float f)
+        public static Color FColor(double f)
         {
             if (f >= 0.0625f) return Crit;
             if (f >= 0.015625f) return Warn;
@@ -141,29 +148,30 @@ namespace ExtNPC.View
         // ------------------------------------------------------------------
 
         /// <summary>Viability below 0.9 is shown critical (inspector.py:340).</summary>
-        public static Color ViabilityColor(float v) => v < 0.9f ? Crit : Ink;
+        public static Color ViabilityColor(double v) => v < 0.9 ? Crit : Ink;
 
         /// <summary>Epigenetic age acceleration above 3 years is critical
         /// (inspector.py:304, 306).</summary>
-        public static Color EpiAccelColor(float years) => years > 3f ? Crit : Ink;
+        public static Color EpiAccelColor(double years) => years > 3.0 ? Crit : Ink;
 
         /// <summary>Inflammation above 0.6 is critical (inspector.py:308).</summary>
-        public static Color StressColor(float s) => s > 0.6f ? Crit : Ink;
+        public static Color StressColor(double s) => s > 0.6 ? Crit : Ink;
 
         /// <summary>inspector.py:88 `_norm` -- clamp into [0,1] for a meter,
         /// handling signed liabilities.</summary>
-        public static float Norm(float value, float lo, float hi)
+        public static double Norm(double value, double lo, double hi)
         {
-            if (hi <= lo) return 0f;
-            return Mathf.Clamp01((value - lo) / (hi - lo));
+            if (hi <= lo) return 0.0;
+            double t = (value - lo) / (hi - lo);
+            return t < 0.0 ? 0.0 : (t > 1.0 ? 1.0 : t);
         }
 
         /// <summary>The stress meter's range, from inspector.py:325/344
         /// `_norm(stress, -1.5, 2.5)`. Named rather than repeated so the
         /// viewer's meter cannot end up on a different scale to the
         /// dashboard's.</summary>
-        public const float StressMeterLo = -1.5f;
-        public const float StressMeterHi = 2.5f;
+        public const double StressMeterLo = -1.5;
+        public const double StressMeterHi = 2.5;
 
         // ------------------------------------------------------------------
         // number and name formatting
@@ -178,21 +186,21 @@ namespace ExtNPC.View
         // mirroring its OUTPUT, not calling the method with a similar name.
 
         /// <summary>f"{v:.1f} cm" -- inspector.py:330.</summary>
-        public static string Height(float cm) =>
+        public static string Height(double cm) =>
             string.Format(Inv, "{0:F1} cm", Py(cm, 1));
 
         /// <summary>f"{v:+.2f}" -- stress, inspector.py:332.</summary>
-        public static string Signed2(float v) =>
+        public static string Signed2(double v) =>
             string.Format(Inv, "{0:+0.00;-0.00;+0.00}", Py(v, 2));
 
         /// <summary>f"{v:.2f}" -- VO2, inspector.py:333.</summary>
-        public static string Fixed2(float v) => Py(v, 2).ToString("F2", Inv);
+        public static string Fixed2(double v) => Py(v, 2).ToString("F2", Inv);
 
         /// <summary>f"{v:.3f}" -- viability, inspector.py:339.</summary>
-        public static string Fixed3(float v) => Py(v, 3).ToString("F3", Inv);
+        public static string Fixed3(double v) => Py(v, 3).ToString("F3", Inv);
 
         /// <summary>f"{v:+.1f} y" -- age acceleration, inspector.py:334.</summary>
-        public static string SignedYears(float v) =>
+        public static string SignedYears(double v) =>
             string.Format(Inv, "{0:+0.0;-0.0;+0.0} y", Py(v, 1));
 
         /// <summary>f"{p:.0%}" -- lineage purity pill, inspector.py:260.
@@ -200,8 +208,8 @@ namespace ExtNPC.View
         /// Python multiplies by 100 and THEN rounds, so an eighth of ancestry
         /// is 12.5 at the rounding step -- an exact midpoint, and the reason
         /// this goes through Py().</summary>
-        public static string Percent0(float fraction) =>
-            string.Format(Inv, "{0:F0}%", Py(fraction * 100f, 0));
+        public static string Percent0(double fraction) =>
+            string.Format(Inv, "{0:F0}%", Py(fraction * 100.0, 0));
 
         public static string Int(int v) => v.ToString(Inv);
 
@@ -218,7 +226,7 @@ namespace ExtNPC.View
         /// reproduced rather than tidied: acceptance for this stage is a
         /// character-for-character match.
         /// </summary>
-        public static string HeightLive(float nowCm, float matureCm)
+        public static string HeightLive(double nowCm, double matureCm)
         {
             return IsGrowing(nowCm, matureCm)
                 ? string.Format(Inv, "{0:F1} cm  → {1:F0} adult",
@@ -228,8 +236,8 @@ namespace ExtNPC.View
 
         /// <summary>inspector.py:285 -- "still growing" is a 0.05 cm gap
         /// between expressed and mature stature.</summary>
-        public static bool IsGrowing(float nowCm, float matureCm) =>
-            Mathf.Abs(nowCm - matureCm) > 0.05f;
+        public static bool IsGrowing(double nowCm, double matureCm) =>
+            System.Math.Abs(nowCm - matureCm) > 0.05;
 
         /// <summary>
         /// BMI, mirroring inspector.py:300.
@@ -242,21 +250,21 @@ namespace ExtNPC.View
         /// possible value for a toddler (~15-16) and reads as a measurement
         /// rather than an endpoint.
         /// </summary>
-        public static string Bmi(float bmi, bool growing) =>
+        public static string Bmi(double bmi, bool growing) =>
             growing ? string.Format(Inv, "{0:F1} at maturity", Py(bmi, 1))
                     : string.Format(Inv, "{0:F1}", Py(bmi, 1));
 
         /// <summary>f"{v:+.4f}" -- realised F, inspector.py:152.</summary>
-        public static string Signed4(float v) =>
+        public static string Signed4(double v) =>
             string.Format(Inv, "{0:+0.0000;-0.0000;+0.0000}", Py(v, 4));
 
         /// <summary>f"{v:+.2f} cm" -- the stature cost of inbreeding,
         /// inspector.py:158. Critical at or below -1 cm, warning otherwise;
         /// the row appears at all only when F > 0.</summary>
-        public static string StatureCost(float cm) =>
+        public static string StatureCost(double cm) =>
             string.Format(Inv, "{0:+0.00;-0.00;+0.00} cm", Py(cm, 2));
 
-        public static Color StatureCostColor(float cm) => cm <= -1f ? Crit : Warn;
+        public static Color StatureCostColor(double cm) => cm <= -1.0 ? Crit : Warn;
 
         /// <summary>The display name. The engine's key is "Given-NNNN"; every
         /// dashboard surface shows the part before the first dash

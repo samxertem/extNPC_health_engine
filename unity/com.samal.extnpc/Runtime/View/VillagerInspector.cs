@@ -191,9 +191,9 @@ namespace ExtNPC.View
             Rule();
             GUILayout.Space(8f);
             Meter("stress load",
-                  InspectorFormat.Norm(row.Stress,
-                                       InspectorFormat.StressMeterLo,
-                                       InspectorFormat.StressMeterHi),
+                  (float)InspectorFormat.Norm(row.Stress,
+                                              InspectorFormat.StressMeterLo,
+                                              InspectorFormat.StressMeterHi),
                   InspectorFormat.Crit,
                   InspectorFormat.Signed2(row.Stress));
 
@@ -275,8 +275,8 @@ namespace ExtNPC.View
             // is not possible, which is the honest answer.
             if (person != null)
             {
-                float mature = person.GetTrait("height_cm");
-                Row("height", float.IsNaN(mature)
+                double mature = person.GetTrait("height_cm");
+                Row("height", double.IsNaN(mature)
                         ? InspectorFormat.Height(row.HeightCm)
                         : InspectorFormat.HeightLive(row.HeightCm, mature));
             }
@@ -296,7 +296,7 @@ namespace ExtNPC.View
 
             Row("pedigree F", InspectorFormat.FmtF(row.PedigreeF),
                 InspectorFormat.FColor(row.PedigreeF));
-            if (row.PedigreeF > 1e-9f)
+            if (row.PedigreeF > 1e-9)
             {
                 // inspector.py:150 — F is meaningless to most readers as a bare
                 // number, so it is always labelled with the mating that
@@ -333,10 +333,10 @@ namespace ExtNPC.View
             // actually got, and they differ because meiosis is a lottery
             // (inspector.py:136).
             Row("realised F", InspectorFormat.Signed4(p.RealisedF),
-                InspectorFormat.FColor(Mathf.Max(p.RealisedF, 0f)));
+                InspectorFormat.FColor(System.Math.Max(p.RealisedF, 0.0)));
 
-            float statureCost = Num(p.GetRaw("stature_cost_cm"));
-            if (row.PedigreeF > 1e-9f && !float.IsNaN(statureCost))
+            double statureCost = Num(p.GetRaw("stature_cost_cm"));
+            if (row.PedigreeF > 1e-9 && !double.IsNaN(statureCost))
             {
                 // The engine's OTHER cost of inbreeding. Recessive load decides
                 // survival; directional dominance decides height; they are
@@ -346,13 +346,13 @@ namespace ExtNPC.View
                     InspectorFormat.StatureCostColor(statureCost));
             }
 
-            float carried = Num(p.GetRaw("hidden_load_alleles"));
-            if (!float.IsNaN(carried))
+            double carried = Num(p.GetRaw("hidden_load_alleles"));
+            if (!double.IsNaN(carried))
                 Row("hidden load", InspectorFormat.Int((int)carried) + " alleles",
                     small: true);
 
-            float expressed = Num(p.GetRaw("expressed_load_homozygotes"));
-            if (!float.IsNaN(expressed) && expressed > 0)
+            double expressed = Num(p.GetRaw("expressed_load_homozygotes"));
+            if (!double.IsNaN(expressed) && expressed > 0)
                 Row("expressed load", InspectorFormat.Int((int)expressed) + " loci",
                     InspectorFormat.Crit);
 
@@ -383,11 +383,11 @@ namespace ExtNPC.View
                     Row("carrier of", string.Join(", ", genes), small: true);
             }
 
-            float het = Num(p.GetRaw("heterozygosity"));
-            if (!float.IsNaN(het))
+            double het = Num(p.GetRaw("heterozygosity"));
+            if (!double.IsNaN(het))
             {
                 GUILayout.Space(6f);
-                Meter("heterozygosity", InspectorFormat.Norm(het, 0f, 0.6f),
+                Meter("heterozygosity", (float)InspectorFormat.Norm(het, 0.0, 0.6),
                       InspectorFormat.Accent, InspectorFormat.Fixed3(het));
             }
 
@@ -398,9 +398,9 @@ namespace ExtNPC.View
             Label("HEALTH", _section);
             GUILayout.Space(6f);
 
-            float bmi = p.GetTrait("bmi");
-            float mature = p.GetTrait("height_cm");
-            if (!float.IsNaN(bmi))
+            double bmi = p.GetTrait("bmi");
+            double mature = p.GetTrait("height_cm");
+            if (!double.IsNaN(bmi))
                 Row("BMI", InspectorFormat.Bmi(
                         bmi, InspectorFormat.IsGrowing(row.HeightCm, mature)));
 
@@ -453,7 +453,7 @@ namespace ExtNPC.View
                 // Categorical traits (eye_color, handedness) are strings and
                 // are shown verbatim. Mapping them to anything here would be
                 // inventing a vocabulary the engine did not write.
-                string shown = CsvParse.TryFloat(raw, out float v)
+                string shown = CsvParse.TryDouble(raw, out double v)
                     ? InspectorFormat.Fixed2(v)
                     : raw;
                 Row(key.Substring(6).Replace('_', ' '), shown, small: true);
@@ -485,8 +485,8 @@ namespace ExtNPC.View
         /// sabotage. Keeping every column name at a GetRaw call site is what
         /// makes the guard able to see them.
         /// </summary>
-        private static float Num(string raw) =>
-            CsvParse.TryFloat(raw, out float v) ? v : float.NaN;
+        private static double Num(string raw) =>
+            CsvParse.TryDouble(raw, out double v) ? v : double.NaN;
 
         /// <summary>
         /// Condition names as the drawer prints them: underscores to spaces,

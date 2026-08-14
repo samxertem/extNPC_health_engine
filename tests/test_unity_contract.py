@@ -478,7 +478,12 @@ def test_the_inbreeding_colour_thresholds_match_the_dashboard():
                                                         m.group(0)))
 
     cs_src = code_only(_FORMAT_CS.read_text(encoding="utf-8"))
-    m = re.search(r"FColor\s*\(float f\)\s*\{(.*?)\n        \}", cs_src, re.S)
+    # `(double f)` since Stage 5: the display path parses at binary64 so the
+    # two UIs hold the same number. The THRESHOLDS this rule compares are
+    # unchanged, and are still written with an f suffix because 0.0625 and
+    # 0.015625 are exact in both widths.
+    m = re.search(r"FColor\s*\((?:float|double) f\)\s*\{(.*?)\n        \}",
+                  cs_src, re.S)
     assert m, "FColor not found in InspectorFormat.cs"
     cs_thresholds = sorted(float(x) for x in re.findall(r"([0-9]*\.[0-9]+)f",
                                                         m.group(1)))
@@ -694,3 +699,58 @@ def test_only_the_shim_touches_an_input_backend_directly(path):
     assert not _NEW_INPUT.search(code), (
         f"{path.name} reads the Input System directly. That is null in any "
         f"project on the legacy input manager. Use ExtNPC.View.InputCompat.")
+
+
+# ---------------------------------------------------------------------
+# Parse width: the defect Stage 5 found, and the rule that keeps it fixed
+# ---------------------------------------------------------------------
+# MEASURED, on a 40-year export: parsing the display columns as binary32 made
+# the viewer print a different number from the dashboard for 77 of 1323
+# `stress` values and 64 of 1323 `aerobic` values --
+#
+#     stress "-1.385"  ->  float64 -1.39   float32 -1.38
+#     aerobic "39.305" ->  float64  39.30  float32  39.31
+#
+# -- because snapshots.py rounds those columns to three decimals and the drawer
+# prints two, so an exact 3-dp midpoint is the ordinary case. Both numbers look
+# right. The formatters were correct on both sides; they were being handed
+# DIFFERENT NUMBERS, which is why the parity fixture could not see it.
+#
+# Parsing the same decimal text to binary64 on both sides is bit-identical, so
+# the rule is that every column the viewer PRINTS is parsed as a double.
+# Geometry (x, y) stays float: it is never shown as text.
+
+_DOUBLE_PARSED = {
+    "LoadFrames": ("Purity", "Stress", "EpiAccel", "Aerobic", "PedigreeF",
+                   "Viability", "HeightCm"),
+    "LoadPeople": ("PedigreeF", "RealisedF", "RelativeViability"),
+}
+
+
+@pytest.mark.parametrize("method,fields", sorted(_DOUBLE_PARSED.items()),
+                         ids=lambda v: v if isinstance(v, str) else "")
+def test_displayed_columns_are_parsed_at_double_width(method, fields):
+    src = code_only(LOADER.read_text(encoding="utf-8"))
+    body = _method_body(src, method)
+    for field in fields:
+        m = re.search(rf"\b{field}\s*=\s*CsvParse\.(\w+)\(", body)
+        assert m, f"{method} no longer assigns {field}"
+        assert m.group(1) == "Double", (
+            f"{method} parses {field} with CsvParse.{m.group(1)}. Displayed "
+            f"columns must be parsed as double or the viewer prints a "
+            f"different number from the dashboard at every rounding boundary.")
+
+
+def test_history_and_traits_are_parsed_at_double_width():
+    """The other two display paths: history.csv's KPI values and people.csv's
+    trait_* cells."""
+    loader = code_only(LOADER.read_text(encoding="utf-8"))
+    assert "double.TryParse" in _method_body(loader, "LoadHistory"), (
+        "history.csv values are not parsed as double; the KPI strip would "
+        "then print different text from the dashboard's stat tiles")
+
+    rows = code_only((UNITY_ROOT / "Runtime" / "Data" / "Rows.cs")
+                     .read_text(encoding="utf-8"))
+    assert re.search(r"double GetTrait\(string trait\) =>\s*"
+                     r"CsvParse\.TryDouble", rows), (
+        "PersonRow.GetTrait no longer returns a double")

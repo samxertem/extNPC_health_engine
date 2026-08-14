@@ -18,6 +18,15 @@ namespace ExtNPC.Data
     ///   * these ~18 scalars are all there is. There are no genomes here, so a
     ///     dead villager's genetic character sheet is not recoverable. That is
     ///     a deliberate engine decision, not an omission to work around.
+    ///
+    /// FLOAT FOR GEOMETRY, DOUBLE FOR ANYTHING PRINTED. x and y only ever
+    /// become a position, so binary32 is plenty. Every field the inspector
+    /// SHOWS is a double, because Python holds these values as binary64 and
+    /// formats from that -- parsing the same text to binary32 here made the two
+    /// UIs print different text for 77 of 1323 `stress` values on a real
+    /// export. See CsvParse.Double for the measurement and the mechanism. The
+    /// cost is ~28 bytes a row, about 10 MB on a 600x600 world, against a
+    /// 300 MB budget.
     /// </summary>
     public struct FrameRow
     {
@@ -29,22 +38,22 @@ namespace ExtNPC.Data
         public int Age;
         public int Deme;
         public string Lineage;          // dominant founder
-        public float Purity;            // that founder's ancestry fraction
+        public double Purity;           // that founder's ancestry fraction
         public int Generation;
         public int Children;
-        public float Stress;            // inflammation state
-        public float EpiAccel;          // epigenetic age acceleration
-        public float Aerobic;
+        public double Stress;           // inflammation state
+        public double EpiAccel;         // epigenetic age acceleration
+        public double Aerobic;
         public int Conditions;
-        public float PedigreeF;
-        public float Viability;
+        public double PedigreeF;
+        public double Viability;
         public int Cnv;
 
         /// <summary>Stature EXPRESSED AT THIS AGE (cm), not the mature value.
         /// snapshots.py draws this distinction on purpose -- a child must not
         /// be rendered adult-sized. people.csv's trait_height_cm is the mature
         /// phenotype and is a different quantity.</summary>
-        public float HeightCm;
+        public double HeightCm;
 
         public string LifeStage;
     }
@@ -126,11 +135,14 @@ namespace ExtNPC.Data
     public sealed class HistoryRow
     {
         public int Tick;
-        public readonly System.Collections.Generic.Dictionary<string, float> Values =
-            new System.Collections.Generic.Dictionary<string, float>();
 
-        public float Get(string key, float fallback = float.NaN) =>
-            Values.TryGetValue(key, out float v) ? v : fallback;
+        /// <summary>Double, not float: these five are the HUD's KPI strip and
+        /// are printed against the dashboard's own tiles. See CsvParse.Double.</summary>
+        public readonly System.Collections.Generic.Dictionary<string, double> Values =
+            new System.Collections.Generic.Dictionary<string, double>();
+
+        public double Get(string key, double fallback = double.NaN) =>
+            Values.TryGetValue(key, out double v) ? v : fallback;
 
         public bool Has(string key) => Values.ContainsKey(key);
     }
@@ -156,9 +168,9 @@ namespace ExtNPC.Data
         public string Mother, Father;
         public int Deme;
         public string DemeLabel;
-        public float PedigreeF;
-        public float RealisedF;
-        public float RelativeViability;
+        public double PedigreeF;
+        public double RealisedF;
+        public double RelativeViability;
         public string[] MendelianDiagnoses;
         public string[] MendelianCarrierOf;
         public string[] MedicalConditions;
@@ -180,8 +192,8 @@ namespace ExtNPC.Data
         /// BundleFormatException, i.e. a whole-panel failure triggered by
         /// asking an ordinary question about an ordinary villager.
         /// </summary>
-        public float GetTrait(string trait) =>
-            CsvParse.TryFloat(GetRaw("trait_" + trait), out float v)
-                ? v : float.NaN;
+        public double GetTrait(string trait) =>
+            CsvParse.TryDouble(GetRaw("trait_" + trait), out double v)
+                ? v : double.NaN;
     }
 }
