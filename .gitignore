@@ -108,6 +108,13 @@ outputs/unity/
 # `unity/com.samal.extnpc` IS tracked — it is source. A Unity *project*
 # that consumes the package is not part of this repo; these patterns cover
 # the case where one gets created here anyway.
+#
+# `run_unity_tests.py` generates exactly such a project, headlessly, so the
+# package can be COMPILED and its Test Runner suite executed without a human
+# opening the editor. The project is regenerable output — the script is the
+# evidence, not the project — so neither it nor its logs are tracked.
+unity/test-project/
+unity/test-project-logs/
 unity/**/Library/
 unity/**/Temp/
 unity/**/Logs/
