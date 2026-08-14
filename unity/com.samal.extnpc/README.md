@@ -208,19 +208,39 @@ bundle so they cannot disagree about a villager.
 number parsing, manifest handling, the inspector's formatters, the timeline
 cursor's arithmetic, and the KPI strip's two em-dash rules.
 
-**Unity will not run them until the project opts in.** Tests inside a *package*
-are invisible to the Test Runner unless the consuming project lists the package
-in `testables`, as a sibling of `dependencies` in `Packages/manifest.json`:
+Run them without opening the editor, from the engine repo:
 
-```json
-"testables": [ "com.samal.extnpc" ]
+```
+python run_unity_tests.py
 ```
 
-Without it the Test Runner reports **`total="0" result="Passed"`** — zero tests,
-green. That is the most dangerous possible output: it is indistinguishable at a
-glance from a suite that ran and passed, and it is what you get by default. If
-the EditMode list does not show an `ExtNPC.Tests` node with ~53 tests under it,
-nothing in this package has been checked, whatever colour the bar is.
+It generates a throwaway consuming project, drives the editor in batch mode,
+and prints the NUnit results. About 8 seconds after the first import.
+
+**There are two separate ways to get zero tests, and both look green.** The
+Test Runner reports `total="0" result="Passed"` — indistinguishable at a glance
+from a suite that ran and passed.
+
+1. **The consuming project does not list the package in `testables`**, as a
+   sibling of `dependencies` in `Packages/manifest.json`:
+
+   ```json
+   "testables": [ "com.samal.extnpc" ]
+   ```
+
+2. **The test assembly is not editor-only.** This one actually happened, and it
+   is why every "34 passing" badge before this was false: `ExtNPC.Tests.asmdef`
+   referenced `UnityEditor.TestRunner` while declaring `"includePlatforms": []`,
+   which makes it an *all-platforms* assembly. It compiled — `ExtNPC.Tests.dll`
+   was sitting in `Library/ScriptAssemblies` the whole time — but an **EditMode**
+   run matched nothing, so the suite had never once executed. It must declare:
+
+   ```json
+   "includePlatforms": [ "Editor" ]
+   ```
+
+If the EditMode list does not show an `ExtNPC.Tests` node with **53** tests
+under it, nothing in this package has been checked, whatever colour the bar is.
 
 `Tests/ParityFixture.generated.cs` is **generated** by
 `tests/test_unity_parity_fixture.py` in the engine repo, from
