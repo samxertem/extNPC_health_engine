@@ -57,8 +57,106 @@ namespace ExtNPC.View
         /// second copy of it would be a second rounding mode, which is the
         /// failure this method exists to have fixed once.
         /// </summary>
-        public static double PyRound(double value, int digits) =>
-            System.Math.Round(value, digits, System.MidpointRounding.ToEven);
+        /// THE TWO WRONG IMPLEMENTATIONS, both of which this package shipped.
+        /// Recorded because each one looks obviously right and each one was
+        /// caught only by running the C# suite against the generated fixture.
+        ///
+        /// 1. `Math.Round(value, digits, ToEven)`. Math.Round(double, int, ...)
+        ///    SCALES BY A POWER OF TEN and rounds the product, so it decides
+        ///    midpoints on a number that is not the one being formatted:
+        ///    -1.385 is stored as -1.38500000000000000888..., strictly past the
+        ///    midpoint, so Python prints -1.39 -- but -1.385 * 100 rounds to
+        ///    exactly -138.5, a midpoint the value never had, and ToEven then
+        ///    picks -1.38.
+        ///
+        /// 2. Leaving the value alone and letting .NET's formatter round it.
+        ///    That is correct on .NET Core 3.0+, whose formatter converts the
+        ///    exact binary value. UNITY'S MONO DOES NOT: it rounds to about 15
+        ///    significant digits first, so -0.72499999999999997779 becomes
+        ///    "-0.725" and then goes half-away-from-zero to -0.73, where Python
+        ///    gives -0.72. Fixing (1) turned three failures into three
+        ///    different ones.
+        ///
+        /// Each was right four times in five, which is the worst failure shape
+        /// there is: a rule that looks correct with a bad input. So the
+        /// rounding is done here, exactly, on the value's own bits, and the
+        /// formatter is only ever handed a number that is already at `digits`
+        /// decimals.
+        /// </summary>
+        public static double PyRound(double value, int digits)
+        {
+            if (double.IsNaN(value) || double.IsInfinity(value)) return value;
+            if (digits < 0 || digits > 15) return value;
+
+            double scale = Pow10(digits);
+            double scaled = value * scale;
+            if (System.Math.Abs(scaled) > 9.007199254740992E15) return value;
+
+            // FAST PATH, and it is the path taken by nearly every value. The
+            // scaled product carries a relative error around 1e-16, so a
+            // fractional part further than 1e-6 from the midpoint is on the
+            // side it appears to be on, and no exact arithmetic is needed. This
+            // matters: the inspector formats a few dozen numbers per frame and
+            // the exact path below allocates.
+            double frac = scaled - System.Math.Floor(scaled);
+            if (System.Math.Abs(frac - 0.5) > 1e-6)
+                return System.Math.Floor(scaled + 0.5) / scale;
+
+            return ExactHalfEven(value, digits, scale);
+        }
+
+        /// <summary>
+        /// Round to <paramref name="digits"/> decimals, half to even, decided
+        /// on the value's EXACT binary expansion -- which is what Python's
+        /// format spec does and what neither Math.Round nor Mono's formatter
+        /// does.
+        ///
+        /// A double is m * 2^e exactly. Rounding it at d decimals is therefore
+        /// an exact question about the integer ratio (m * 10^d) / 2^-e, and
+        /// BigInteger answers it without a rounding step of its own. Ties go to
+        /// even, which is the only case where Python and .NET's formatter
+        /// genuinely differ by design -- and it is not exotic here: pedigree F
+        /// and lineage purity are sums of 2^-k, so for those fields an exact
+        /// midpoint (0.125 -> "12%", 0.03125 -> "0.0312") is the ordinary case.
+        /// </summary>
+        private static double ExactHalfEven(double value, int digits, double scale)
+        {
+            long bits = System.BitConverter.DoubleToInt64Bits(value);
+            int sign = bits < 0 ? -1 : 1;
+            int biased = (int)((bits >> 52) & 0x7FF);
+            long mantissa = bits & 0xFFFFFFFFFFFFFL;
+
+            int exponent;
+            if (biased == 0) { exponent = -1074; }                 // subnormal
+            else { mantissa |= 1L << 52; exponent = biased - 1075; }
+
+            var num = new System.Numerics.BigInteger(mantissa)
+                      * System.Numerics.BigInteger.Pow(10, digits);
+            System.Numerics.BigInteger n;
+
+            if (exponent >= 0)
+            {
+                // No fractional part at all: the scaled value is an integer.
+                n = num << exponent;
+            }
+            else
+            {
+                System.Numerics.BigInteger den = System.Numerics.BigInteger.One << -exponent;
+                n = System.Numerics.BigInteger.DivRem(num, den,
+                        out System.Numerics.BigInteger rem);
+                int cmp = (rem << 1).CompareTo(den);
+                if (cmp > 0 || (cmp == 0 && !n.IsEven)) n += 1;
+            }
+
+            return sign * (double)n / scale;
+        }
+
+        private static double Pow10(int digits)
+        {
+            double p = 1.0;
+            for (int i = 0; i < digits; i++) p *= 10.0;
+            return p;
+        }
 
         private static double Py(double value, int digits) => PyRound(value, digits);
 
