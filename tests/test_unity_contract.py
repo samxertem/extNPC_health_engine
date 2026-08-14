@@ -702,6 +702,325 @@ def test_only_the_shim_touches_an_input_backend_directly(path):
 
 
 # ---------------------------------------------------------------------
+# Stage 5: the timeline, the KPI strip, and the width of a parsed number
+# ---------------------------------------------------------------------
+# Stage 5 puts five of the dashboard's own stat tiles on screen and gives the
+# viewer a clock. Three new ways to disagree come with that, and each gets a
+# rule here:
+#
+#   1. The TILES can drift -- a label, a decimal count, or (worst) one of the
+#      two em-dash rules quietly becoming a 0.000 that claims a measurement
+#      nobody made.
+#   2. The CLOCK can invent biology. Interpolating a position between two
+#      years is cosmetic and labelled; interpolating a stature would draw a
+#      growth curve the engine did not compute, and it would look exactly like
+#      roadmap #13's real one.
+#   3. The PARSE WIDTH can put the two UIs on different numbers. This one is
+#      not hypothetical: it was measured this session, see below.
+
+_TIMELINE_CS = UNITY_ROOT / "Runtime" / "View" / "TimelineFormat.cs"
+_HUD_CS = UNITY_ROOT / "Runtime" / "View" / "TimelineHud.cs"
+_CLOCK_CS = UNITY_ROOT / "Runtime" / "View" / "WorldClock.cs"
+_RIBBON_CS = UNITY_ROOT / "Runtime" / "View" / "FlowRibbonView.cs"
+_RENDERER_CS = UNITY_ROOT / "Runtime" / "View" / "WorldRenderer.cs"
+_APP_PY = Path(__file__).parent.parent / "dashboard" / "app.py"
+
+# key in history.csv -> (dashboard label, C# constant, C# formatter)
+_KPI_TILES = {
+    "n_alive": ("ALIVE", "AliveLabel", "Alive"),
+    "heterozygosity": ("DIVERSITY H", "HeterozygosityLabel", "Heterozygosity"),
+    "fst": ("F_ST", "FstLabel", "Fst"),
+    "mean_inbreeding": ("INBREEDING F", "InbreedingLabel", "Inbreeding"),
+    "lethal_equivalents": ("LOAD B(t)", "LoadLabel", "Load"),
+}
+
+
+def _stage5_present():
+    return _TIMELINE_CS.exists() and _HUD_CS.exists() and _CLOCK_CS.exists()
+
+
+def test_stage_five_sources_exist():
+    """Guard: every rule below is vacuous without these three files."""
+    if not _stage5_present():
+        pytest.skip("Stage 5 timeline not present")
+    assert _RIBBON_CS.exists(), "flow ribbons are part of this stage"
+    assert _APP_PY.exists(), "dashboard/app.py is the timeline's parity source"
+
+
+def test_the_kpi_labels_are_the_dashboards_own():
+    """
+    The five tiles the plan names, spelled as the deck spells them.
+
+    A tile reading "DIVERSITY" in one UI and "DIVERSITY H" in the other is a
+    small thing that costs a reader a minute every time they compare the two,
+    and there is no mechanism that would ever correct it.
+    """
+    if not _stage5_present():
+        pytest.skip("Stage 5 timeline not present")
+
+    panels = _PANELS_PY.read_text(encoding="utf-8")
+    cs = code_only(_TIMELINE_CS.read_text(encoding="utf-8"))
+
+    for key, (label, const, _) in _KPI_TILES.items():
+        m = re.search(rf'key="{re.escape(key)}",\s*label="([^"]+)"', panels)
+        assert m, f"panels.py has no kpi tile for {key}"
+        assert m.group(1) == label, (
+            f"the dashboard now labels {key} '{m.group(1)}', not '{label}' -- "
+            f"update TimelineFormat.{const} in the same commit")
+        assert re.search(rf'{const}\s*=\s*"{re.escape(label)}"', cs), (
+            f"TimelineFormat.{const} is not '{label}'")
+
+
+def test_the_two_em_dash_rules_are_intact_on_both_sides():
+    """
+    The rule with teeth on this panel.
+
+    F_ST with a single deme and B(t) with no measurement are printed as an em
+    dash, not a zero, because a displayed 0.000 asserts "this was measured and
+    came out zero" -- a different claim from "there was nothing to measure".
+    Both are one edit from becoming a plausible-looking number.
+    """
+    if not _stage5_present():
+        pytest.skip("Stage 5 timeline not present")
+
+    panels = _PANELS_PY.read_text(encoding="utf-8")
+    # The dashboard's own conditions, as written.
+    assert '_n_demes(params) > 1 else "—"' in panels, (
+        "panels.py no longer prints an em dash for F_ST in a single-deme "
+        "world; TimelineFormat.Fst must follow")
+    assert '_last(cols, "lethal_equivalents", 0.0) > 0.0 else "—"' in panels, (
+        "panels.py no longer prints an em dash for an unmeasurable B(t); "
+        "TimelineFormat.Load must follow")
+
+    cs = code_only(_TIMELINE_CS.read_text(encoding="utf-8"))
+    assert re.search(r'Unmeasurable\s*=\s*"—"', cs), (
+        "TimelineFormat.Unmeasurable is not an em dash (U+2014). A hyphen "
+        "looks almost identical and is a silent parity break.")
+
+    fst = re.search(r"string Fst\(double fst, int nDemes\) =>(.*?);", cs, re.S)
+    assert fst, "TimelineFormat.Fst not found"
+    assert "nDemes > 1" in fst.group(1), (
+        "Fst no longer decides on the DEME COUNT. Deciding on the value "
+        "instead would print an em dash for a real, measured F_ST of zero.")
+    assert "Unmeasurable" in fst.group(1)
+
+    load = re.search(r"string Load\(double b\) =>(.*?);", cs, re.S)
+    assert load, "TimelineFormat.Load not found"
+    assert "b > 0.0" in load.group(1) and "Unmeasurable" in load.group(1)
+
+
+def test_every_history_column_the_hud_prints_exists(headers):
+    """
+    The same rule the loader and the inspector are held to.
+
+    `Get("mean_inbreeding")` against a column the engine calls something else
+    returns the fallback silently, and a HUD confidently printing 0.0000 for
+    the mean inbreeding of a consanguineous village is worse than one that
+    fails to draw.
+    """
+    if not _stage5_present():
+        pytest.skip("Stage 5 timeline not present")
+    src = code_only(_HUD_CS.read_text(encoding="utf-8"))
+
+    wanted = set(re.findall(r'\.Get\("([^"]+)"', src))
+    assert wanted, "no history.csv column requests parsed from the HUD"
+
+    missing = sorted(wanted - headers["history.csv"])
+    assert not missing, (
+        f"TimelineHud.cs reads history.csv column(s) {missing}, which the "
+        f"engine does not export.")
+
+    # ...and it prints the five the plan names, no more: the HUD is numbers
+    # only, and a sixth series creeping in is how a viewer starts becoming a
+    # second, worse dashboard (UNITY_PLAN.md 0.1).
+    assert wanted == set(_KPI_TILES), (
+        f"the HUD reads {sorted(wanted)}; Stage 5 specifies exactly "
+        f"{sorted(_KPI_TILES)}. Charts belong in the dashboard.")
+
+
+def test_the_timeline_state_wording_matches_the_dashboards():
+    """The LIVE / VIEWING YEAR banner is app.py:2010-2012. Both UIs tell the
+    reader the same thing about where they are in time."""
+    if not _stage5_present():
+        pytest.skip("Stage 5 timeline not present")
+
+    app = _APP_PY.read_text(encoding="utf-8")
+    cs = _TIMELINE_CS.read_text(encoding="utf-8")
+
+    assert "● LIVE" in app and "● LIVE" in cs
+    m = re.search(r'f"(⏱ VIEWING YEAR \{scrub\}[^"]*)"', app)
+    assert m, "the dashboard's scrub-state string has changed shape"
+    expected = m.group(1).replace("{scrub}", "{0}")
+    assert expected in cs, (
+        f"the dashboard says '{expected}' and TimelineFormat does not")
+
+    # The event note, app.py:2018-2019.
+    assert "f\"y{e['tick']} {e['label']}\"" in app
+    assert '"y{0} {1}"' in cs, "the HUD spells an event differently"
+    m = re.search(r'note = \("([^"]+)', app)
+    assert m, "the dashboard's no-events note has changed shape"
+    m2 = re.search(r'NoEventsNote\s*=\s*"([^"]+)"', cs)
+    assert m2, "TimelineFormat.NoEventsNote not found"
+    assert m.group(1).startswith(m2.group(1)), (
+        f"the viewer's no-events note '{m2.group(1)}' is not the opening of "
+        f"the dashboard's '{m.group(1)}'")
+
+
+def test_the_event_markers_are_the_dashboards_colour():
+    """app.py:1976 marks events in CRIT. The glyphs are deliberately not
+    mirrored -- the built-in font has no biohazard sign -- but the colour and
+    the position carry the same claim and cost nothing to keep."""
+    if not _stage5_present():
+        pytest.skip("Stage 5 timeline not present")
+    app = _APP_PY.read_text(encoding="utf-8")
+    m = re.search(r'marks\[t\] = \{"label": icons\.get\(e\["kind"\], "[^"]+"\),\s*'
+                  r'"style": \{"color": (\w+)', app)
+    assert m, "the dashboard's event marker style has changed shape"
+    assert m.group(1) == "CRIT"
+    cs = code_only(_TIMELINE_CS.read_text(encoding="utf-8"))
+    assert re.search(r"EventMarkerColor\s*=>\s*InspectorFormat\.Crit", cs), (
+        "the viewer's event markers are no longer CRIT")
+
+
+# ---------------------------------------------------------------------
+# The interpolation rule
+# ---------------------------------------------------------------------
+# UNITY_PLAN.md Stage 5 names inter-tick motion as "the one place a viewer can
+# imply biology that did not happen". Position is the agreed exception and is
+# labelled on screen. Every other frame field is a MEASUREMENT: a stature that
+# eased between two years would draw a growth curve the engine did not compute
+# and would be indistinguishable from roadmap #13's real one; an eased stress
+# level would invent a physiological trajectory outright.
+
+_FRAME_MEASUREMENTS = ("HeightCm", "Stress", "EpiAccel", "Aerobic", "PedigreeF",
+                       "Viability", "Purity", "Age", "Children", "Conditions",
+                       "Cnv", "Generation")
+_MEASUREMENT_REF = re.compile(r"\.(" + "|".join(_FRAME_MEASUREMENTS) + r")\b")
+_LERP_CALL = re.compile(r"\bLerp\s*\(")
+
+
+def _lerp_endpoints(src: str):
+    """The first two arguments of every `Lerp(` call in `src`.
+
+    THE FIRST VERSION OF THIS RULE WAS A ONE-LINE REGEX and a deliberate
+    sabotage walked straight past it. It required the field to follow `Lerp(`
+    immediately -- `Lerp(row.HeightCm, ...)` -- and the sabotage wrote
+    `Lerp((float)row.HeightCm, ...)`, which is not a clever evasion but the
+    LIKELIER spelling: the display fields are doubles since this session and
+    Mathf.Lerp takes floats, so a cast is what anyone would actually type.
+
+    Only the first two arguments are scanned, and that is deliberate too. A
+    field in the THIRD argument is a ramp -- DemeRingView tints a ring by its
+    dominance share exactly that way -- which is reading a value, not
+    inventing one. Interpolating BETWEEN TWO MEASUREMENTS is the forbidden
+    thing, and it lives in arguments one and two.
+    """
+    out = []
+    for m in _LERP_CALL.finditer(src):
+        i, depth, args, start = m.end(), 0, [], m.end()
+        while i < len(src) and len(args) < 2:
+            c = src[i]
+            if c in "([{":
+                depth += 1
+            elif c in ")]}":
+                if depth == 0:
+                    break
+                depth -= 1
+            elif c == "," and depth == 0:
+                args.append(src[start:i])
+                start = i + 1
+            elif c == ";":
+                break
+            i += 1
+        out.append(" ".join(args))
+    return out
+
+
+@pytest.mark.parametrize("path", _RUNTIME_CS, ids=lambda p: p.name)
+def test_no_biological_quantity_is_interpolated_between_years(path):
+    hits = []
+    for endpoints in _lerp_endpoints(code_only(path.read_text(encoding="utf-8"))):
+        hits += _MEASUREMENT_REF.findall(endpoints)
+    assert not hits, (
+        f"{path.name} interpolates {hits} between two ticks. Only POSITION may "
+        f"be blended, and only while playback is running: the engine simulated "
+        f"year N and year N+1 and nothing in between, so an eased measurement "
+        f"is a number the simulation never produced.")
+
+
+def test_the_cosmetic_motion_disclaimer_reaches_the_screen():
+    """A cosmetic blend that is not labelled is just a wrong picture. The
+    string has to exist AND be drawn -- a constant nobody renders is a comment
+    with extra steps."""
+    if not _stage5_present():
+        pytest.skip("Stage 5 timeline not present")
+    fmt = _TIMELINE_CS.read_text(encoding="utf-8")
+    assert "cosmetic" in fmt.lower(), "no cosmetic-motion note in TimelineFormat"
+    hud = code_only(_HUD_CS.read_text(encoding="utf-8"))
+    assert "CosmeticMotionNote" in hud, (
+        "TimelineHud never draws the cosmetic-motion note")
+
+
+def test_the_clock_only_ever_shows_an_exported_year():
+    """The displayed year is read out of the bundle's tick array, never
+    computed by adding one to a year. The retained range does not have to
+    start at zero -- the snapshot ring is capped -- so an arithmetic timeline
+    would mislabel a truncated run."""
+    if not _stage5_present():
+        pytest.skip("Stage 5 timeline not present")
+    src = code_only(_CLOCK_CS.read_text(encoding="utf-8"))
+
+    # The ASSIGNMENT, not the presence of the token. The first version of this
+    # rule asked whether "_bundle.Ticks[" appeared anywhere in the file, and a
+    # sabotage that replaced the year lookup with `FirstTick + Index`
+    # arithmetic sailed through it -- because Ticks is still indexed elsewhere,
+    # in NextYear and SeekYear. A rule that a two-line change can satisfy
+    # without doing the thing is not a rule.
+    assert re.search(r"int year\s*=\s*_bundle\.Ticks\[", src), (
+        "WorldClock's displayed year is no longer read out of "
+        "WorldBundle.Ticks. Adding an index to FirstTick assumes the retained "
+        "range is contiguous from the first year, which a capped snapshot ring "
+        "does not promise.")
+
+
+def test_the_headcount_check_counts_the_years_own_frame():
+    """
+    The acceptance criterion, protected.
+
+    Stage 5 previews next year's newborns rising out of the ground during a
+    blend. Counting them would inflate the population by the year's births and
+    break the one check that ties the picture to history.csv.
+    """
+    if not _stage5_present():
+        pytest.skip("Stage 5 timeline not present")
+    src = code_only(_RENDERER_CS.read_text(encoding="utf-8"))
+    assert "VisibleCount = frame.Length;" in src, (
+        "VisibleCount is no longer the displayed year's own frame length")
+    assert "EmergingCount" in src, (
+        "the emerging (next-year) villagers are no longer counted separately")
+
+
+def test_the_flow_ribbon_uses_the_dashboards_width_profile():
+    """1 + 5 * weight / wmax (panels.py:794), normalised per FRAME on both
+    sides. A different profile would rank the same two migration routes
+    differently on the two maps."""
+    if not _stage5_present():
+        pytest.skip("Stage 5 timeline not present")
+    panels = _PANELS_PY.read_text(encoding="utf-8")
+    m = re.search(r'width=([0-9.]+) \+ ([0-9.]+) \* f\["weight"\] / wmax', panels)
+    assert m, "the dashboard's flow width rule has changed shape"
+
+    cs = code_only(_RIBBON_CS.read_text(encoding="utf-8"))
+    m2 = re.search(r"WidthProfile\(float weight, float maxWeight\) =>\s*"
+                   r"([0-9.]+)f \+ ([0-9.]+)f \*", cs)
+    assert m2, "FlowRibbonView.WidthProfile not found"
+    assert (float(m2.group(1)), float(m2.group(2))) == \
+           (float(m.group(1)), float(m.group(2))), (
+        f"the dashboard draws routes at {m.group(1)}+{m.group(2)}*w/wmax and "
+        f"the viewer at {m2.group(1)}+{m2.group(2)}*w/wmax")
+
+
+# ---------------------------------------------------------------------
 # Parse width: the defect Stage 5 found, and the rule that keeps it fixed
 # ---------------------------------------------------------------------
 # MEASURED, on a 40-year export: parsing the display columns as binary32 made

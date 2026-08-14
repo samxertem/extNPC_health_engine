@@ -105,6 +105,27 @@ namespace ExtNPC.Data
         }
 
         /// <summary>
+        /// A run parameter as an integer, or <paramref name="fallback"/>.
+        ///
+        /// `params` is the engine's DemographyParams verbatim, so this is the
+        /// viewer's only honest source for facts about the run's SHAPE rather
+        /// than its results. `n_demes` is the one Stage 5 needs: the dashboard
+        /// decides whether F_ST is measurable from its own params object
+        /// (panels.py:340 `_n_demes`), and the HUD must decide it the same way
+        /// rather than inferring it from a value that happens to be zero --
+        /// "no differentiation was measured" and "there was nothing to
+        /// measure" are different claims.
+        /// </summary>
+        public int ParamInt(string key, int fallback)
+        {
+            if (Params == null) return fallback;
+            JToken token = Params[key];
+            if (token == null || token.Type == JTokenType.Null) return fallback;
+            try { return (int)token; }
+            catch (System.Exception) { return fallback; }
+        }
+
+        /// <summary>
         /// Refuse a bundle this build would misread.
         ///
         /// A schema the viewer does not know is not a warning: a reshaped table

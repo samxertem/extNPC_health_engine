@@ -23,6 +23,14 @@ namespace ExtNPC.Editor
             // are clickable and clicking them appears to do nothing.
             root.AddComponent<VillagerInspector>();
 
+            // Stage 5. The clock drives the renderer's year; the HUD is also
+            // where manifest.json's `catalogue` becomes permanently visible,
+            // which UNITY_PLAN.md §3.1 requires of any scene showing this data.
+            // A viewer built without them would open on a single frozen year
+            // and never say which model version produced it.
+            root.AddComponent<WorldClock>();
+            root.AddComponent<TimelineHud>();
+
             // Default to the engine repo's own export location, resolved
             // relative to the Unity project. Wrong as often as right, but it
             // makes the field's expected shape obvious at a glance.

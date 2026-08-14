@@ -44,6 +44,7 @@ warnings.filterwarnings("ignore")
 pytest.importorskip("dash", reason="dashboard/inspector.py imports dash")
 
 from dashboard.inspector import _f_color, _fmt_f, _norm, relationship_label
+from dashboard.panels import kpi_data
 
 GENERATED = (Path(__file__).parent.parent / "unity" / "com.samal.extnpc" /
              "Tests" / "ParityFixture.generated.cs")
@@ -67,8 +68,14 @@ _ENV = "EXTNPC_UPDATE_PARITY"
 # decimals and 0.125 as a percent are the two that actually caught it.
 _F_VALUES = [0.0, 0.004, 0.015625, 0.03125, 0.0625, 0.078125, 0.10938,
              0.125, 0.25, 0.5]
-_SIGNED2 = [0.0, 0.213, -0.213, 1.731, -0.687, 0.6, 0.61]
-_FIXED2 = [0.0, 41.554, 4.6, 52.0]
+# The last two of each are REAL VALUES from a 40-year export, picked because
+# they are exact 3-decimal midpoints printed at two: snapshots.py rounds
+# stress and aerobic to 3 dp and the drawer shows 2, so these are the
+# ordinary case rather than the exotic one. They are in the grid because the
+# viewer used to parse them as binary32 and print the other neighbour --
+# "-1.38" against the dashboard's "-1.39" -- on 77 of 1323 villager-years.
+_SIGNED2 = [0.0, 0.213, -0.213, 1.731, -0.687, 0.6, 0.61, -1.385, -0.725]
+_FIXED2 = [0.0, 41.554, 4.6, 52.0, 39.305, 55.805, 44.695]
 _FIXED3 = [0.9734, 0.9, 0.899, 1.071, 0.475]
 _YEARS = [0.0, 1.24, -1.24, 3.0, 3.1]
 #             ------- exact midpoints at .0% -------
@@ -84,6 +91,47 @@ _STATURE = [-1.312, -0.75, -0.938, -0.4]
 # have to parse floats back out of a string to replay them.
 _NORM_STRESS = [-1.5, 2.5, 0.0, -9.0, 9.0, 0.213]        # inspector.py:325/344
 _NORM_HET = [0.0, 0.412, 0.6, 0.9]                       # inspector.py:323
+
+# ---------------------------------------------------------------------
+# Stage 5: the KPI strip the Unity HUD prints
+# ---------------------------------------------------------------------
+# These are NOT copied f-strings. `_kpi` below calls dashboard/panels.py's real
+# `kpi_data` and reads the tile it produces, so what lands in the fixture is
+# what the stat-tile deck actually renders.
+#
+# The em-dash cases are the reason this section exists. Two of the five tiles
+# print "—" rather than a number when the quantity is not measurable -- F_ST in
+# a single-deme world, and Morton's B before the load layer has a measurement --
+# and both rules are one edit away from becoming a 0.000 that asserts something
+# the engine never claimed. A number is easy to notice when it changes; an em
+# dash quietly turning into "0.000" is not.
+_KPI_ALIVE = [0.0, 1.0, 36.0, 127.0]
+#              ---- exact midpoints at .3f / .4f ----
+_KPI_HET = [0.0, 0.412, 0.0625, 0.5, 0.4738]
+_KPI_FST = [0.0, 0.019, 0.1032, 0.0625]
+_KPI_F = [0.0, 0.03125, 0.0625, 0.10938, 0.0009]
+_KPI_LOAD = [0.0, 1.4, 1.3755, 0.0004]
+
+
+def _kpi(key: str, value: float, n_demes: int = 1) -> str:
+    """The stat tile's rendered value, from the dashboard's own `kpi_data`.
+
+    Calling the real function rather than copying its f-string is the whole
+    point: a tile whose format changes -- or whose em-dash condition changes --
+    fails the comparison in this module and forces InspectorFormat's Stage 5
+    sibling to be updated in the same commit.
+
+    `params` is a stub because `_n_demes` reads it with getattr; building a real
+    DemographyParams here would drag the simulation package into a formatting
+    test for one integer.
+    """
+    from types import SimpleNamespace
+
+    cols = {key: [float(value)]}
+    for tile in kpi_data(cols, SimpleNamespace(n_demes=n_demes)):
+        if tile["key"] == key:
+            return tile["value"]
+    raise AssertionError(f"kpi_data produced no tile for {key!r}")
 
 
 def _cases():
@@ -130,6 +178,22 @@ def _cases():
         out.append(("NormStress", v, 0.0, f"{_norm(v, -1.5, 2.5):.6f}"))
     for v in _NORM_HET:
         out.append(("NormHeterozygosity", v, 0.0, f"{_norm(v, 0.0, 0.6):.6f}"))
+
+    # Stage 5 -- the KPI strip, straight out of panels.kpi_data.
+    for v in _KPI_ALIVE:
+        out.append(("KpiAlive", v, 0.0, _kpi("n_alive", v)))
+    for v in _KPI_HET:
+        out.append(("KpiHeterozygosity", v, 0.0, _kpi("heterozygosity", v)))
+    for v in _KPI_FST:
+        # BOTH worlds, because the tile's rule is about the world's shape and
+        # not about the value: one deme means "nothing to measure" whatever
+        # number sits in the column.
+        out.append(("KpiFst", v, 1.0, _kpi("fst", v, n_demes=1)))
+        out.append(("KpiFst", v, 3.0, _kpi("fst", v, n_demes=3)))
+    for v in _KPI_F:
+        out.append(("KpiInbreeding", v, 0.0, _kpi("mean_inbreeding", v)))
+    for v in _KPI_LOAD:
+        out.append(("KpiLoad", v, 0.0, _kpi("lethal_equivalents", v)))
     return out
 
 
@@ -181,8 +245,12 @@ def _render(reason: str = "") -> str:
         "        internal struct Case",
         "        {",
         "            public string Fn;",
-        "            public float A;",
-        "            public float B;",
+        # DOUBLE, not float. The C# side must be handed the SAME number the
+        # dashboard formatted, or the fixture would compare two formatters
+        # over two different values and report the difference as a formatting
+        # bug -- which is exactly how the binary32 parse hid for two sessions.
+        "            public double A;",
+        "            public double B;",
         "            public string Expected;",
         "        }",
         "",
@@ -192,7 +260,7 @@ def _render(reason: str = "") -> str:
     for fn, a, b, expected in _cases():
         lines.append(
             f"            new Case {{ Fn = {_cs_string(fn)}, "
-            f"A = {a!r}f, B = {b!r}f, Expected = {_cs_string(str(expected))} }},")
+            f"A = {a!r}, B = {b!r}, Expected = {_cs_string(str(expected))} }},")
     lines += [
         "        };",
         "    }",
@@ -221,8 +289,28 @@ def test_the_grid_actually_covers_the_formatters():
     for required in ("FmtF", "RelationshipLabel", "FColor", "Percent0",
                      "HeightLive", "Bmi", "Signed2", "StatureCost",
                      "NormStress", "NormHeterozygosity", "Height", "Fixed2",
-                     "Fixed3", "SignedYears", "Signed4"):
+                     "Fixed3", "SignedYears", "Signed4",
+                     # Stage 5
+                     "KpiAlive", "KpiHeterozygosity", "KpiFst",
+                     "KpiInbreeding", "KpiLoad"):
         assert required in functions, f"{required} is not covered"
+
+
+def test_the_kpi_grid_covers_both_em_dash_cases():
+    """
+    A guard on the grid rather than on the code.
+
+    The two tiles that can print "—" are the two a well-meaning edit turns into
+    "0.000", so a grid that happened to contain only measurable values would
+    leave the interesting half of each rule unchecked -- and would pass.
+    """
+    expected = {(fn, exp) for fn, _, _, exp in _cases()
+                if fn in ("KpiFst", "KpiLoad")}
+    assert ("KpiFst", "—") in expected, "no single-deme F_ST case in the grid"
+    assert ("KpiLoad", "—") in expected, "no unmeasurable B(t) case in the grid"
+    # ...and the measurable half, or the rule could be "always an em dash".
+    assert any(fn == "KpiFst" and exp != "—" for fn, exp in expected)
+    assert any(fn == "KpiLoad" and exp != "—" for fn, exp in expected)
 
 
 def test_the_generated_fixture_matches_the_dashboards_current_output():

@@ -34,8 +34,13 @@ namespace ExtNPC.View
         public bool showDemeRings = true;
         public bool showGround = true;
 
+        [Tooltip("Draw migration routes from flows.csv. Empty in a single-deme " +
+                 "world — with one settlement there is nowhere to migrate.")]
+        public bool showFlows = true;
+
         [Header("Time")]
-        [Tooltip("Tick to display. Stage 5 replaces this with a real clock.")]
+        [Tooltip("Year to display. Driven by WorldClock when one is attached; " +
+                 "settable by hand otherwise.")]
         public int tick;
 
         /// <summary>Fires when a villager is clicked. Stage 4's inspector
@@ -56,8 +61,20 @@ namespace ExtNPC.View
         private readonly List<VillagerView> _spares = new List<VillagerView>();
         private readonly HashSet<string> _seen = new HashSet<string>();
         private readonly List<DemeRingView> _rings = new List<DemeRingView>();
+        private readonly List<FlowRibbonView> _ribbons = new List<FlowRibbonView>();
+
+        // Stage 5. The next retained year and how far toward it the display is
+        // blended -- COSMETIC, position only, and zero unless a clock is
+        // actively playing. See WorldClock.
+        private int _nextTick;
+        private float _alpha;
+
+        // Reused so a 60 fps blend does not allocate a dictionary per frame.
+        private readonly Dictionary<string, FrameRow> _nextByName =
+            new Dictionary<string, FrameRow>();
 
         private int _renderedTick = int.MinValue;
+        private float _renderedAlpha = -1f;
 
         public MapProjection Projection => new MapProjection
         {
@@ -65,9 +82,24 @@ namespace ExtNPC.View
             GroundY = groundY,
         };
 
-        /// <summary>Villagers currently on screen. The acceptance check for
-        /// this stage compares it with history.csv's n_alive.</summary>
+        /// <summary>Villagers the DISPLAYED YEAR has. The acceptance check for
+        /// Stage 3 compares it with history.csv's n_alive, and Stage 5 re-runs
+        /// that check at every year the scrub bar lands on — so this counts the
+        /// year's own frame and deliberately excludes anyone who is only being
+        /// previewed rising out of the ground for the year after.</summary>
         public int VisibleCount { get; private set; }
+
+        /// <summary>Villagers born in the NEXT year, part-risen during a
+        /// playback blend. Never counted as population: they are not alive in
+        /// the year on screen.</summary>
+        public int EmergingCount { get; private set; }
+
+        /// <summary>Years whose headcount has been checked against
+        /// history.csv, and how many disagreed. Surfaced by the HUD, because a
+        /// check nobody can see the result of is a check nobody runs.</summary>
+        public int HeadcountChecks { get; private set; }
+
+        public int HeadcountMismatches { get; private set; }
 
         private void Awake()
         {
@@ -106,20 +138,62 @@ namespace ExtNPC.View
         private void Update()
         {
             if (_bundle == null) return;
-            if (tick != _renderedTick) Render(tick);
+            if (tick != _renderedTick || !Mathf.Approximately(_alpha, _renderedAlpha))
+                Render(tick);
             if (InputCompat.LeftPressedThisFrame) TrySelect();
+        }
+
+        /// <summary>
+        /// What to draw: a year, the year after it, and how far between them.
+        ///
+        /// Called by <see cref="WorldClock"/> every frame. `alpha` is COSMETIC
+        /// and moves POSITIONS ONLY — see <see cref="Render"/>. A scene with no
+        /// clock never calls this and simply sets <see cref="tick"/>, which
+        /// leaves alpha at zero and shows exported frames exactly.
+        /// </summary>
+        public void SetTime(int year, int nextYear, float alpha)
+        {
+            tick = year;
+            _nextTick = nextYear;
+            _alpha = Mathf.Clamp01(alpha);
         }
 
         // ------------------------------------------------------------------
         // rendering
         // ------------------------------------------------------------------
 
+        /// <summary>
+        /// Draw the year, optionally blended toward the next one.
+        ///
+        /// THE ONE RULE IN THIS METHOD. Everything a villager IS comes from
+        /// `frame`, the year on screen: stature, colour, stress, viability, F.
+        /// The blend toward `next` touches the GROUND POSITION and nothing
+        /// else. A stature that eased between two years would draw a growth
+        /// curve the engine did not compute and would be indistinguishable
+        /// from roadmap #13's real one; a stress level that eased would invent
+        /// a physiological trajectory outright. tests/test_unity_contract.py
+        /// forbids interpolating any frame field but x and y.
+        ///
+        /// And the blend animates less than it sounds: a villager's map
+        /// position is `deme centre + person_map_offset(name)`
+        /// (snapshots.py:66), a pure function of their deme and their name, so
+        /// the only thing that ever moves between two years is somebody who
+        /// migrated — an event the engine records as instantaneous.
+        /// </summary>
         public void Render(int atTick)
         {
             if (_bundle == null) return;
 
             var projection = Projection;
             FrameRow[] frame = _bundle.FrameAt(atTick);
+
+            bool blending = _alpha > 0f && _nextTick != atTick;
+            _nextByName.Clear();
+            if (blending)
+            {
+                foreach (var row in _bundle.FrameAt(_nextTick))
+                    _nextByName[row.Name] = row;
+            }
 
             _seen.Clear();
             foreach (var row in frame)
@@ -132,6 +206,45 @@ namespace ExtNPC.View
                 view.SetVisible(true);
                 view.Apply(row, projection);
                 _seen.Add(row.Name);
+
+                if (!blending) continue;
+
+                if (_nextByName.TryGetValue(row.Name, out FrameRow ahead))
+                {
+                    // Position only. Both endpoints are exported coordinates.
+                    view.CosmeticBlendGround(Vector3.Lerp(
+                        projection.ToWorld(row.X, row.Y),
+                        projection.ToWorld(ahead.X, ahead.Y), _alpha));
+                }
+                else
+                {
+                    // Absent from the next frame: this villager dies during the
+                    // year being played through. Sink rather than blink out.
+                    view.CosmeticSetEmergence(1f - _alpha);
+                }
+            }
+
+            // Born into the NEXT year: rise out of the ground as it arrives.
+            // Drawn from their own row, so their stature is theirs and not an
+            // interpolation, and counted separately — they are not alive in the
+            // year on screen and must not enter the headcount.
+            EmergingCount = 0;
+            if (blending)
+            {
+                foreach (var kv in _nextByName)
+                {
+                    if (_seen.Contains(kv.Key)) continue;
+                    if (!_views.TryGetValue(kv.Key, out var view))
+                    {
+                        view = Rent();
+                        _views[kv.Key] = view;
+                    }
+                    view.SetVisible(true);
+                    view.Apply(kv.Value, projection);
+                    view.CosmeticSetEmergence(_alpha);
+                    _seen.Add(kv.Key);
+                    EmergingCount++;
+                }
             }
 
             // Anyone not in this frame is not alive at this tick. Frames hold
@@ -151,9 +264,23 @@ namespace ExtNPC.View
             }
 
             if (showDemeRings) RenderDemes(atTick, projection);
+            if (showFlows) RenderFlows(atTick, projection);
 
             VisibleCount = frame.Length;
+
+            // `first` keeps the tally honest: OnLoaded renders and then runs
+            // the LOUD check itself, and counting both would report two checks
+            // for one year.
+            bool first = _renderedTick == int.MinValue;
+            bool newYear = atTick != _renderedTick;
             _renderedTick = atTick;
+            _renderedAlpha = _alpha;
+
+            // Stage 3's acceptance check, re-run at every year the timeline
+            // lands on rather than once at load. Silent while it agrees: a log
+            // line per year would bury the mismatch it exists to surface. The
+            // HUD shows the running tally instead.
+            if (newYear && !first) CheckHeadcount(atTick, verbose: false);
         }
 
         private readonly List<string> _retire = new List<string>();
@@ -172,6 +299,36 @@ namespace ExtNPC.View
                 bool used = i < demes.Length;
                 _rings[i].SetVisible(used);
                 if (used) _rings[i].Apply(demes[i], projection);
+            }
+        }
+
+        /// <summary>
+        /// Migration routes for this year.
+        ///
+        /// The weight is normalised against the largest route IN THIS FRAME,
+        /// which is the dashboard's own rule (panels.py:789 `wmax`). Normalising
+        /// against the run's global maximum instead would make a quiet decade's
+        /// routes invisible and would say something different from the map next
+        /// to it.
+        /// </summary>
+        private void RenderFlows(int atTick, in MapProjection projection)
+        {
+            FlowRow[] flows = _bundle.Flows.TryGetValue(atTick, out var f)
+                ? f
+                : System.Array.Empty<FlowRow>();
+
+            float maxWeight = 0f;
+            for (int i = 0; i < flows.Length; i++)
+                if (flows[i].Weight > maxWeight) maxWeight = flows[i].Weight;
+
+            while (_ribbons.Count < flows.Length)
+                _ribbons.Add(FlowRibbonView.Create(_demeRoot, ringMaterial));
+
+            for (int i = 0; i < _ribbons.Count; i++)
+            {
+                bool used = i < flows.Length;
+                _ribbons[i].SetVisible(used);
+                if (used) _ribbons[i].Apply(flows[i], maxWeight, projection);
             }
         }
 
@@ -203,35 +360,56 @@ namespace ExtNPC.View
         /// "roughly the right number of capsules" is not something an eye can
         /// check.
         /// </summary>
-        public bool VerifyHeadcountAgainstHistory()
+        public bool VerifyHeadcountAgainstHistory() =>
+            CheckHeadcount(_renderedTick, verbose: true);
+
+        /// <summary>
+        /// The check itself, run at every year the timeline visits.
+        ///
+        /// `verbose` distinguishes the one-shot at load — which says out loud
+        /// that it ran, because a check with no output is indistinguishable
+        /// from no check — from the per-year run behind a scrub bar, which
+        /// stays quiet while it agrees and shouts when it does not. A log line
+        /// per year would bury the mismatch in ninety successes.
+        ///
+        /// A mismatch is logged as an error, not thrown: a viewer that renders
+        /// and says loudly that it does not trust itself is more useful than
+        /// one that refuses. The HUD carries the tally so a disagreement is
+        /// visible on screen and not only in a console nobody has open.
+        /// </summary>
+        public bool CheckHeadcount(int atTick, bool verbose)
         {
             if (_bundle == null) return false;
 
             HistoryRow year = null;
             foreach (var h in _bundle.History)
             {
-                if (h.Tick == _renderedTick) { year = h; break; }
+                if (h.Tick == atTick) { year = h; break; }
             }
             if (year == null || !year.Has("n_alive"))
             {
-                Debug.Log($"[extNPC] no history row for year {_renderedTick}; " +
-                          $"headcount unchecked.");
+                if (verbose)
+                    Debug.Log($"[extNPC] no history row for year {atTick}; " +
+                              $"headcount unchecked.");
                 return false;
             }
 
-            int expected = Mathf.RoundToInt(year.Get("n_alive"));
+            HeadcountChecks++;
+            int expected = (int)System.Math.Round(year.Get("n_alive"));
             if (expected != VisibleCount)
             {
+                HeadcountMismatches++;
                 Debug.LogError(
-                    $"[extNPC] headcount mismatch at year {_renderedTick}: " +
+                    $"[extNPC] headcount mismatch at year {atTick}: " +
                     $"{VisibleCount} villagers drawn from frames.csv but " +
                     $"history.csv records n_alive={expected}. The viewer is " +
                     $"not showing the world the engine simulated.");
                 return false;
             }
 
-            Debug.Log($"[extNPC] year {_renderedTick}: {VisibleCount} villagers " +
-                      $"drawn, matching history.csv n_alive={expected}.");
+            if (verbose)
+                Debug.Log($"[extNPC] year {atTick}: {VisibleCount} villagers " +
+                          $"drawn, matching history.csv n_alive={expected}.");
             return true;
         }
 

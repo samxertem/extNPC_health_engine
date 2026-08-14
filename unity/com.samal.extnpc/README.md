@@ -4,7 +4,7 @@
 
 <p align="center">
   <img alt="unity" src="https://img.shields.io/badge/unity-6000.0%2B-4ea3ff">
-  <img alt="tests" src="https://img.shields.io/badge/tests-34%20passing-0ca30c">
+  <img alt="tests" src="https://img.shields.io/badge/tests-53%20passing-0ca30c">
   <img alt="upm"   src="https://img.shields.io/badge/UPM-com.samal.extnpc-1a1a19">
 </p>
 
@@ -137,6 +137,41 @@ two modes, loudly:
   banner exists so a thinner panel reads as *a year with less recorded*, not
   *a villager with less going on*.
 
+## The timeline (Stage 5)
+
+`WorldClock` + `TimelineHud` turn the bundle into a run you can watch: play,
+pause, a speed slider and a scrub bar over every retained year, with event
+markers from `events.csv`.
+
+- **A scrub always lands ON an exported year.** The clock walks positions in
+  `WorldBundle.Ticks`, not year arithmetic — the engine's snapshot ring is
+  capped, so a long run's timeline does not start at zero and adding one to a
+  year would mislabel it.
+- **Inter-tick motion is cosmetic, and says so on screen** while it is
+  happening. Only a *position* is blended, never a measurement: an eased
+  stature would draw a growth curve the engine did not compute and would look
+  exactly like roadmap #13's real one. Pause, and you are on a frame the engine
+  exported. In practice the blend animates one thing only — a **migration** —
+  because a villager's map position is `deme centre + person_map_offset(name)`,
+  a pure function of their deme and their name.
+- **Births rise out of the ground, deaths sink into it.** Not a scale-up: a
+  half-size body would be a stature that is not theirs, and stature is exported
+  per year.
+- **The KPI strip is five of the dashboard's own stat tiles** — ALIVE,
+  DIVERSITY H, F_ST, INBREEDING F, LOAD B(t) — read from `history.csv` at the
+  displayed year and formatted by `TimelineFormat.cs`, which mirrors
+  `dashboard/panels.py`. Two of them print an **em dash rather than a zero**
+  when the quantity is not measurable (F_ST with one deme; B(t) with no
+  measurement), because a displayed `0.000` claims a measurement nobody made.
+  Numbers only: charts stay in the dashboard.
+- **`manifest.json`'s `catalogue` is now permanently on screen**, which the
+  plan requires of any scene showing this data. Before Stage 5 it appeared only
+  in a console line at load.
+- **The Stage 3 headcount check now runs at every year** the timeline visits,
+  and the HUD reports the tally. Villagers drawn from `frames.csv` must equal
+  `history.csv`'s `n_alive`; newborns previewed mid-blend are counted
+  separately and never enter that number.
+
 ## Numbers are parsed at the width Python holds them
 
 Every column this package **prints** is parsed with `CsvParse.Double`, not
@@ -170,7 +205,8 @@ bundle so they cannot disagree about a villager.
 ## Testing
 
 `Tests/` runs in Unity's Test Runner and covers the CSV dialect, locale-proof
-number parsing, manifest handling, and the inspector's formatters.
+number parsing, manifest handling, the inspector's formatters, the timeline
+cursor's arithmetic, and the KPI strip's two em-dash rules.
 
 **Unity will not run them until the project opts in.** Tests inside a *package*
 are invisible to the Test Runner unless the consuming project lists the package
@@ -183,7 +219,7 @@ in `testables`, as a sibling of `dependencies` in `Packages/manifest.json`:
 Without it the Test Runner reports **`total="0" result="Passed"`** — zero tests,
 green. That is the most dangerous possible output: it is indistinguishable at a
 glance from a suite that ran and passed, and it is what you get by default. If
-the EditMode list does not show an `ExtNPC.Tests` node with ~35 tests under it,
+the EditMode list does not show an `ExtNPC.Tests` node with ~53 tests under it,
 nothing in this package has been checked, whatever colour the bar is.
 
 `Tests/ParityFixture.generated.cs` is **generated** by

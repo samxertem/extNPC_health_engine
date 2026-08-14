@@ -31,6 +31,13 @@ namespace ExtNPC.View
         private CapsuleCollider _collider;
         private MaterialPropertyBlock _block;
 
+        // Where the body stands and how tall it is, kept so the two COSMETIC
+        // adjustments below can move it without recomputing anything from the
+        // row. Both are metres in Unity space; neither is a measurement.
+        private Vector3 _ground;
+        private float _heightM;
+        private float _emergence = 1f;
+
         /// <summary>The row this view last drew. Read by selection/inspection.</summary>
         public FrameRow Row { get; private set; }
 
@@ -98,8 +105,10 @@ namespace ExtNPC.View
             transform.localScale = new Vector3(
                 BodyWidthM, heightM * 0.5f, BodyWidthM);
 
-            Vector3 ground = projection.ToWorld(row.X, row.Y);
-            transform.localPosition = ground + new Vector3(0f, heightM * 0.5f, 0f);
+            _heightM = heightM;
+            _ground = projection.ToWorld(row.X, row.Y);
+            _emergence = 1f;
+            Place();
 
             // Collider in local space; the transform scale above sizes it.
             _collider.height = 2f;
@@ -113,6 +122,58 @@ namespace ExtNPC.View
             _renderer.SetPropertyBlock(_block);
 
             gameObject.name = row.Name;
+        }
+
+        // ------------------------------------------------------------------
+        // Stage 5: the two COSMETIC adjustments, and nothing else
+        // ------------------------------------------------------------------
+        //
+        // Both are applied only while playback is running, both move the body
+        // and neither touches a value. The naming is on purpose: anything in
+        // this class that is not a function of the row has "Cosmetic" in its
+        // name, so a reader can tell at a call site whether they are looking at
+        // the simulation or at the viewer.
+
+        /// <summary>
+        /// Stand at a blended ground position -- WorldRenderer's interpolation
+        /// between this year and the next, for display only.
+        ///
+        /// Only the POSITION blends. Stature, colour, stress and every other
+        /// field stay at the exported year's value, because those are
+        /// measurements: a height that eased between two years would draw a
+        /// growth curve the engine did not compute, and it would look exactly
+        /// like roadmap #13's real one.
+        /// </summary>
+        public void CosmeticBlendGround(Vector3 blended)
+        {
+            _ground = blended;
+            Place();
+        }
+
+        /// <summary>
+        /// How far out of the ground the body stands: 1 fully, 0 entirely
+        /// below the plane. Births rise, deaths sink.
+        ///
+        /// WHY NOT SCALE. Growing a newborn from nothing would show a stature
+        /// that is not theirs -- and stature is exported per year, so a
+        /// half-size body is a wrong measurement rather than a transition.
+        /// Sinking keeps the body its true length and hides it behind the
+        /// ground plane, which is a camera fact rather than a biological one.
+        /// </summary>
+        public void CosmeticSetEmergence(float fraction)
+        {
+            _emergence = Mathf.Clamp01(fraction);
+            Place();
+        }
+
+        private void Place()
+        {
+            // Body centre sits half a height above the ground when fully out;
+            // sinking translates it down by up to a full body length, so at
+            // emergence 0 the crown is exactly at ground level.
+            float sunk = _heightM * (1f - _emergence);
+            transform.localPosition =
+                _ground + new Vector3(0f, _heightM * 0.5f - sunk, 0f);
         }
 
         public void SetVisible(bool visible)
