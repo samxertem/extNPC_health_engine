@@ -1,0 +1,76 @@
+{
+  "capsules": {
+    "setup": {
+      "body_installed": "False",
+      "device": "Direct3D12",
+      "mesh_verts": 550.0
+    },
+    "n28": {
+      "count": 28.0,
+      "ms_mean": 1.761,
+      "ms_min": 1.236,
+      "implied_fps_min": 808.9
+    },
+    "n100": {
+      "count": 100.0,
+      "ms_mean": 2.554,
+      "ms_min": 1.706,
+      "implied_fps_min": 586.1
+    },
+    "n300": {
+      "count": 300.0,
+      "ms_mean": 5.23,
+      "ms_min": 3.741,
+      "implied_fps_min": 267.3
+    },
+    "n600": {
+      "count": 600.0,
+      "ms_mean": 8.348,
+      "ms_min": 7.301,
+      "implied_fps_min": 137.0
+    },
+    "n1000": {
+      "count": 1000.0,
+      "ms_mean": 14.102,
+      "ms_min": 11.984,
+      "implied_fps_min": 83.4
+    }
+  },
+  "bodies": {
+    "setup": {
+      "body_installed": "True",
+      "device": "Direct3D12",
+      "mesh_verts": 14517.0
+    },
+    "n28": {
+      "count": 28.0,
+      "ms_mean": 3.74,
+      "ms_min": 2.967,
+      "implied_fps_min": 337.0
+    },
+    "n100": {
+      "count": 100.0,
+      "ms_mean": 3.371,
+      "ms_min": 2.098,
+      "implied_fps_min": 476.6
+    },
+    "n300": {
+      "count": 300.0,
+      "ms_mean": 5.77,
+      "ms_min": 5.221,
+      "implied_fps_min": 191.5
+    },
+    "n600": {
+      "count": 600.0,
+      "ms_mean": 11.074,
+      "ms_min": 10.82,
+      "implied_fps_min": 92.4
+    },
+    "n1000": {
+      "count": 1000.0,
+      "ms_mean": 19.642,
+      "ms_min": 19.124,
+      "implied_fps_min": 52.3
+    }
+  }
+}
