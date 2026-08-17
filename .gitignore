@@ -102,6 +102,15 @@ reads/
 #     python export_for_unity.py
 outputs/unity/
 
+# outputs/mpfb/ splits the same way. The two JSON files ARE tracked: they are
+# the measured calibration of a third-party add-on, which is exactly the kind
+# of number that has to be in history next to the code that read it. The FBX
+# files and the downloaded MPFB source are not: they are megabytes of
+# regenerable output. Regenerate everything with:
+#     python run_mpfb_probe.py
+outputs/mpfb/*.fbx
+outputs/mpfb/_install/
+
 # ---------------------------------------------------------------------
 # Unity
 # ---------------------------------------------------------------------
