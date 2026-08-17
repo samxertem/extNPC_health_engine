@@ -104,6 +104,35 @@ def _method_body(src: str, name: str) -> str:
     raise AssertionError(f"method {name} not found in the loader source")
 
 
+def _instance_method_body(src: str, signature: str) -> str:
+    """Source of one INSTANCE method, sliced by matching braces.
+
+    `_method_body` above is driven by `_METHOD`, which matches static methods
+    only. Widening that regex to cover instance methods would change the slice
+    boundaries every other rule in this module depends on, for the sake of one
+    rule, so this reads its own, and does it by counting braces rather than
+    by guessing where the next definition starts.
+
+    `signature` is matched literally and must be unique in the file, so a rule
+    cannot silently start reading a different overload.
+    """
+    start = src.find(signature)
+    assert start != -1, f"{signature!r} not found in the source"
+    assert src.find(signature, start + 1) == -1, (
+        f"{signature!r} appears more than once; the slice would be ambiguous")
+
+    open_brace = src.index("{", start)
+    depth = 0
+    for i in range(open_brace, len(src)):
+        if src[i] == "{":
+            depth += 1
+        elif src[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return src[start:i + 1]
+    raise AssertionError(f"unbalanced braces after {signature!r}")
+
+
 @pytest.fixture(scope="module")
 def exported(tmp_path_factory) -> Path:
     """A real bundle with structure, so flows.csv and demes.csv are populated
@@ -1004,6 +1033,47 @@ def test_the_headcount_check_counts_the_years_own_frame():
         "VisibleCount is no longer the displayed year's own frame length")
     assert "EmergingCount" in src, (
         "the emerging (next-year) villagers are no longer counted separately")
+
+
+def test_the_headcount_check_actually_looks_at_the_scene():
+    """
+    Session 21. The acceptance check compared `VisibleCount`, which is
+    `frame.Length`, against history.csv's `n_alive`. Both numbers are read
+    out of the export, so their agreement is the DATA agreeing with itself and
+    says nothing about what was rendered. Hiding a living villager in play mode
+    with SetActive(false) left the check returning true, while its own error
+    text said "villagers drawn" and UNITY_PLAN.md's Stage 3 acceptance claimed
+    "villager count on screen equals n_alive".
+
+    The claim outran the check for three sessions. This rule is the four-second
+    version: CheckHeadcount must consult the scene graph, and it must do so by
+    reading the bodies rather than by asking the pool. A pool that hands back
+    the wrong view corrupts its own dictionary and the scene together, so
+    `_views.Count` would give the same wrong answer twice.
+    """
+    if not _stage5_present():
+        pytest.skip("Stage 5 timeline not present")
+    src = code_only(_RENDERER_CS.read_text(encoding="utf-8"))
+
+    check = _instance_method_body(
+        src, "public bool CheckHeadcount(int atTick, bool verbose)")
+    assert "SetEquals" in check, (
+        "CheckHeadcount no longer compares the drawn bodies with the expected "
+        "set. Without it the method compares two readings of the same export "
+        "and cannot fail on a pooling bug: the failure it names first.")
+    assert "_seen" in check, (
+        "the scene comparison is no longer made against `_seen`, which is "
+        "built from the frame rows. Comparing against anything the pool "
+        "maintains lets one bug satisfy both sides.")
+
+    names = _instance_method_body(
+        src, "public void DrawnBodyNames(HashSet<string> into)")
+    assert "_villagerRoot" in names and "activeSelf" in names, (
+        "DrawnBodyNames no longer reads the scene graph. Counting `_views` "
+        "instead asks the pool to confirm its own bookkeeping.")
+    assert "_views" not in names, (
+        "DrawnBodyNames consults the pool's dictionary. That shares a failure "
+        "cause with the thing being checked; it must read the bodies.")
 
 
 def test_the_flow_ribbon_uses_the_dashboards_width_profile():

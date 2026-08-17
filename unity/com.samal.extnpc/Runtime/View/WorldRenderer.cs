@@ -60,6 +60,10 @@ namespace ExtNPC.View
             new Dictionary<string, VillagerView>();
         private readonly List<VillagerView> _spares = new List<VillagerView>();
         private readonly HashSet<string> _seen = new HashSet<string>();
+
+        // The scene half of the acceptance check, reused so a per-year
+        // comparison over a few hundred names allocates nothing.
+        private readonly HashSet<string> _drawn = new HashSet<string>();
         private readonly List<DemeRingView> _rings = new List<DemeRingView>();
         private readonly List<FlowRibbonView> _ribbons = new List<FlowRibbonView>();
 
@@ -100,6 +104,80 @@ namespace ExtNPC.View
         public int HeadcountChecks { get; private set; }
 
         public int HeadcountMismatches { get; private set; }
+
+        /// <summary>How many of those checks were able to include the scene
+        /// half. Reported separately on purpose: the scene comparison only
+        /// applies to the year actually on screen, and a guard that silently
+        /// skipped every time would leave the check as blind as it was before
+        /// while still reporting a rising tally.</summary>
+        public int SceneChecks { get; private set; }
+
+        /// <summary>
+        /// Bodies the SCENE actually has, as opposed to rows the DATA claims.
+        ///
+        /// WHY THIS IS NOT <see cref="VisibleCount"/>. VisibleCount is
+        /// `frame.Length`, a number read out of frames.csv. Comparing it with
+        /// history.csv's n_alive tests that the two exported tables agree with
+        /// each other, which is worth testing and does fail when they do not.
+        /// But it is a claim about the DATA, and it cannot fail when the
+        /// renderer draws the wrong bodies.
+        ///
+        /// A pooling bug is exactly that failure, and it is the first one named
+        /// in CheckHeadcount's own doc comment and in UNITY_PLAN.md's Stage 3
+        /// acceptance ("villager count on screen equals n_alive"). Session 21
+        /// hid a living villager with SetActive(false) in play mode and
+        /// CheckHeadcount still returned true. The claim was broader than the
+        /// check for three sessions.
+        ///
+        /// This is the missing third source, so the year can be agreed on by
+        /// history.csv, frames.csv AND the scene graph rather than by two
+        /// readings of the same export.
+        ///
+        /// Called once per year visited, never per frame: an allocation-free
+        /// walk over at most a few hundred pooled transforms.
+        /// </summary>
+        public int DrawnBodyCount()
+        {
+            int n = 0;
+            foreach (Transform t in _villagerRoot)
+            {
+                if (t.gameObject.activeSelf) n++;
+            }
+            return n;
+        }
+
+        /// <summary>
+        /// The NAMES of the bodies currently standing, written into
+        /// <paramref name="into"/> rather than returned, so the per-year check
+        /// reuses one set instead of allocating.
+        ///
+        /// Read off the scene graph, where <see cref="VillagerView.Apply"/> stamps
+        /// `gameObject.name` with the row's name, and therefore independent of
+        /// the `_views` dictionary the pool keeps. That independence is the
+        /// point: a pool that hands back the wrong view corrupts its own
+        /// bookkeeping and the scene together, so asking the pool would get
+        /// the same wrong answer twice.
+        ///
+        /// A SET, not a count, because the interesting failure preserves the
+        /// count: a body left standing under a name no row has this year, while
+        /// the villager who should be there is missing, keeps the tally exactly
+        /// right and shows the wrong person. Verified in play mode; a bare
+        /// count passes it and the set does not.
+        ///
+        /// One failure the set deliberately does NOT catch, because it cannot
+        /// occur: a pure permutation of names among the correct bodies.
+        /// <see cref="VillagerView.Apply"/> writes the name and every visible
+        /// property from the same row, so no state exists in which a body wears
+        /// one villager's name and another's appearance.
+        /// </summary>
+        public void DrawnBodyNames(HashSet<string> into)
+        {
+            into.Clear();
+            foreach (Transform t in _villagerRoot)
+            {
+                if (t.gameObject.activeSelf) into.Add(t.name);
+            }
+        }
 
         private void Awake()
         {
@@ -350,9 +428,17 @@ namespace ExtNPC.View
 
         /// <summary>
         /// Villagers drawn must equal the population the engine recorded for
-        /// this year. Two independent tables -- frames.csv and history.csv --
-        /// have to agree, and a pooling bug, a dropped row or a CSV
-        /// misparse breaks the agreement.
+        /// this year. THREE sources have to agree, not two:
+        ///
+        ///   history.csv's n_alive  ==  frames.csv's row count  ==  the bodies
+        ///   standing in the scene.
+        ///
+        /// The first pair catches a dropped row or a CSV misparse. The second
+        /// pair catches a pooling bug, and only the second pair does, which is
+        /// the correction session 21 made. Until then the method compared two
+        /// numbers that had both been read out of the export and reported the
+        /// result as "villagers drawn", so hiding a living villager left it
+        /// passing. See <see cref="DrawnBodyNames"/>.
         ///
         /// It is logged as an error rather than thrown: a viewer that refuses
         /// to render is less useful than one that renders and says loudly that
@@ -396,21 +482,87 @@ namespace ExtNPC.View
 
             HeadcountChecks++;
             int expected = (int)System.Math.Round(year.Get("n_alive"));
+
+            // HALF ONE: the DATA agreeing with itself. Both numbers come out
+            // of the export, so this catches a dropped row, a CSV misparse or a
+            // frames/history disagreement, and says nothing whatever about what
+            // is on screen.
             if (expected != VisibleCount)
             {
                 HeadcountMismatches++;
                 Debug.LogError(
                     $"[extNPC] headcount mismatch at year {atTick}: " +
-                    $"{VisibleCount} villagers drawn from frames.csv but " +
-                    $"history.csv records n_alive={expected}. The viewer is " +
-                    $"not showing the world the engine simulated.");
+                    $"frames.csv has {VisibleCount} rows but history.csv " +
+                    $"records n_alive={expected}. The two exported tables " +
+                    $"disagree; the bundle does not describe one world.");
                 return false;
+            }
+
+            // HALF TWO: the SCENE agreeing with the data. This is the half
+            // that was missing until session 21: hiding a living villager with
+            // SetActive(false) left the check above returning true, because
+            // VisibleCount is `frame.Length` and never looked at the scene. The
+            // pooling failure this class's own comments claim to cover was
+            // therefore uncovered.
+            //
+            // `_seen` is built straight from the frame rows in Render(), never
+            // from the pool, so it is an independent expectation rather than
+            // the pool restating itself. It includes the villagers rising for
+            // next year, and so does the scene, so the two remain comparable
+            // mid-blend.
+            //
+            // Guarded on the rendered year because a caller may ask about any
+            // tick and the scene only ever shows one; SceneChecks records how
+            // often the guard let it through, so a version that always skipped
+            // could not hide behind a healthy HeadcountChecks tally.
+            if (atTick == _renderedTick)
+            {
+                SceneChecks++;
+                DrawnBodyNames(_drawn);
+                if (!_drawn.SetEquals(_seen))
+                {
+                    HeadcountMismatches++;
+                    Debug.LogError(
+                        $"[extNPC] scene/data mismatch at year {atTick}: " +
+                        $"{_drawn.Count} bodies standing for {_seen.Count} " +
+                        $"expected. {DescribeSetDifference(_seen, _drawn)} " +
+                        $"The data is consistent, so this is the renderer: " +
+                        $"the viewer is not showing the world it loaded.");
+                    return false;
+                }
             }
 
             if (verbose)
                 Debug.Log($"[extNPC] year {atTick}: {VisibleCount} villagers " +
                           $"drawn, matching history.csv n_alive={expected}.");
             return true;
+        }
+
+        /// <summary>
+        /// Name the first few villagers on each side of a disagreement.
+        ///
+        /// A bare count tells you something is wrong; the names tell you which
+        /// shape of wrong. "missing" with nothing extra is a body that failed to
+        /// be shown; matched missing-and-extra counts are two people wearing
+        /// each other's identity, which is the failure a count alone cannot see
+        /// and the reason this comparison is a set.
+        /// </summary>
+        private static string DescribeSetDifference(
+            HashSet<string> expected, HashSet<string> actual)
+        {
+            var missing = new List<string>();
+            var extra = new List<string>();
+            foreach (string name in expected)
+            {
+                if (!actual.Contains(name) && missing.Count < 4) missing.Add(name);
+            }
+            foreach (string name in actual)
+            {
+                if (!expected.Contains(name) && extra.Count < 4) extra.Add(name);
+            }
+            string m = missing.Count == 0 ? "none" : string.Join(", ", missing);
+            string e = extra.Count == 0 ? "none" : string.Join(", ", extra);
+            return $"Expected but not drawn: {m}. Drawn but not expected: {e}.";
         }
 
         // ------------------------------------------------------------------
@@ -478,6 +630,8 @@ namespace ExtNPC.View
                 r.sharedMaterial.SetColor("_BaseColor", c);
                 r.sharedMaterial.SetColor("_Color", c);
             }
+
         }
+
     }
 }
