@@ -38,6 +38,11 @@ namespace ExtNPC.View
         private float _heightM;
         private float _emergence = 1f;
 
+        // True when the mesh's origin is at the soles (a real body) rather than
+        // at its centre (Unity's primitives). Place() needs to know which,
+        // because getting it wrong buries every villager to the waist.
+        private bool _feetPivot;
+
         /// <summary>The row this view last drew. Read by selection/inspection.</summary>
         public FrameRow Row { get; private set; }
 
@@ -89,31 +94,56 @@ namespace ExtNPC.View
             // position does not need the precision.
             float heightM = (float)(System.Math.Max(row.HeightCm, 1.0) * 0.01);
 
-            // Sex is encoded as SHAPE, not colour: colour is spoken for by
-            // lineage, and a second meaning on the same channel makes both
-            // unreadable. Capsule and cylinder are both body-shaped and tell
-            // apart from directly above, which is the usual camera angle.
-            _filter.sharedMesh = row.IsFemale
-                ? PrimitiveMeshes.Capsule
-                : PrimitiveMeshes.Cylinder;
+            // Stage 6: a real body if one is installed, a primitive if not.
+            // HumanMesh returns a UNIT body -- 1 m tall, soles on the origin --
+            // so the two cases differ in scale and in where the pivot sits, and
+            // nowhere else.
+            Mesh body = HumanMesh.UnitBody(row.IsFemale);
+            _feetPivot = body != null;
 
-            // Both primitives are 2 units tall and 1 unit wide at scale 1.
-            // Width is a constant: the engine models stature, not breadth, and
-            // scaling girth by BMI here would be a body measurement the
-            // simulation never made. Phase B gets real bodies from MPFB; until
-            // then an honest cylinder beats an invented one.
-            transform.localScale = new Vector3(
-                BodyWidthM, heightM * 0.5f, BodyWidthM);
+            if (_feetPivot)
+            {
+                _filter.sharedMesh = body;
+                // UNIFORM scale, which is a change of policy from the capsule
+                // and worth being explicit about. BodyWidthM existed because
+                // scaling a cylinder's girth by BMI would have been a breadth
+                // measurement the engine never made. A real mesh has its own
+                // proportions, so scaling it uniformly by stature invents
+                // nothing: it is one modelled body at different sizes, which is
+                // exactly what "one shared human mesh" means in Stage 6.
+                transform.localScale = Vector3.one * heightM;
+
+                // Local units, so the uniform scale above puts the collider in
+                // metres: a 1 m tall capsule of ~0.11 radius is a 1.75 m body
+                // with a 0.19 m radius at typical stature. Click-picking only.
+                _collider.height = 1f;
+                _collider.radius = 0.11f;
+                _collider.center = new Vector3(0f, 0.5f, 0f);
+            }
+            else
+            {
+                // Sex is encoded as SHAPE, not colour: colour is spoken for by
+                // lineage, and a second meaning on the same channel makes both
+                // unreadable. Capsule and cylinder are both body-shaped and
+                // tell apart from directly above, which is the usual camera
+                // angle.
+                _filter.sharedMesh = row.IsFemale
+                    ? PrimitiveMeshes.Capsule
+                    : PrimitiveMeshes.Cylinder;
+
+                // Both primitives are 2 units tall and 1 unit wide at scale 1.
+                transform.localScale = new Vector3(
+                    BodyWidthM, heightM * 0.5f, BodyWidthM);
+
+                _collider.height = 2f;
+                _collider.radius = 0.5f;
+                _collider.center = Vector3.zero;
+            }
 
             _heightM = heightM;
             _ground = projection.ToWorld(row.X, row.Y);
             _emergence = 1f;
             Place();
-
-            // Collider in local space; the transform scale above sizes it.
-            _collider.height = 2f;
-            _collider.radius = 0.5f;
-            _collider.center = Vector3.zero;
 
             _renderer.GetPropertyBlock(_block);
             Color c = row.Color;
@@ -168,12 +198,13 @@ namespace ExtNPC.View
 
         private void Place()
         {
-            // Body centre sits half a height above the ground when fully out;
-            // sinking translates it down by up to a full body length, so at
-            // emergence 0 the crown is exactly at ground level.
+            // Sinking translates down by up to a full body length, so at
+            // emergence 0 the crown is exactly at ground level either way. What
+            // differs is the resting offset: a soles-origin mesh stands ON the
+            // ground, a centre-origin primitive floats half a height above it.
             float sunk = _heightM * (1f - _emergence);
-            transform.localPosition =
-                _ground + new Vector3(0f, _heightM * 0.5f - sunk, 0f);
+            float rest = _feetPivot ? 0f : _heightM * 0.5f;
+            transform.localPosition = _ground + new Vector3(0f, rest - sunk, 0f);
         }
 
         public void SetVisible(bool visible)
