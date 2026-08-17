@@ -54,7 +54,6 @@ namespace ExtNPC.View
         private string _selected;
 
         private Vector2 _scroll;
-        private Texture2D _px;
         private GUIStyle _key, _val, _valSmall, _name, _sub, _pill, _banner, _section;
         private bool _stylesReady;
 
@@ -89,7 +88,6 @@ namespace ExtNPC.View
             // loader lives.
             if (_renderer != null) _renderer.VillagerSelected -= OnVillagerSelected;
             if (_loader != null) _loader.Loaded -= OnLoaded;
-            if (_px != null) Destroy(_px);
         }
 
         private void OnLoaded(WorldBundle bundle) => _bundle = bundle;
@@ -123,14 +121,15 @@ namespace ExtNPC.View
             var area = new Rect(Screen.width - panelWidth - margin, margin,
                                 panelWidth, Screen.height - margin * 2f);
 
-            Fill(area, InspectorFormat.Surface);
-            Outline(area, InspectorFormat.Grid);
+            // Same chrome as the timeline HUD, from the same place, so the two
+            // panels cannot drift into looking like two different tools.
+            HudChrome.Panel(area);
 
             GUILayout.BeginArea(new Rect(area.x + 14f, area.y + 12f,
                                          area.width - 28f, area.height - 24f));
             _scroll = GUILayout.BeginScrollView(_scroll, false, false);
 
-            Label("INSPECTOR", _section);
+            Section("INSPECTOR");
             GUILayout.Space(8f);
 
             if (string.IsNullOrEmpty(_selected)) DrawEmpty();
@@ -328,7 +327,7 @@ namespace ExtNPC.View
             GUILayout.Space(10f);
             Rule();
             GUILayout.Space(8f);
-            Label("GENETIC LOAD", _section);
+            Section("GENETIC LOAD");
             GUILayout.Space(6f);
 
             // Pedigree F and realised F are both shown on purpose: the first
@@ -398,7 +397,7 @@ namespace ExtNPC.View
             GUILayout.Space(8f);
             Rule();
             GUILayout.Space(8f);
-            Label("HEALTH", _section);
+            Section("HEALTH");
             GUILayout.Space(6f);
 
             double bmi = p.GetTrait("bmi");
@@ -435,7 +434,7 @@ namespace ExtNPC.View
             GUILayout.Space(8f);
             Rule();
             GUILayout.Space(8f);
-            Label("TRAITS · MATURE PHENOTYPE", _section);
+            Section("TRAITS · MATURE PHENOTYPE");
             GUILayout.Space(4f);
             Label("The genetic endpoint, not the value expressed at this age.",
                   _sub);
@@ -535,6 +534,18 @@ namespace ExtNPC.View
 
         private void Label(string text, GUIStyle style) => GUILayout.Label(text, style);
 
+        /// <summary>A section header, drawn the same way the timeline HUD draws
+        /// one. Two panels of the same instrument should not label their
+        /// sections in two different visual languages.</summary>
+        private void Section(string title)
+        {
+            Rect r = GUILayoutUtility.GetRect(10f, 15f, GUILayout.ExpandWidth(true));
+            HudChrome.SectionBar(r);
+            GUI.Label(new Rect(r.x + 6f, r.y + 1f, r.width - 8f, r.height),
+                      title, _section);
+            GUILayout.Space(5f);
+        }
+
         private void Meter(string label, float frac, Color color, string hint)
         {
             GUILayout.BeginHorizontal();
@@ -547,13 +558,17 @@ namespace ExtNPC.View
             Fill(bar, InspectorFormat.Plane);
             Fill(new Rect(bar.x, bar.y, bar.width * Mathf.Clamp01(frac), bar.height),
                  color);
+            // A hairline cap on the filled end, so a bar at 3% still reads as a
+            // measurement rather than as an empty trough.
+            Fill(new Rect(bar.x + bar.width * Mathf.Clamp01(frac) - 1f, bar.y - 1f,
+                          2f, bar.height + 2f), color);
             GUILayout.Space(6f);
         }
 
         private void Rule()
         {
             Rect r = GUILayoutUtility.GetRect(10f, 1f, GUILayout.ExpandWidth(true));
-            Fill(r, InspectorFormat.Grid);
+            HudChrome.Hairline(r);
         }
 
         private void Swatch(Color c, float size)
@@ -569,30 +584,14 @@ namespace ExtNPC.View
             GUILayout.Space(4f);
         }
 
-        private void Fill(Rect r, Color c)
-        {
-            if (Event.current.type != EventType.Repaint) return;
-            Color prev = GUI.color;
-            GUI.color = c;
-            GUI.DrawTexture(r, _px);
-            GUI.color = prev;
-        }
+        private static void Fill(Rect r, Color c) => HudChrome.Fill(r, c);
 
-        private void Outline(Rect r, Color c)
-        {
-            Fill(new Rect(r.x, r.y, r.width, 1f), c);
-            Fill(new Rect(r.x, r.yMax - 1f, r.width, 1f), c);
-            Fill(new Rect(r.x, r.y, 1f, r.height), c);
-            Fill(new Rect(r.xMax - 1f, r.y, 1f, r.height), c);
-        }
+        private static void Outline(Rect r, Color c) => HudChrome.Outline(r, c);
 
         private void EnsureStyles()
         {
             if (_stylesReady) return;
 
-            _px = new Texture2D(1, 1) { hideFlags = HideFlags.HideAndDontSave };
-            _px.SetPixel(0, 0, Color.white);
-            _px.Apply();
 
             _key = new GUIStyle(GUI.skin.label)
             { fontSize = 12, wordWrap = false };

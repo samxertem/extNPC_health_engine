@@ -47,8 +47,11 @@ namespace ExtNPC.View
         private ExtNpcWorldLoader _loader;
         private WorldBundle _bundle;
 
-        private Texture2D _px;
-        private GUIStyle _key, _val, _small, _state, _section, _warn;
+        // The shared 1x1 now lives in HudChrome; these are the button-state
+        // backgrounds, which are this component's own and are released with it.
+        private readonly List<Texture2D> _owned = new List<Texture2D>();
+        private GUIStyle _key, _val, _small, _state, _section, _warn, _button;
+        private GUIStyle _slider, _sliderThumb;
         private bool _stylesReady;
 
         private void Awake()
@@ -66,7 +69,8 @@ namespace ExtNPC.View
         private void OnDestroy()
         {
             if (_loader != null) _loader.Loaded -= OnLoaded;
-            if (_px != null) Destroy(_px);
+            foreach (Texture2D t in _owned) if (t != null) Destroy(t);
+            _owned.Clear();
         }
 
         private void OnLoaded(WorldBundle bundle) => _bundle = bundle;
@@ -86,18 +90,35 @@ namespace ExtNPC.View
 
         /// <summary>Top-left: which run this is, and what it looked like in the
         /// year on screen.</summary>
+        /// <summary>
+        /// The panel's height is MEASURED, not guessed.
+        ///
+        /// The content is not a fixed number of lines: the provenance string
+        /// wraps at one width and not another, and two warnings appear only for
+        /// worlds that earn them (an experimental catalogue, an overflowed
+        /// snapshot ring). A hardcoded height clipped the headcount verdict off
+        /// the bottom, which is the one line on the panel that reports whether
+        /// the viewer trusts itself, so the failure hid exactly the wrong thing.
+        ///
+        /// IMGUI cannot know the height before laying the content out, so the
+        /// layout runs inside a generously tall area (nothing is ever clipped)
+        /// and the frame is drawn at the height the PREVIOUS frame measured. It
+        /// converges in one frame and is stable thereafter.
+        /// </summary>
+        private const float PanelPad = 10f;
+        private float _worldPanelHeight = 258f;
+
         private void DrawProvenanceAndKpis()
         {
             const float w = 268f;
-            var area = new Rect(12f, 12f, w, 250f);
-            Fill(area, InspectorFormat.Surface);
-            Outline(area, InspectorFormat.Grid);
+            var area = new Rect(12f, 12f, w, _worldPanelHeight);
+            HudChrome.Panel(area);
 
-            GUILayout.BeginArea(new Rect(area.x + 12f, area.y + 10f,
-                                         area.width - 24f, area.height - 20f));
+            GUILayout.BeginArea(new Rect(area.x + 12f, area.y + PanelPad,
+                                         area.width - 24f,
+                                         Screen.height - area.y - PanelPad));
 
-            GUILayout.Label("WORLD", _section);
-            GUILayout.Space(4f);
+            Section("WORLD");
             // Manifest.ToString() carries seed, year, catalogue and commit. The
             // catalogue is in it deliberately and must never be dropped.
             GUILayout.Label(_bundle.Manifest.ToString(), _small);
@@ -113,13 +134,10 @@ namespace ExtNPC.View
             }
 
             GUILayout.Space(8f);
-            Rule();
-            GUILayout.Space(8f);
 
             HistoryRow year = HistoryAt(_clock.Year);
-            GUILayout.Label(TimelineFormat.Range(_clock.Year, _bundle.FirstTick,
-                                                 _bundle.LastTick), _section);
-            GUILayout.Space(6f);
+            Section(TimelineFormat.Range(_clock.Year, _bundle.FirstTick,
+                                         _bundle.LastTick));
 
             if (year == null)
             {
@@ -147,6 +165,14 @@ namespace ExtNPC.View
             GUILayout.Space(8f);
             DrawHeadcountVerdict();
 
+            if (Event.current.type == EventType.Repaint)
+            {
+                // Inside a BeginArea, GetLastRect is relative to the area, so
+                // yMax IS the content height.
+                float content = GUILayoutUtility.GetLastRect().yMax;
+                _worldPanelHeight = content + PanelPad * 2f;
+            }
+
             GUILayout.EndArea();
         }
 
@@ -173,10 +199,14 @@ namespace ExtNPC.View
             }
             else
             {
+                // "1 years checked" is the kind of thing that makes a reader
+                // trust the rest of the panel slightly less.
+                int n = _renderer.HeadcountChecks;
                 GUILayout.Label(
                     "headcount agrees with history.csv (" +
-                    InspectorFormat.Int(_renderer.HeadcountChecks) +
-                    " years checked)", _small);
+                    InspectorFormat.Int(n) + (n == 1 ? " year" : " years") +
+                    " checked, " + InspectorFormat.Int(_renderer.SceneChecks) +
+                    " against the scene)", _small);
             }
         }
 
@@ -189,50 +219,76 @@ namespace ExtNPC.View
 
             var area = new Rect(12f, Screen.height - barHeight - 12f,
                                 width, barHeight);
-            Fill(area, InspectorFormat.Surface);
-            Outline(area, InspectorFormat.Grid);
+            HudChrome.Panel(area);
 
-            GUILayout.BeginArea(new Rect(area.x + 12f, area.y + 8f,
-                                         area.width - 24f, area.height - 16f));
+            GUILayout.BeginArea(new Rect(area.x + 14f, area.y + 10f,
+                                         area.width - 28f, area.height - 20f));
 
             // ---- transport row -------------------------------------------
             GUILayout.BeginHorizontal();
 
-            if (GUILayout.Button(_clock.playing ? "PAUSE" : "PLAY",
-                                 GUILayout.Width(74f)))
+            if (GUILayout.Button(_clock.playing ? "PAUSE" : "PLAY", _button,
+                                 GUILayout.Width(76f), GUILayout.Height(22f)))
             {
                 _clock.TogglePlay();
             }
+            GUILayout.Space(4f);
             // The dashboard's "⏮ Live" (app.py:1338), same job: return to the
             // export's own last year.
-            if (GUILayout.Button("Live", GUILayout.Width(56f))) _clock.GoLive();
+            if (GUILayout.Button("LIVE", _button,
+                                 GUILayout.Width(58f), GUILayout.Height(22f)))
+            {
+                _clock.GoLive();
+            }
 
-            GUILayout.Space(10f);
-            GUILayout.Label(
-                _clock.IsLive ? TimelineFormat.LiveState
-                              : TimelineFormat.ScrubState(_clock.Year),
-                _clock.IsLive ? StateStyle(TimelineFormat.LiveColor)
-                              : StateStyle(TimelineFormat.ScrubColor));
+            GUILayout.Space(12f);
+
+            // The state reads as a lamp on an instrument rather than a line of
+            // text: the same words, in the same colour, inside a tinted pill so
+            // it is findable without being read.
+            string state = _clock.IsLive ? TimelineFormat.LiveState
+                                         : TimelineFormat.ScrubState(_clock.Year);
+            Color stateColor = _clock.IsLive ? TimelineFormat.LiveColor
+                                             : TimelineFormat.ScrubColor;
+            var stateContent = new GUIContent(state);
+            float stateW = _state.CalcSize(stateContent).x + 18f;
+            Rect statePill = GUILayoutUtility.GetRect(
+                stateW, 22f, GUILayout.Width(stateW), GUILayout.Height(22f));
+            HudChrome.Pill(statePill, stateColor);
+            GUI.Label(new Rect(statePill.x + 9f, statePill.y + 3f,
+                               statePill.width, statePill.height),
+                      state, StateStyle(stateColor));
 
             GUILayout.FlexibleSpace();
 
             GUILayout.Label(TimelineFormat.Speed(_clock.yearsPerSecond), _small,
                             GUILayout.Width(70f));
             _clock.yearsPerSecond = GUILayout.HorizontalSlider(
-                _clock.yearsPerSecond, 0.5f, 30f, GUILayout.Width(110f));
+                _clock.yearsPerSecond, 0.5f, 30f, _slider, _sliderThumb,
+                GUILayout.Width(110f), GUILayout.Height(20f));
 
             GUILayout.EndHorizontal();
-            GUILayout.Space(6f);
+            GUILayout.Space(8f);
 
             // ---- scrub bar ------------------------------------------------
-            Rect track = GUILayoutUtility.GetRect(10f, 18f, GUILayout.ExpandWidth(true));
-            DrawEventMarkers(track);
+            Rect track = GUILayoutUtility.GetRect(10f, 22f, GUILayout.ExpandWidth(true));
 
             int count = _clock.Count;
+            float fraction = count > 1 ? (float)_clock.Index / (count - 1) : 0f;
+            HudChrome.ScrubTrack(track, fraction,
+                                 _bundle.FirstTick, _bundle.LastTick);
+            DrawEventMarkers(track);
+            HudChrome.Playhead(track, fraction);
+
             if (count > 1)
             {
+                // An invisible slider over the drawn track. GUIStyle.none on
+                // both parts means IMGUI still does the dragging, the hit
+                // testing and the keyboard focus, while none of its own chrome
+                // lands on top of the ruler above.
                 float wanted = GUI.HorizontalSlider(track, _clock.Index, 0f,
-                                                    count - 1);
+                                                    count - 1,
+                                                    GUIStyle.none, GUIStyle.none);
                 int index = Mathf.RoundToInt(wanted);
                 if (index != _clock.Index)
                 {
@@ -270,9 +326,6 @@ namespace ExtNPC.View
         /// </summary>
         private void DrawEventMarkers(Rect track)
         {
-            Fill(new Rect(track.x, track.center.y - 1f, track.width, 2f),
-                 InspectorFormat.Plane);
-
             if (_bundle.Events == null || _bundle.Events.Count == 0) return;
 
             int lo = _bundle.FirstTick, hi = _bundle.LastTick;
@@ -283,7 +336,13 @@ namespace ExtNPC.View
                 if (e.Tick < lo || e.Tick > hi) continue;
                 float t = (float)(e.Tick - lo) / (hi - lo);
                 float x = track.x + t * track.width;
-                Fill(new Rect(x - 1f, track.y, 2f, track.height),
+
+                // A rule through the groove plus a flag above it. The rule
+                // alone was easy to lose against the elapsed fill once the
+                // track gained a colour; the flag sits clear of both.
+                Fill(new Rect(x - 1f, track.y + 2f, 2f, track.height - 4f),
+                     TimelineFormat.EventMarkerColor);
+                Fill(new Rect(x - 3f, track.y, 7f, 3f),
                      TimelineFormat.EventMarkerColor);
             }
         }
@@ -316,6 +375,14 @@ namespace ExtNPC.View
         // IMGUI primitives (same shapes as VillagerInspector's)
         // ------------------------------------------------------------------
 
+        /// <summary>
+        /// One KPI: label, dotted leader, value.
+        ///
+        /// The leader is measured from the two labels rather than stretched
+        /// across a fixed gap, so it stops where the value begins whatever the
+        /// value's width. A leader that runs under its own number is worse than
+        /// no leader at all.
+        /// </summary>
         private void Row(string key, string value)
         {
             GUILayout.BeginHorizontal();
@@ -323,7 +390,31 @@ namespace ExtNPC.View
             GUILayout.FlexibleSpace();
             GUILayout.Label(value, _val);
             GUILayout.EndHorizontal();
-            GUILayout.Space(2f);
+
+            if (Event.current.type == EventType.Repaint)
+            {
+                Rect line = GUILayoutUtility.GetLastRect();
+                float keyEnd = line.x + _key.CalcSize(new GUIContent(key)).x + 6f;
+                float valStart = line.xMax -
+                                 _val.CalcSize(new GUIContent(value)).x - 6f;
+                if (valStart > keyEnd)
+                {
+                    HudChrome.Leader(new Rect(keyEnd, line.y + line.height * 0.62f,
+                                              valStart - keyEnd, 1f));
+                }
+            }
+
+            GUILayout.Space(3f);
+        }
+
+        /// <summary>A section header with its own strip behind it.</summary>
+        private void Section(string title)
+        {
+            Rect r = GUILayoutUtility.GetRect(10f, 15f, GUILayout.ExpandWidth(true));
+            HudChrome.SectionBar(r);
+            GUI.Label(new Rect(r.x + 6f, r.y + 1f, r.width - 8f, r.height),
+                      title, _section);
+            GUILayout.Space(5f);
         }
 
         private GUIStyle StateStyle(Color c)
@@ -335,33 +426,14 @@ namespace ExtNPC.View
         private void Rule()
         {
             Rect r = GUILayoutUtility.GetRect(10f, 1f, GUILayout.ExpandWidth(true));
-            Fill(r, InspectorFormat.Grid);
+            HudChrome.Hairline(r);
         }
 
-        private void Fill(Rect r, Color c)
-        {
-            if (Event.current.type != EventType.Repaint) return;
-            Color prev = GUI.color;
-            GUI.color = c;
-            GUI.DrawTexture(r, _px);
-            GUI.color = prev;
-        }
-
-        private void Outline(Rect r, Color c)
-        {
-            Fill(new Rect(r.x, r.y, r.width, 1f), c);
-            Fill(new Rect(r.x, r.yMax - 1f, r.width, 1f), c);
-            Fill(new Rect(r.x, r.y, 1f, r.height), c);
-            Fill(new Rect(r.xMax - 1f, r.y, 1f, r.height), c);
-        }
+        private static void Fill(Rect r, Color c) => HudChrome.Fill(r, c);
 
         private void EnsureStyles()
         {
             if (_stylesReady) return;
-
-            _px = new Texture2D(1, 1) { hideFlags = HideFlags.HideAndDontSave };
-            _px.SetPixel(0, 0, Color.white);
-            _px.Apply();
 
             _key = new GUIStyle(GUI.skin.label) { fontSize = 11 };
             _key.normal.textColor = InspectorFormat.Muted;
@@ -385,7 +457,66 @@ namespace ExtNPC.View
             { fontSize = 10, fontStyle = FontStyle.Bold, wordWrap = true };
             _warn.normal.textColor = InspectorFormat.Warn;
 
+            // Flat transport buttons. Unity's default button is a rounded grey
+            // gel that belongs to the editor's own chrome, and next to a
+            // measurement panel it reads as a leftover. Built from the label
+            // style rather than the button style so none of that survives; the
+            // background is painted by HudChrome under it.
+            _button = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 11,
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleCenter,
+                border = new RectOffset(1, 1, 1, 1),
+            };
+            _button.normal.textColor = InspectorFormat.Ink2;
+            _button.hover.textColor = InspectorFormat.Ink;
+            _button.active.textColor = InspectorFormat.Accent;
+            _button.normal.background = SolidTexture(InspectorFormat.Plane);
+            _button.hover.background = SolidTexture(
+                Color.Lerp(InspectorFormat.Plane, InspectorFormat.Accent, 0.22f));
+            _button.active.background = SolidTexture(
+                Color.Lerp(InspectorFormat.Plane, InspectorFormat.Accent, 0.40f));
+
+            // The speed slider, in the same language as the scrub track: a flat
+            // groove and a solid accent thumb. Unity's default is the same grey
+            // gel as its button, and leaving one styled control next to one
+            // unstyled one looks more unfinished than leaving both alone.
+            _slider = new GUIStyle
+            {
+                fixedHeight = 4f,
+                margin = new RectOffset(0, 0, 8, 8),
+            };
+            _slider.normal.background = SolidTexture(InspectorFormat.Plane);
+
+            _sliderThumb = new GUIStyle
+            {
+                fixedWidth = 9f,
+                fixedHeight = 14f,
+                border = new RectOffset(0, 0, 0, 0),
+            };
+            _sliderThumb.normal.background = SolidTexture(InspectorFormat.Ink2);
+            _sliderThumb.hover.background = SolidTexture(InspectorFormat.Ink);
+            _sliderThumb.active.background = SolidTexture(InspectorFormat.Accent);
+
             _stylesReady = true;
+        }
+
+        /// <summary>
+        /// A 1x1 texture for a button state.
+        ///
+        /// Held by the style for the component's life, so it is created once in
+        /// EnsureStyles and never per frame. HideAndDontSave keeps it out of
+        /// the scene and out of any save; the three of them are released in
+        /// OnDestroy with the styles that own them.
+        /// </summary>
+        private Texture2D SolidTexture(Color c)
+        {
+            var t = new Texture2D(1, 1) { hideFlags = HideFlags.HideAndDontSave };
+            t.SetPixel(0, 0, c);
+            t.Apply();
+            _owned.Add(t);
+            return t;
         }
     }
 }
