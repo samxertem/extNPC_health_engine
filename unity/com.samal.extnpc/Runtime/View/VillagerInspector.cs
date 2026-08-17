@@ -44,6 +44,13 @@ namespace ExtNPC.View
                  "not keep them.")]
         public bool showTraits = true;
 
+        [Tooltip("Show a live, moving head at the top of the panel. Needs a " +
+                 "body asset in Resources/extnpc/ — see HumanMesh. With none " +
+                 "installed the panel says so instead.")]
+        public bool showPortrait = true;
+
+        private CharacterPortrait _portrait;
+
         private WorldRenderer _renderer;
         private ExtNpcWorldLoader _loader;
         private WorldBundle _bundle;
@@ -93,6 +100,52 @@ namespace ExtNPC.View
         private void OnLoaded(WorldBundle bundle) => _bundle = bundle;
 
         private void OnVillagerSelected(FrameRow row) => _selected = row.Name;
+
+        // ------------------------------------------------------------------
+        // the portrait
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Point the portrait at the selection and render one frame.
+        ///
+        /// IN UPDATE, NOT IN OnGUI. OnGUI runs several times per frame, once
+        /// for layout and once per repaint event, so rendering the portrait
+        /// camera there would cost it two or three times over and make the
+        /// animation speed depend on how many event passes Unity happened to
+        /// send. Update runs exactly once, so the motion is a function of wall
+        /// clock and nothing else.
+        /// </summary>
+        private void Update()
+        {
+            if (!showPortrait || !CharacterPortrait.BodyInstalled)
+            {
+                _portrait?.ClearSubject();
+                return;
+            }
+            if (_bundle == null || string.IsNullOrEmpty(_selected))
+            {
+                _portrait?.ClearSubject();
+                return;
+            }
+
+            FrameRow[] frame = _bundle.FrameAt(_renderer.tick);
+            for (int i = 0; i < frame.Length; i++)
+            {
+                if (frame[i].Name != _selected) continue;
+                _portrait ??= CharacterPortrait.Create(transform);
+                _portrait.SetSubject(frame[i].Name, frame[i].IsFemale,
+                                     frame[i].HeightCm, frame[i].Color);
+                // Time.timeAsDouble rather than Time.time: a session left open
+                // long enough loses animation resolution in a float, and the
+                // pose is defined on a double for that reason.
+                _portrait.RenderFrame(Time.timeAsDouble);
+                return;
+            }
+
+            // Selected but not alive at this year. The panel already says so in
+            // words; showing the last face they had would contradict it.
+            _portrait?.ClearSubject();
+        }
 
         // ------------------------------------------------------------------
         // mode
@@ -218,8 +271,18 @@ namespace ExtNPC.View
 
         // ---- identity ----------------------------------------------------
 
+        /// <summary>Portrait card size in points. 0.866 aspect, matching
+        /// <see cref="CharacterPortrait"/>'s render texture, so the face is
+        /// never stretched.</summary>
+        private const float PortraitW = 132f, PortraitH = 152f;
+
         private void DrawIdentity(in FrameRow row)
         {
+            GUILayout.BeginHorizontal();
+
+            if (showPortrait) DrawPortrait(row);
+
+            GUILayout.BeginVertical();
             GUILayout.BeginHorizontal();
             Swatch(row.Color, 18f);
             GUILayout.Space(8f);
@@ -234,11 +297,50 @@ namespace ExtNPC.View
             GUILayout.Space(8f);
 
             // inspector.py:260 — lineage pill carries the purity as a percent.
-            GUILayout.BeginHorizontal();
             Pill(InspectorFormat.GivenName(row.Lineage) + " " +
                  InspectorFormat.Percent0(row.Purity));
             Pill(DemeLabel(row.Deme, row.Tick));
+            GUILayout.FlexibleSpace();
+            GUILayout.EndVertical();
+
             GUILayout.EndHorizontal();
+            GUILayout.Space(10f);
+        }
+
+        /// <summary>
+        /// The live head, or an honest note about why there is not one.
+        ///
+        /// The absent case is deliberately a sentence and not a blank box. The
+        /// package ships no assets by design, so "no body installed" is a
+        /// SUPPORTED state rather than a failure, and the reader needs to be
+        /// told the difference between that and a villager who cannot be drawn.
+        /// </summary>
+        private void DrawPortrait(in FrameRow row)
+        {
+            Rect card = GUILayoutUtility.GetRect(PortraitW, PortraitH,
+                GUILayout.Width(PortraitW), GUILayout.Height(PortraitH));
+
+            RenderTexture face = _portrait != null ? _portrait.Texture : null;
+            if (face != null)
+            {
+                GUI.DrawTexture(card, face, ScaleMode.ScaleToFit, false);
+            }
+            else
+            {
+                Fill(card, CharacterPortrait.Backdrop(row.Color));
+                var text = new Rect(card.x + 8f, card.y + 8f,
+                                    card.width - 16f, card.height - 16f);
+                GUI.Label(text, CharacterPortrait.BodyInstalled
+                        ? "no face at this year"
+                        : "no body pack installed\n\n" +
+                          "python run_mpfb_probe.py --export-bodies\n\n" +
+                          "then drop the FBX files in\nAssets/Resources/extnpc/",
+                    _sub);
+            }
+
+            // The lineage colour again, as a hairline frame, so the portrait is
+            // tied to the same identity the map dot carries.
+            Outline(card, row.Color);
             GUILayout.Space(10f);
         }
 
