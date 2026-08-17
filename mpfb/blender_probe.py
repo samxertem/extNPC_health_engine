@@ -340,6 +340,77 @@ def bake_shape_keys(obj) -> int:
     return count
 
 
+def export_body(out_dir: str, filename: str, ethnicity: str, **macros) -> dict:
+    """One clean body for the Unity viewer, on a freshly created human.
+
+    Fresh on purpose: `probe_path_independence` shows that a human driven
+    through other macro vectors carries ~1e-7 m of that history in its race
+    key-block data, so a body baked after the experiments would not be
+    reproducible from its macro vector alone.
+
+    The height macro is left at the NEUTRAL 0.5 rather than set to some target
+    stature, because `HumanMesh` normalises the mesh to unit height on import
+    and Unity scales it per villager. What the macro would still change is
+    PROPORTION, because the min/max height targets are shape targets rather
+    than a scale, so the neutral is the only value that adds no shape opinion.
+    It is also the one value inside the dead band, where no height target
+    applies at all.
+    """
+    export_service = dynamic_import("mpfb.services.exportservice", "ExportService")
+    object_service = dynamic_import("mpfb.services.objectservice", "ObjectService")
+    human_service = dynamic_import("mpfb.services.humanservice", "HumanService")
+
+    for obj in list(bpy.data.objects):
+        bpy.data.objects.remove(obj, do_unlink=True)
+
+    race = ETHNICITY_PRESETS[ethnicity]
+    character = Character()
+    character.apply(age=0.5, height=0.5, muscle=0.5, weight=0.5, proportions=0.5,
+                    **race, **macros)
+    authored = character.stature()
+
+    human_service.add_builtin_rig(character.obj, "game_engine")
+    root = export_service.create_character_copy(character.obj, name_suffix="_body")
+    mesh = object_service.find_object_of_type_amongst_nearest_relatives(root, "Basemesh")
+    export_service.bake_modifiers_remove_helpers(
+        mesh, bake_masks=True, bake_subdiv=True, remove_helpers=True, also_proxy=True)
+    dropped = bake_shape_keys(mesh)
+
+    os.makedirs(out_dir, exist_ok=True)
+    path = os.path.join(out_dir, filename)
+    bpy.ops.object.select_all(action="DESELECT")
+    root.select_set(True)
+    for child in object_service.get_list_of_children(root):
+        child.select_set(True)
+    bpy.context.view_layer.objects.active = root
+    bpy.ops.export_scene.fbx(filepath=path, use_selection=True,
+                             add_leaf_bones=False, bake_anim=False)
+
+    return {
+        "path": path,
+        "authored_stature_m": authored,
+        "baked_stature_m": stature(mesh),
+        "shape_keys_baked": dropped,
+        "verts": len(mesh.data.vertices),
+        "macros": {**{"age": 0.5, "height": 0.5, "muscle": 0.5, "weight": 0.5,
+                      "proportions": 0.5}, **race, **macros},
+    }
+
+
+# The ethnicity macro is held FIXED (investigation memo §3.3: the engine has
+# founder-lineage ancestry, not continental ancestry, so any value fed to
+# these sliders would be invented at render time). Session 22 measured what
+# the CHOICE costs: 18.18 mm of stature between these two. `even_thirds` is
+# MPFB's own default and is the shipped one, because it implies nothing the
+# engine does not model.
+ETHNICITY_PRESETS = {
+    "even_thirds": dict(african=0.33, asian=0.33, caucasian=0.33),
+    "african": dict(african=1.0, asian=0.0, caucasian=0.0),
+    "asian": dict(african=0.0, asian=1.0, caucasian=0.0),
+    "caucasian": dict(african=0.0, asian=0.0, caucasian=1.0),
+}
+
+
 def export_variants(character: Character, out_dir: str) -> dict:
     """Three FBX files that differ only in how they were prepared.
 
@@ -410,9 +481,41 @@ def main() -> int:
                         help="height macro for the exported character "
                              "(default 0.5151, the reachable stature nearest 1.75 m "
                              "for a mid-build adult male)")
+    parser.add_argument("--mode", choices=("probe", "bodies"), default="probe",
+                        help="probe = measure the macros; bodies = export the "
+                             "two viewer bodies and nothing else")
+    parser.add_argument("--ethnicity", choices=tuple(ETHNICITY_PRESETS),
+                        default="even_thirds",
+                        help="the FIXED ethnicity macro. See the note beside "
+                             "ETHNICITY_PRESETS; the choice is worth 18.18 mm "
+                             "of stature and is held constant by design.")
     args = parser.parse_args(argv)
 
     version = ensure_mpfb()
+
+    if args.mode == "bodies":
+        bodies = {
+            "human_female.fbx": dict(gender=0.0),
+            "human_male.fbx": dict(gender=1.0),
+        }
+        report = {
+            "blender": bpy.app.version_string,
+            "mpfb": str(version),
+            "ethnicity": args.ethnicity,
+            "bodies": {},
+        }
+        for filename, macros in bodies.items():
+            result = export_body(args.out, filename, args.ethnicity, **macros)
+            report["bodies"][filename] = result
+            print(f"[BODY] {filename}: {result['baked_stature_m']:.6f} m, "
+                  f"{result['verts']} verts, "
+                  f"{result['shape_keys_baked']} shape keys baked out")
+        out_path = os.path.join(args.out, "mpfb_bodies.json")
+        with open(out_path, "w", encoding="utf-8") as handle:
+            json.dump(report, handle, indent=2)
+        print(f"[BODY] wrote {out_path}")
+        return 0
+
     for obj in list(bpy.data.objects):
         bpy.data.objects.remove(obj, do_unlink=True)
 

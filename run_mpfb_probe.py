@@ -45,6 +45,7 @@ import json
 import os
 import platform
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -172,6 +173,175 @@ def install_mpfb(exe: Path, work: Path) -> None:
 
 
 # ---------------------------------------------------------------------
+# the inspector's portrait
+# ---------------------------------------------------------------------
+
+def portrait(args) -> int:
+    """Render the inspector's moving head and check what came out.
+
+    WHY THIS IS NOT AN EditMode TEST. `run_unity_tests.py` runs the editor
+    under `-nographics`, which has no device and cannot render to a texture.
+    PortraitPoseTests pins all the arithmetic, but arithmetic cannot tell you
+    that the camera is aimed at a head rather than at a shoulder or at nothing.
+    This renders four pictures and asserts on their pixels.
+
+    Four questions, one picture each:
+      * is there a face at all, or is the frame empty backdrop,
+      * does it MOVE between two times,
+      * do two villagers move DIFFERENTLY at the same time,
+      * is the backdrop the lineage colour it was given.
+    """
+    import run_unity_tests as rut
+    from mpfb import unity_measure
+
+    manifest = json.loads((rut.PACKAGE / "package.json").read_text(encoding="utf-8"))
+    editor = rut.find_editor(manifest.get("unity", "6000.0"))
+    project = rut.DEFAULT_PROJECT
+    log_dir = project.parent / (project.name + "-logs")
+    png_dir = (args.out / "portraits").resolve()
+
+    shots = unity_measure.check_portrait(project, log_dir, editor, png_dir)
+    unity_measure.write_json(shots, args.out / "unity_portrait.json")
+
+    device = shots.pop("device", {})
+    print(f"\n  device {device.get('graphicsDeviceType')}, "
+          f"body installed {device.get('bodyInstalled')}")
+    if str(device.get("bodyInstalled", "")).lower() != "true":
+        print("  no body pack installed; the portrait cannot draw a face. "
+              "Run --export-bodies first.")
+        return 1
+
+    failed = 0
+    for tag, shot in sorted(shots.items()):
+        fraction = shot.get("subject_fraction", 0.0)
+        # A head and shoulders at this framing covers roughly a third of the
+        # frame. Far below means the camera is looking past the body; far above
+        # means it is inside it.
+        ok = 0.15 <= fraction <= 0.72
+        failed += not ok
+        print(f"  [{'PASS' if ok else 'FAIL'}] {tag}: subject fills "
+              f"{fraction:.1%} of frame, backdrop rgb "
+              f"{shot.get('backdrop_rgb')}, mean luma {shot.get('mean_luma')}")
+
+    def box(tag):
+        return shots.get(tag, {}).get("subject_box")
+
+    moved = box("Selin-24_t0.0") != box("Selin-24_t3.7")
+    print(f"  [{'PASS' if moved else 'FAIL'}] the head moves between t=0.0 and "
+          f"t=3.7 ({box('Selin-24_t0.0')} -> {box('Selin-24_t3.7')})")
+    failed += not moved
+
+    apart = box("Selin-24_t3.7") != box("Tomas-28_t3.7")
+    print(f"  [{'PASS' if apart else 'FAIL'}] two villagers are at different "
+          f"points in the sway at the same instant")
+    failed += not apart
+
+    warm = shots.get("Selin-24_t0.0", {}).get("backdrop_rgb") or [0, 0, 0]
+    cool = shots.get("Tomas-28_t0.0", {}).get("backdrop_rgb") or [0, 0, 0]
+    tinted = warm[0] > warm[2] and cool[2] > cool[0]
+    print(f"  [{'PASS' if tinted else 'FAIL'}] the backdrop carries the lineage "
+          f"colour (warm {warm} vs cool {cool})")
+    failed += not tinted
+
+    print(f"\n  pictures in {png_dir}")
+    return 1 if failed else 0
+
+
+# ---------------------------------------------------------------------
+# the two viewer bodies
+# ---------------------------------------------------------------------
+
+def bodies(exe: Path, args) -> int:
+    """Export `human_female.fbx` / `human_male.fbx`, optionally installing them.
+
+    These are what turns UNITY_PLAN.md Stage 6's last line, "replace capsules
+    with one shared human mesh", from a plan into a village of people, and what
+    gives the inspector a face to animate.
+
+    NOT TRACKED, and that is the whole shape of the design. MPFB's code is
+    GPLv3 and its output is CC0, so the FBX may ship anywhere but the generator
+    may never live inside the Unity package. `HumanMesh` therefore treats their
+    absence as a supported state: with no body installed every villager stays a
+    capsule and the inspector says why.
+    """
+    out = args.out
+    out.mkdir(parents=True, exist_ok=True)
+    wanted = [out / "human_female.fbx", out / "human_male.fbx"]
+
+    if args.export_bodies or not all(p.exists() for p in wanted):
+        code, output = _run_blender(exe, ["-P", str(PROBE), "--",
+                                          "--out", str(out),
+                                          "--mode", "bodies",
+                                          "--ethnicity", args.ethnicity])
+        if code != 0:
+            print(output[-6000:])
+            return 1
+        for line in output.splitlines():
+            if line.startswith("[BODY]"):
+                print("  " + line)
+
+    missing = [p for p in wanted if not p.exists()]
+    if missing:
+        print(f"  MISSING after export: {[p.name for p in missing]}")
+        return 1
+
+    # Verify in the throwaway project BEFORE touching anyone's real one.
+    # HumanMesh.Bake has one job, folding the FBX's centimetre Z-up transform
+    # into the vertices, and the EditMode suite can only test that job on
+    # synthetic boxes. This is the only place it meets a real MPFB export.
+    import run_unity_tests as rut
+    from mpfb import unity_measure
+
+    manifest = json.loads((rut.PACKAGE / "package.json").read_text(encoding="utf-8"))
+    editor = rut.find_editor(manifest.get("unity", "6000.0"))
+    project = rut.DEFAULT_PROJECT
+    log_dir = project.parent / (project.name + "-logs")
+    print(f"\n  verifying in {project.name}")
+    checked = unity_measure.check_bodies(out, project, log_dir, editor)
+    unity_measure.write_json(checked, out / "unity_bodies.json")
+
+    failed = 0
+    for label, got in sorted(checked.items()):
+        # C# writes a lowercase bool literal; comparing against Python's "True"
+        # made a working pipeline report FAIL twice before this was noticed.
+        if str(got.get("installed", "")).lower() != "true":
+            print(f"  [FAIL] {label}: not installed")
+            failed += 1
+            continue
+        height = got.get("unit_height", 0.0)
+        floor = got.get("unit_min_y", 1.0)
+        rendered = got.get("rendered_at_1p754592", 0.0)
+        ok = (abs(height - 1.0) < 1e-4 and abs(floor) < 1e-4
+              and abs(rendered - 1.754592) < 1e-4)
+        failed += not ok
+        print(f"  [{'PASS' if ok else 'FAIL'}] {label}: authored "
+              f"{got.get('authored_stature_m'):.6f} m, normalised to "
+              f"{height:.6f} tall standing on {floor:+.6f}, "
+              f"renders {rendered:.6f} m when scaled to 1.754592")
+    if failed:
+        print("\n  the body pipeline is broken; not installing anywhere else.")
+        return 1
+
+    if args.install_bodies is None:
+        print(f"\n  bodies are in {out}. Re-run with "
+              f"--install-bodies <projectPath> to put them in a Unity project.")
+        return 0
+
+    project = args.install_bodies.resolve()
+    if not (project / "Assets").is_dir():
+        print(f"  {project} does not look like a Unity project (no Assets/).")
+        return 1
+    target = project / "Assets" / "Resources" / "extnpc"
+    target.mkdir(parents=True, exist_ok=True)
+    for path in wanted:
+        shutil.copy2(path, target / path.name)
+        print(f"  installed {path.name} -> {target / path.name}")
+    print("\n  Unity will import them on next focus. VillagerView picks them "
+          "up automatically; no scene change is needed.")
+    return 0
+
+
+# ---------------------------------------------------------------------
 # verdicts
 # ---------------------------------------------------------------------
 
@@ -230,12 +400,31 @@ def main() -> int:
                         help="Blender half only")
     parser.add_argument("--out", type=Path, default=OUT_DIR)
     parser.add_argument("--export-macro", type=float, default=0.5151)
+    parser.add_argument("--export-bodies", action="store_true",
+                        help="export the two viewer bodies (human_female.fbx, "
+                             "human_male.fbx) instead of running the probe")
+    parser.add_argument("--ethnicity", default="even_thirds",
+                        help="the fixed ethnicity macro for --export-bodies")
+    parser.add_argument("--install-bodies", type=Path, default=None,
+                        help="a Unity project to copy the bodies into, at "
+                             "Assets/Resources/extnpc/. Implies --export-bodies "
+                             "if the files are not already there.")
+    parser.add_argument("--check-portrait", action="store_true",
+                        help="render the inspector's portrait head to PNG and "
+                             "report on it. Needs a graphics device, so this is "
+                             "the one command here that is not -nographics.")
     args = parser.parse_args()
 
     exe = args.blender or find_blender()
     print(f"  blender  {exe}")
     if args.install_mpfb:
         install_mpfb(exe, args.out / "_install")
+
+    if args.check_portrait:
+        return portrait(args)
+
+    if args.export_bodies or args.install_bodies:
+        return bodies(exe, args)
 
     args.out.mkdir(parents=True, exist_ok=True)
     code, output = _run_blender(exe, ["-P", str(PROBE), "--",
