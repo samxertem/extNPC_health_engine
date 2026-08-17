@@ -310,6 +310,227 @@
       }
     ]
   },
+  "macro_config": {
+    "bands": {
+      "age": [
+        {
+          "lowest": -0.01,
+          "highest": 0.1874998,
+          "low": "baby",
+          "high": "child"
+        },
+        {
+          "lowest": 0.1874999,
+          "highest": 0.49998,
+          "low": "child",
+          "high": "young"
+        },
+        {
+          "lowest": 0.49999,
+          "highest": 1.01,
+          "low": "young",
+          "high": "old"
+        }
+      ],
+      "height": [
+        {
+          "lowest": -0.01,
+          "highest": 0.49,
+          "low": "minheight",
+          "high": ""
+        },
+        {
+          "lowest": 0.51,
+          "highest": 1.01,
+          "low": "",
+          "high": "maxheight"
+        }
+      ],
+      "gender": [
+        {
+          "lowest": -0.01,
+          "highest": 1.01,
+          "low": "female",
+          "high": "male"
+        }
+      ],
+      "weight": [
+        {
+          "lowest": -0.01,
+          "highest": 0.49998,
+          "low": "minweight",
+          "high": "averageweight"
+        },
+        {
+          "lowest": 0.49999,
+          "highest": 1.01,
+          "low": "averageweight",
+          "high": "maxweight"
+        }
+      ],
+      "muscle": [
+        {
+          "lowest": -0.01,
+          "highest": 0.49998,
+          "low": "minmuscle",
+          "high": "averagemuscle"
+        },
+        {
+          "lowest": 0.49999,
+          "highest": 1.01,
+          "low": "averagemuscle",
+          "high": "maxmuscle"
+        }
+      ],
+      "proportions": [
+        {
+          "lowest": -0.01,
+          "highest": 0.4999,
+          "low": "uncommonproportions",
+          "high": ""
+        },
+        {
+          "lowest": 0.5,
+          "highest": 1.01,
+          "low": "",
+          "high": "idealproportions"
+        }
+      ]
+    },
+    "height_checks": [
+      {
+        "macro": 0.0,
+        "predicted_component": 0.98,
+        "predicted_names": [
+          "minheight"
+        ],
+        "live_shape_key_weight": 0.9703959822654724
+      },
+      {
+        "macro": 0.2,
+        "predicted_component": 0.58,
+        "predicted_names": [
+          "minheight"
+        ],
+        "live_shape_key_weight": 0.5743160247802734
+      },
+      {
+        "macro": 0.4,
+        "predicted_component": 0.18,
+        "predicted_names": [
+          "minheight"
+        ],
+        "live_shape_key_weight": 0.1782359927892685
+      },
+      {
+        "macro": 0.47,
+        "predicted_component": 0.04,
+        "predicted_names": [
+          "minheight"
+        ],
+        "live_shape_key_weight": 0.039608001708984375
+      },
+      {
+        "macro": 0.48,
+        "predicted_component": 0.02,
+        "predicted_names": [
+          "minheight"
+        ],
+        "live_shape_key_weight": 0.019804000854492188
+      },
+      {
+        "macro": 0.485,
+        "predicted_component": 0.01,
+        "predicted_names": [
+          "minheight"
+        ],
+        "live_shape_key_weight": 0.0
+      },
+      {
+        "macro": 0.49,
+        "predicted_component": 0,
+        "predicted_names": [],
+        "live_shape_key_weight": 0.0
+      },
+      {
+        "macro": 0.5,
+        "predicted_component": 0,
+        "predicted_names": [],
+        "live_shape_key_weight": 0.0
+      },
+      {
+        "macro": 0.51,
+        "predicted_component": 0,
+        "predicted_names": [],
+        "live_shape_key_weight": 0.0
+      },
+      {
+        "macro": 0.515,
+        "predicted_component": 0.01,
+        "predicted_names": [
+          "maxheight"
+        ],
+        "live_shape_key_weight": 0.0
+      },
+      {
+        "macro": 0.52,
+        "predicted_component": 0.02,
+        "predicted_names": [
+          "maxheight"
+        ],
+        "live_shape_key_weight": 0.019804000854492188
+      },
+      {
+        "macro": 0.6,
+        "predicted_component": 0.18,
+        "predicted_names": [
+          "maxheight"
+        ],
+        "live_shape_key_weight": 0.1782359927892685
+      },
+      {
+        "macro": 0.8,
+        "predicted_component": 0.58,
+        "predicted_names": [
+          "maxheight"
+        ],
+        "live_shape_key_weight": 0.5743160247802734
+      },
+      {
+        "macro": 1.0,
+        "predicted_component": 0.98,
+        "predicted_names": [
+          "maxheight"
+        ],
+        "live_shape_key_weight": 0.9703959822654724
+      }
+    ],
+    "declared_height_gap": [
+      0.49,
+      0.51
+    ],
+    "macros_inside_declared_gap": [
+      0.49,
+      0.5,
+      0.51
+    ],
+    "macros_dropped_by_the_0p01_cutoff": [
+      0.485,
+      0.515
+    ],
+    "universal_factor_ratios": [
+      0.9901999819035433,
+      0.9902000427246095,
+      0.9901999599403806,
+      0.9902000427246094,
+      0.9902000427246094,
+      0.9902000427246094,
+      0.9901999599403806,
+      0.9902000427246095,
+      0.9901999819035433
+    ],
+    "universal_factor_is_constant": true
+  },
   "dead_band": {
     "female": {
       "low": 0.485,

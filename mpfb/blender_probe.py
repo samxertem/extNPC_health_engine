@@ -286,6 +286,103 @@ def probe_dead_band(character: Character, step: float = 0.001) -> dict:
     return bands
 
 
+def probe_macro_config(character: Character) -> dict:
+    """MPFB's own macro band table, and a check of the model built from it.
+
+    THIS IS THE GROUND TRUTH THE DEAD BAND WAS INFERRED FROM. Session 22
+    derived `2 * (0.49 - v)` and the flat zone by measuring statures and
+    reading `_interpolate_macro_components`. `macro.json` states both outright:
+    the height macro declares parts (-0.01, 0.49) and (0.51, 1.01), and the
+    interpolator's test is `value > lowest and value < highest`, so a value in
+    [0.49, 0.51] matches NEITHER part and produces no component at all.
+
+    **The dead band is a declared gap in the tool's configuration, not an
+    accident and not a bug.** That distinction matters for the write-up: a gap
+    somebody chose is a design constraint to map around, while a bug might be
+    fixed upstream and change every character's stature.
+
+    The returned `prediction` is the falsifiable half. For each sampled macro
+    value it computes the component weight from the CONFIG alone and compares
+    it against the weight measured off the live shape key. If MPFB ever
+    changes the bands, or if the reading of the interpolator above is wrong,
+    the two disagree.
+    """
+    config = dynamic_import("mpfb.services.targetservice", "_MACRO_CONFIG")
+    targets = config["macrotargets"]
+
+    def predict(macro_name: str, value: float) -> dict:
+        """The interpolator, reimplemented from the config, in Python."""
+        out = {}
+        for part in targets[macro_name]["parts"]:
+            lowest, highest = part["lowest"], part["highest"]
+            if not (lowest < value < highest):
+                continue
+            span = highest - lowest
+            pct = (value - lowest) / span
+            if part["low"]:
+                out[part["low"]] = round(1.0 - pct, 4)
+            if part["high"]:
+                out[part["high"]] = round(pct, 4)
+        return out
+
+    # Measure the live shape-key weight for the height target beside the
+    # prediction. The live weight carries the muscle/weight product as well,
+    # so the comparison is against predicted * universal, recovered from the
+    # neutral case rather than assumed.
+    checks = []
+    for value in (0.0, 0.2, 0.4, 0.47, 0.48, 0.485, 0.49, 0.5, 0.51, 0.515,
+                  0.52, 0.6, 0.8, 1.0):
+        character.apply(gender=0.0, height=value)
+        keys = character.obj.data.shape_keys
+        live = 0.0
+        if keys:
+            for block in keys.key_blocks:
+                if "$hg" in block.name:
+                    live = float(block.value)
+        predicted = predict("height", value)
+        checks.append({
+            "macro": value,
+            "predicted_component": sum(predicted.values()),
+            "predicted_names": sorted(predicted),
+            "live_shape_key_weight": live,
+        })
+
+    # The two mechanisms, separated. A macro value inside the declared gap has
+    # no component at all; one just outside it has a component that the target
+    # stack's cutoff=0.01 then throws away. Both end at a live weight of zero,
+    # and they are different facts about different code, so the probe reports
+    # them apart rather than leaving a reader to notice.
+    declared_gap = [targets["height"]["parts"][0]["highest"],
+                    targets["height"]["parts"][1]["lowest"]]
+    in_gap = [c["macro"] for c in checks
+              if declared_gap[0] <= c["macro"] <= declared_gap[1]]
+    dropped = [c["macro"] for c in checks
+               if c["predicted_component"] > 0.0
+               and c["live_shape_key_weight"] == 0.0]
+    agreeing = [c for c in checks if c["live_shape_key_weight"] > 0.0]
+    # Every surviving weight should be the predicted component times the same
+    # universal muscle/weight factor. If that ratio is not constant, the model
+    # of how the stack multiplies its components is wrong.
+    ratios = [c["live_shape_key_weight"] / c["predicted_component"]
+              for c in agreeing if c["predicted_component"] > 0.0]
+
+    return {
+        "bands": {name: targets[name]["parts"]
+                  for name in ("age", "height", "gender", "weight", "muscle",
+                               "proportions")
+                  if name in targets},
+        "height_checks": checks,
+        # The one fact that makes the dead band explicable rather than merely
+        # observed: it is a gap MPFB DECLARES, not an accident.
+        "declared_height_gap": declared_gap,
+        "macros_inside_declared_gap": in_gap,
+        "macros_dropped_by_the_0p01_cutoff": dropped,
+        "universal_factor_ratios": ratios,
+        "universal_factor_is_constant":
+            bool(ratios) and (max(ratios) - min(ratios)) < 1e-4,
+    }
+
+
 def probe_coupling(character: Character) -> dict:
     """How much does each OTHER macro move stature, at a fixed height macro?
 
@@ -527,6 +624,7 @@ def main() -> int:
         "scale_length": bpy.context.scene.unit_settings.scale_length,
         "path_independence": probe_path_independence(character),
         "height_curve": probe_height_curve(character),
+        "macro_config": probe_macro_config(character),
         "dead_band": probe_dead_band(character),
         "coupling": probe_coupling(character),
     }
