@@ -15,6 +15,13 @@ namespace ExtNPC.Editor
         [MenuItem("GameObject/extNPC/World Viewer", false, 10)]
         public static void CreateViewer()
         {
+            // HumanMesh caches the result of its Resources lookup, including a
+            // negative one. Dropping an MPFB body into Assets/Resources/extnpc/
+            // and then building a viewer would otherwise give capsules until
+            // the next domain reload, which looks like the body pack not
+            // working rather than like a stale cache.
+            HumanMesh.Forget();
+
             var root = new GameObject("extNPC World");
             var loader = root.AddComponent<ExtNpcWorldLoader>();
             var renderer = root.AddComponent<WorldRenderer>();

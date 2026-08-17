@@ -117,7 +117,11 @@ namespace ExtNPC.View
         /// </summary>
         private void Update()
         {
-            if (!showPortrait || !CharacterPortrait.BodyInstalled)
+            // `show` as well as `showPortrait`: with the panel hidden there is
+            // nothing to blit the texture into, and rendering a camera every
+            // frame for an invisible picture is the kind of cost that is
+            // invisible until someone profiles a build.
+            if (!show || !showPortrait || !CharacterPortrait.BodyInstalled)
             {
                 _portrait?.ClearSubject();
                 return;
