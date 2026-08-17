@@ -1,0 +1,74 @@
+{
+  "mpfb_baked.fbx": {
+    "useFileScale": "True fileScale=0.01",
+    "cached_renderer_bounds": [
+      1.164235,
+      1.948065,
+      0.58801
+    ],
+    "local_mesh_bounds": [
+      0.011401,
+      0.004768,
+      0.017546
+    ],
+    "blendShapes": "0 bones=53",
+    "vertex_span": [
+      1.14008,
+      1.754592,
+      0.476798
+    ],
+    "vertex_min": [
+      -0.57004,
+      -0.000338,
+      -0.097963
+    ]
+  },
+  "mpfb_gamerig.fbx": {
+    "useFileScale": "True fileScale=0.01",
+    "cached_renderer_bounds": [
+      1.778608,
+      2.662778,
+      1.015277
+    ],
+    "local_mesh_bounds": [
+      0.014239,
+      0.006015,
+      0.023884
+    ],
+    "blendShapes": "3 bones=53",
+    "vertex_span": [
+      0.99254,
+      1.66589,
+      0.42301
+    ],
+    "vertex_min": [
+      -0.49627,
+      0.000983,
+      -0.10154
+    ]
+  },
+  "mpfb_norig.fbx": {
+    "useFileScale": "True fileScale=0.01",
+    "cached_renderer_bounds": [
+      0.014239,
+      0.006015,
+      0.023884
+    ],
+    "local_mesh_bounds": [
+      0.014239,
+      0.006015,
+      0.023884
+    ],
+    "blendShapes": "3 bones=0",
+    "vertex_span": [
+      0.009925,
+      0.00423,
+      0.016659
+    ],
+    "vertex_min": [
+      -0.004963,
+      -0.003215,
+      1e-05
+    ]
+  }
+}

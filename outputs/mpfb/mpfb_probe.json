@@ -1,0 +1,433 @@
+{
+  "blender": "4.4.3",
+  "mpfb": "(2, 0, 17)",
+  "unit_system": "METRIC",
+  "scale_length": 1.0,
+  "path_independence": {
+    "histories": {
+      "fresh": {
+        "stature_m": 1.5912298129405826,
+        "key_block_order": [
+          "Basis",
+          "$md-$as-$fe-$yn",
+          "$md-$ca-$fe-$yn",
+          "$md-$af-$fe-$yn",
+          "$md-universal-$fe-$yn-$av$mu-$av$wg"
+        ],
+        "key_block_weights": {
+          "Basis": 0.0,
+          "$md-$as-$fe-$yn": 0.3267660140991211,
+          "$md-$ca-$fe-$yn": 0.3267660140991211,
+          "$md-$af-$fe-$yn": 0.3267660140991211,
+          "$md-universal-$fe-$yn-$av$mu-$av$wg": 0.9901999831199646
+        },
+        "key_block_digest": {
+          "Basis": "47126384a96f0399",
+          "$md-$as-$fe-$yn": "2863fc7c1723b490",
+          "$md-$ca-$fe-$yn": "9f2d202944a456f3",
+          "$md-$af-$fe-$yn": "42f8a8b05168c73c",
+          "$md-universal-$fe-$yn-$av$mu-$av$wg": "47126384a96f0399"
+        },
+        "base_mesh_digest": "47126384a96f0399"
+      },
+      "after_height_1": {
+        "stature_m": 1.5912298129405826,
+        "key_block_order": [
+          "Basis",
+          "$md-$as-$fe-$yn",
+          "$md-$ca-$fe-$yn",
+          "$md-$af-$fe-$yn",
+          "$md-universal-$fe-$yn-$av$mu-$av$wg"
+        ],
+        "key_block_weights": {
+          "Basis": 0.0,
+          "$md-$as-$fe-$yn": 0.3267660140991211,
+          "$md-$ca-$fe-$yn": 0.3267660140991211,
+          "$md-$af-$fe-$yn": 0.3267660140991211,
+          "$md-universal-$fe-$yn-$av$mu-$av$wg": 0.9901999831199646
+        },
+        "key_block_digest": {
+          "Basis": "47126384a96f0399",
+          "$md-$as-$fe-$yn": "2863fc7c1723b490",
+          "$md-$ca-$fe-$yn": "9f2d202944a456f3",
+          "$md-$af-$fe-$yn": "42f8a8b05168c73c",
+          "$md-universal-$fe-$yn-$av$mu-$av$wg": "47126384a96f0399"
+        },
+        "base_mesh_digest": "47126384a96f0399"
+      },
+      "after_height_0": {
+        "stature_m": 1.5912298129405826,
+        "key_block_order": [
+          "Basis",
+          "$md-$as-$fe-$yn",
+          "$md-$ca-$fe-$yn",
+          "$md-$af-$fe-$yn",
+          "$md-universal-$fe-$yn-$av$mu-$av$wg"
+        ],
+        "key_block_weights": {
+          "Basis": 0.0,
+          "$md-$as-$fe-$yn": 0.3267660140991211,
+          "$md-$ca-$fe-$yn": 0.3267660140991211,
+          "$md-$af-$fe-$yn": 0.3267660140991211,
+          "$md-universal-$fe-$yn-$av$mu-$av$wg": 0.9901999831199646
+        },
+        "key_block_digest": {
+          "Basis": "47126384a96f0399",
+          "$md-$as-$fe-$yn": "2863fc7c1723b490",
+          "$md-$ca-$fe-$yn": "9f2d202944a456f3",
+          "$md-$af-$fe-$yn": "42f8a8b05168c73c",
+          "$md-universal-$fe-$yn-$av$mu-$av$wg": "47126384a96f0399"
+        },
+        "base_mesh_digest": "47126384a96f0399"
+      },
+      "after_male_tall": {
+        "stature_m": 1.5912296985043213,
+        "key_block_order": [
+          "Basis",
+          "$md-$as-$fe-$yn",
+          "$md-$ca-$fe-$yn",
+          "$md-$af-$fe-$yn",
+          "$md-universal-$fe-$yn-$av$mu-$av$wg"
+        ],
+        "key_block_weights": {
+          "Basis": 0.0,
+          "$md-$as-$fe-$yn": 0.3267660140991211,
+          "$md-$ca-$fe-$yn": 0.3267660140991211,
+          "$md-$af-$fe-$yn": 0.3267660140991211,
+          "$md-universal-$fe-$yn-$av$mu-$av$wg": 0.9901999831199646
+        },
+        "key_block_digest": {
+          "Basis": "47126384a96f0399",
+          "$md-$as-$fe-$yn": "4e7af3468715da3d",
+          "$md-$ca-$fe-$yn": "c8d08c37b59655b1",
+          "$md-$af-$fe-$yn": "a00c1635566db832",
+          "$md-universal-$fe-$yn-$av$mu-$av$wg": "47126384a96f0399"
+        },
+        "base_mesh_digest": "47126384a96f0399"
+      },
+      "after_three_states": {
+        "stature_m": 1.5912296985043213,
+        "key_block_order": [
+          "Basis",
+          "$md-$as-$fe-$yn",
+          "$md-$ca-$fe-$yn",
+          "$md-$af-$fe-$yn",
+          "$md-universal-$fe-$yn-$av$mu-$av$wg"
+        ],
+        "key_block_weights": {
+          "Basis": 0.0,
+          "$md-$as-$fe-$yn": 0.3267660140991211,
+          "$md-$ca-$fe-$yn": 0.3267660140991211,
+          "$md-$af-$fe-$yn": 0.3267660140991211,
+          "$md-universal-$fe-$yn-$av$mu-$av$wg": 0.9901999831199646
+        },
+        "key_block_digest": {
+          "Basis": "47126384a96f0399",
+          "$md-$as-$fe-$yn": "4e7af3468715da3d",
+          "$md-$ca-$fe-$yn": "c8d08c37b59655b1",
+          "$md-$af-$fe-$yn": "a00c1635566db832",
+          "$md-universal-$fe-$yn-$av$mu-$av$wg": "47126384a96f0399"
+        },
+        "base_mesh_digest": "47126384a96f0399"
+      }
+    },
+    "bit_identical": false,
+    "distinct_statures": 2,
+    "distinct_key_orders": 1,
+    "spread_mm": 0.00011443626135587692
+  },
+  "height_curve": {
+    "female": [
+      {
+        "macro": 0.0,
+        "stature_m": 1.2351914857281372
+      },
+      {
+        "macro": 0.05,
+        "stature_m": 1.2715219472302124
+      },
+      {
+        "macro": 0.1,
+        "stature_m": 1.307852289522998
+      },
+      {
+        "macro": 0.15,
+        "stature_m": 1.3441827510250732
+      },
+      {
+        "macro": 0.2,
+        "stature_m": 1.3805132125271484
+      },
+      {
+        "macro": 0.25,
+        "stature_m": 1.416843554819934
+      },
+      {
+        "macro": 0.3,
+        "stature_m": 1.4531740163220093
+      },
+      {
+        "macro": 0.35,
+        "stature_m": 1.4895044778240845
+      },
+      {
+        "macro": 0.4,
+        "stature_m": 1.5258349393261597
+      },
+      {
+        "macro": 0.45,
+        "stature_m": 1.5621654008282349
+      },
+      {
+        "macro": 0.5,
+        "stature_m": 1.5912296985043213
+      },
+      {
+        "macro": 0.55,
+        "stature_m": 1.648415666713845
+      },
+      {
+        "macro": 0.6,
+        "stature_m": 1.719929373357445
+      },
+      {
+        "macro": 0.65,
+        "stature_m": 1.791471335105598
+      },
+      {
+        "macro": 0.7,
+        "stature_m": 1.8630132966209203
+      },
+      {
+        "macro": 0.75,
+        "stature_m": 1.9345552583690733
+      },
+      {
+        "macro": 0.8,
+        "stature_m": 2.0060971009079367
+      },
+      {
+        "macro": 0.85,
+        "stature_m": 2.077639181748964
+      },
+      {
+        "macro": 0.9,
+        "stature_m": 2.1491872598417103
+      },
+      {
+        "macro": 0.95,
+        "stature_m": 2.2207588080782443
+      },
+      {
+        "macro": 1.0,
+        "stature_m": 2.292330594966188
+      }
+    ],
+    "male": [
+      {
+        "macro": 0.0,
+        "stature_m": 1.3734578628791496
+      },
+      {
+        "macro": 0.05,
+        "stature_m": 1.40974859718699
+      },
+      {
+        "macro": 0.1,
+        "stature_m": 1.44603945070412
+      },
+      {
+        "macro": 0.15,
+        "stature_m": 1.4823303042212501
+      },
+      {
+        "macro": 0.2,
+        "stature_m": 1.5186211577383801
+      },
+      {
+        "macro": 0.25,
+        "stature_m": 1.5549120112555102
+      },
+      {
+        "macro": 0.3,
+        "stature_m": 1.5912027454469353
+      },
+      {
+        "macro": 0.35,
+        "stature_m": 1.6274935989640653
+      },
+      {
+        "macro": 0.4,
+        "stature_m": 1.6637844524811953
+      },
+      {
+        "macro": 0.45,
+        "stature_m": 1.7000753059983253
+      },
+      {
+        "macro": 0.5,
+        "stature_m": 1.7291079172864556
+      },
+      {
+        "macro": 0.55,
+        "stature_m": 1.786389063927345
+      },
+      {
+        "macro": 0.6,
+        "stature_m": 1.8579903183272108
+      },
+      {
+        "macro": 0.65,
+        "stature_m": 1.9295916920527816
+      },
+      {
+        "macro": 0.7,
+        "stature_m": 2.001193065661937
+      },
+      {
+        "macro": 0.75,
+        "stature_m": 2.072794320061803
+      },
+      {
+        "macro": 0.8,
+        "stature_m": 2.144395812880248
+      },
+      {
+        "macro": 0.85,
+        "stature_m": 2.2159970675129443
+      },
+      {
+        "macro": 0.9,
+        "stature_m": 2.2875985600985587
+      },
+      {
+        "macro": 0.95,
+        "stature_m": 2.359199814731255
+      },
+      {
+        "macro": 1.0,
+        "stature_m": 2.4308013075497
+      }
+    ]
+  },
+  "dead_band": {
+    "female": {
+      "low": 0.485,
+      "high": 0.515,
+      "width": 0.03,
+      "stature_m": 1.5912296985043213,
+      "step_mm": 4.359602928161621
+    },
+    "male": {
+      "low": 0.485,
+      "high": 0.515,
+      "width": 0.03,
+      "stature_m": 1.7291079172864556,
+      "step_mm": 4.354849981609732
+    },
+    "androgynous": {
+      "low": 0.48,
+      "high": 0.52,
+      "width": 0.04,
+      "stature_m": 1.659431338950526,
+      "step_mm": 8.0718994140625
+    },
+    "male_muscle_0": {
+      "low": 0.485,
+      "high": 0.515,
+      "width": 0.03,
+      "stature_m": 1.7291079172864556,
+      "step_mm": 4.269589262548834
+    }
+  },
+  "coupling": {
+    "reference_m": 1.7472904585301876,
+    "deltas": {
+      "muscle=0.0": {
+        "stature_m": 1.7472904585301876,
+        "delta_mm": 0.0
+      },
+      "muscle=1.0": {
+        "stature_m": 1.7472904585301876,
+        "delta_mm": 0.0
+      },
+      "weight=0.0": {
+        "stature_m": 1.7472904585301876,
+        "delta_mm": 0.0
+      },
+      "weight=1.0": {
+        "stature_m": 1.7472904585301876,
+        "delta_mm": 0.0
+      },
+      "proportions=0.0": {
+        "stature_m": 1.7472904585301876,
+        "delta_mm": 0.0
+      },
+      "proportions=1.0": {
+        "stature_m": 1.7472904585301876,
+        "delta_mm": 0.0
+      },
+      "age=0.0": {
+        "stature_m": 0.6498570914845914,
+        "delta_mm": -1097.4333670455962
+      },
+      "age=0.1875": {
+        "stature_m": 1.3595217443071306,
+        "delta_mm": -387.76871422305703
+      },
+      "age=0.25": {
+        "stature_m": 1.4370147669687867,
+        "delta_mm": -310.2756915614009
+      },
+      "age=0.75": {
+        "stature_m": 1.7322921626036987,
+        "delta_mm": -14.998295926488936
+      },
+      "age=1.0": {
+        "stature_m": 1.71826432319358,
+        "delta_mm": -29.026135336607695
+      },
+      "gender=0.0": {
+        "stature_m": 1.6059847045689821,
+        "delta_mm": -141.30575396120548
+      },
+      "african=1": {
+        "stature_m": 1.81388224568218,
+        "delta_mm": 66.59178715199232
+      },
+      "asian=1": {
+        "stature_m": 1.6286579775623977,
+        "delta_mm": -118.63248096778989
+      },
+      "even_thirds": {
+        "stature_m": 1.7291079172864556,
+        "delta_mm": -18.182541243731976
+      }
+    }
+  },
+  "export_macro": 0.5151,
+  "export_stature_m": 1.7545919009135105,
+  "export_spans_xyz_m": [
+    1.1400803327560425,
+    0.476798452436924,
+    1.7545919009135105
+  ],
+  "exports": {
+    "norig": {
+      "path": "C:\\Users\\samal\\Desktop\\extNPC_health_engine\\outputs\\mpfb\\mpfb_norig.fbx",
+      "blender_stature_m": 1.7545919009135105,
+      "expect": "WRONG: 100x small, Z-up preserved"
+    },
+    "gamerig": {
+      "path": "C:\\Users\\samal\\Desktop\\extNPC_health_engine\\outputs\\mpfb\\mpfb_gamerig.fbx",
+      "blender_stature_m": 1.7545917872048449,
+      "expect": "WRONG: neutral base mesh, blendshapes at 0"
+    },
+    "baked": {
+      "path": "C:\\Users\\samal\\Desktop\\extNPC_health_engine\\outputs\\mpfb\\mpfb_baked.fbx",
+      "blender_stature_m": 1.7545917872048449,
+      "shape_keys_baked": 4,
+      "expect": "CORRECT: matches Blender exactly"
+    }
+  }
+}
