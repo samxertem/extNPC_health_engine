@@ -1,0 +1,54 @@
+{
+  "device": {
+    "graphicsDeviceType": "Direct3D12",
+    "bodyInstalled": "True"
+  },
+  "Selin-24_t0.0": {
+    "rendered": "true",
+    "subject_fraction": 0.357,
+    "mean_luma": 70.04,
+    "backdrop_rgb": [
+      51.0,
+      35.0,
+      30.0
+    ],
+    "subject_box": "0,0,228,210",
+    "png": "C:\\Users\\samal\\Desktop\\extNPC_health_engine\\outputs\\mpfb\\portraits\\portrait_Selin-24_t0.0.png"
+  },
+  "Selin-24_t3.7": {
+    "rendered": "true",
+    "subject_fraction": 0.3768,
+    "mean_luma": 73.17,
+    "backdrop_rgb": [
+      51.0,
+      35.0,
+      30.0
+    ],
+    "subject_box": "0,0,231,213",
+    "png": "C:\\Users\\samal\\Desktop\\extNPC_health_engine\\outputs\\mpfb\\portraits\\portrait_Selin-24_t3.7.png"
+  },
+  "Tomas-28_t0.0": {
+    "rendered": "true",
+    "subject_fraction": 0.3562,
+    "mean_luma": 70.8,
+    "backdrop_rgb": [
+      30.0,
+      39.0,
+      51.0
+    ],
+    "subject_box": "0,0,231,206",
+    "png": "C:\\Users\\samal\\Desktop\\extNPC_health_engine\\outputs\\mpfb\\portraits\\portrait_Tomas-28_t0.0.png"
+  },
+  "Tomas-28_t3.7": {
+    "rendered": "true",
+    "subject_fraction": 0.3975,
+    "mean_luma": 75.72,
+    "backdrop_rgb": [
+      30.0,
+      39.0,
+      51.0
+    ],
+    "subject_box": "5,0,231,212",
+    "png": "C:\\Users\\samal\\Desktop\\extNPC_health_engine\\outputs\\mpfb\\portraits\\portrait_Tomas-28_t3.7.png"
+  }
+}

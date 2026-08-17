@@ -1,0 +1,28 @@
+{
+  "female": {
+    "installed": "true",
+    "verts": 14517.0,
+    "authored_stature_m": 1.59123,
+    "unit_height": 1.0,
+    "unit_min_y": 0.0,
+    "unit_centre_x": 0.0,
+    "unit_centre_z": 0.0,
+    "unit_width_x": 0.610327,
+    "unit_depth_z": 0.241364,
+    "rendered_at_1p754592": 1.754592,
+    "rendered_min_y": 0.0
+  },
+  "male": {
+    "installed": "true",
+    "verts": 14517.0,
+    "authored_stature_m": 1.729108,
+    "unit_height": 1.0,
+    "unit_min_y": 0.0,
+    "unit_centre_x": 0.0,
+    "unit_centre_z": 0.0,
+    "unit_width_x": 0.65339,
+    "unit_depth_z": 0.275369,
+    "rendered_at_1p754592": 1.754592,
+    "rendered_min_y": 0.0
+  }
+}

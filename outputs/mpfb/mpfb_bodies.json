@@ -1,0 +1,43 @@
+{
+  "blender": "4.4.3",
+  "mpfb": "(2, 0, 17)",
+  "ethnicity": "even_thirds",
+  "bodies": {
+    "human_female.fbx": {
+      "path": "C:\\Users\\samal\\Desktop\\extNPC_health_engine\\outputs\\mpfb\\human_female.fbx",
+      "authored_stature_m": 1.5912298129405826,
+      "baked_stature_m": 1.5912296713504475,
+      "shape_keys_baked": 5,
+      "verts": 13380,
+      "macros": {
+        "age": 0.5,
+        "height": 0.5,
+        "muscle": 0.5,
+        "weight": 0.5,
+        "proportions": 0.5,
+        "african": 0.33,
+        "asian": 0.33,
+        "caucasian": 0.33,
+        "gender": 0.0
+      }
+    },
+    "human_male.fbx": {
+      "path": "C:\\Users\\samal\\Desktop\\extNPC_health_engine\\outputs\\mpfb\\human_male.fbx",
+      "authored_stature_m": 1.7291078989510424,
+      "baked_stature_m": 1.7291078949347138,
+      "shape_keys_baked": 5,
+      "verts": 13380,
+      "macros": {
+        "age": 0.5,
+        "height": 0.5,
+        "muscle": 0.5,
+        "weight": 0.5,
+        "proportions": 0.5,
+        "african": 0.33,
+        "asian": 0.33,
+        "caucasian": 0.33,
+        "gender": 1.0
+      }
+    }
+  }
+}
