@@ -1,0 +1,50 @@
+{
+  "capsules": {
+    "load": {
+      "loaded": "True",
+      "last_tick": 90.0,
+      "body_installed": "False"
+    },
+    "scene": {
+      "visible_count": 28.0,
+      "headcount_ok": "True",
+      "bodies_in_scene": 28.0,
+      "tallest_local_scale_y": 0.934
+    },
+    "village_wide_capsules": {
+      "png": "C:\\Users\\samal\\Desktop\\extNPC_health_engine\\outputs\\mpfb\\village\\village_wide_capsules.png",
+      "mean_luma": 74.11
+    },
+    "village_close_capsules": {
+      "png": "C:\\Users\\samal\\Desktop\\extNPC_health_engine\\outputs\\mpfb\\village\\village_close_capsules.png",
+      "mean_luma": 72.09
+    },
+    "_exit": {
+      "code": 0
+    }
+  },
+  "bodies": {
+    "load": {
+      "loaded": "True",
+      "last_tick": 90.0,
+      "body_installed": "True"
+    },
+    "scene": {
+      "visible_count": 28.0,
+      "headcount_ok": "True",
+      "bodies_in_scene": 28.0,
+      "tallest_local_scale_y": 1.868
+    },
+    "village_wide_bodies": {
+      "png": "C:\\Users\\samal\\Desktop\\extNPC_health_engine\\outputs\\mpfb\\village\\village_wide_bodies.png",
+      "mean_luma": 74.06
+    },
+    "village_close_bodies": {
+      "png": "C:\\Users\\samal\\Desktop\\extNPC_health_engine\\outputs\\mpfb\\village\\village_close_bodies.png",
+      "mean_luma": 71.78
+    },
+    "_exit": {
+      "code": 0
+    }
+  }
+}
