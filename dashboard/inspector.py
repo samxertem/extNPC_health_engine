@@ -267,7 +267,7 @@ def summary_card(world, name: Optional[str],
 
     if historical:
         body.append(html.Div(
-            f"⏱ historical view — year {frame['tick']}",
+            f"historical view — year {frame['tick']}",
             style={"color": WARN, "fontSize": "11px", "fontWeight": 700,
                    "marginBottom": "8px"}))
 

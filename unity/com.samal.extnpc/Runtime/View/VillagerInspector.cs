@@ -181,7 +181,10 @@ namespace ExtNPC.View
                 // The banner is not decoration. It is the difference between
                 // "this villager has no genetics" and "this year has no
                 // genetics recorded".
-                Label("⏱ historical view — year " +
+                // The clock glyph is gone from both UIs; see
+                // TimelineFormat.ScrubState. "historical view" was already
+                // carrying the meaning, so nothing replaces it here.
+                Label("historical view — year " +
                       InspectorFormat.Int(row.Tick), _banner);
                 GUILayout.Space(6f);
             }

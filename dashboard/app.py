@@ -2009,7 +2009,12 @@ def render_timeline_state(scrub, _tick):
     if scrub is None:
         state = html.Span("● LIVE", style={"color": GOOD})
     else:
-        state = html.Span(f"⏱ VIEWING YEAR {scrub} — press Live to return",
+        # REPLAY, not a clock glyph. U+23F1 carries emoji presentation, so a
+        # browser and Unity resolve it through different font stacks: on
+        # Windows it renders as a colour emoji that ignores the label's colour,
+        # and on a Linux or Android player it may not resolve at all. A word
+        # renders identically everywhere and pairs with "● LIVE" above.
+        state = html.Span(f"REPLAY · VIEWING YEAR {scrub} — press Live to return",
                           style={"color": WARN})
     if not WORLD.event_log:
         note = ("Drag to replay the run. Charts rebuild from history; the map "

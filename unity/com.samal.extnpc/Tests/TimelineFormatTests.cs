@@ -98,8 +98,63 @@ namespace ExtNPC.Tests
         [Test]
         public void TheScrubStateNamesTheYearAndTheWayBack()
         {
-            Assert.AreEqual("⏱ VIEWING YEAR 40 — press Live to return",
+            Assert.AreEqual("REPLAY · VIEWING YEAR 40 — press Live to return",
                             TimelineFormat.ScrubState(40));
+        }
+
+        /// <summary>
+        /// Every non-ASCII character the HUD prints must be one that has been
+        /// looked at, in pixels, in a running editor.
+        ///
+        /// AN ALLOWLIST, NOT A BAN ON EMOJI. A list of emoji codepoint ranges
+        /// would need maintaining against a moving standard and would still
+        /// miss the next character nobody checked. This asks the question that
+        /// actually matters instead: has anyone seen this one drawn?
+        ///
+        /// U+23F1 is why the rule exists. It has emoji presentation, so it
+        /// resolved through an OS emoji font rather than the text font,
+        /// rendering white and red on Windows inside an amber label and liable
+        /// to box on a target with no emoji font at all. It sat on the one
+        /// banner whose whole job is to say the view is not live.
+        ///
+        /// Adding a character here is meant to be a deliberate act with a
+        /// screenshot behind it, not a formality.
+        /// </summary>
+        [Test]
+        public void TheHudPrintsOnlyGlyphsSomeoneHasSeenRendered()
+        {
+            // Confirmed in a running editor, session 21, at 6x magnification.
+            const string confirmed = "·—–●→₂";
+
+            string[] banners =
+            {
+                TimelineFormat.LiveState,
+                TimelineFormat.ScrubState(40),
+                TimelineFormat.CosmeticMotionNote,
+                TimelineFormat.Unmeasurable,
+                TimelineFormat.NoEventsNote,
+                TimelineFormat.Range(40, 0, 90),
+                TimelineFormat.Speed(4f),
+                TimelineFormat.EventEntry(12, "plague"),
+                TimelineFormat.AliveLabel,
+                TimelineFormat.HeterozygosityLabel,
+                TimelineFormat.FstLabel,
+                TimelineFormat.InbreedingLabel,
+                TimelineFormat.LoadLabel,
+                TimelineFormat.EventNotePrefix,
+            };
+
+            foreach (string banner in banners)
+            {
+                foreach (char c in banner)
+                {
+                    if (c < 128 || confirmed.IndexOf(c) >= 0) continue;
+                    Assert.Fail(
+                        $"'{banner}' contains U+{(int)c:X4}, which is not in " +
+                        $"the set of glyphs confirmed to render as text. " +
+                        $"Look at it in an editor and add it, or use a word.");
+                }
+            }
         }
 
         [Test]

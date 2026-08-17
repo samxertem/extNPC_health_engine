@@ -883,11 +883,30 @@ def test_the_timeline_state_wording_matches_the_dashboards():
     cs = _TIMELINE_CS.read_text(encoding="utf-8")
 
     assert "● LIVE" in app and "● LIVE" in cs
-    m = re.search(r'f"(⏱ VIEWING YEAR \{scrub\}[^"]*)"', app)
+    # Deliberately not anchored on the banner's leading decoration. The regex
+    # used to open with a literal U+23F1, so removing that glyph from both UIs
+    # together -- which is a change that PRESERVES parity -- failed the parity
+    # test. A rule that fires on a correct change teaches people to edit the
+    # rule, which is how a rule stops being believed.
+    m = re.search(r'f"([^"]*VIEWING YEAR \{scrub\}[^"]*)"', app)
     assert m, "the dashboard's scrub-state string has changed shape"
     expected = m.group(1).replace("{scrub}", "{0}")
     assert expected in cs, (
         f"the dashboard says '{expected}' and TimelineFormat does not")
+
+    # U+23F1 specifically, on both sides. It has emoji presentation, so it
+    # resolves through an OS emoji font rather than the text font: in Unity it
+    # rendered white and red inside an amber label, and on a target with no
+    # emoji font it boxes. It sat on the one banner that exists to say the view
+    # is not live. See REPORT.md session 21.
+    for name, src in (("dashboard/app.py", app),
+                      ("TimelineFormat.cs", cs),
+                      ("dashboard/inspector.py",
+                       _INSPECTOR_PY.read_text(encoding="utf-8")),
+                      ("VillagerInspector.cs",
+                       _INSPECTOR_CS.read_text(encoding="utf-8"))):
+        assert "⏱" not in src, (
+            f"{name} prints U+23F1. It is not a text glyph; use a word.")
 
     # The event note, app.py:2018-2019.
     assert "f\"y{e['tick']} {e['label']}\"" in app

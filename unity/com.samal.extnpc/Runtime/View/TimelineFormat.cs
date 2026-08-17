@@ -104,10 +104,26 @@ namespace ExtNPC.View
         /// <summary>app.py:2010, in GOOD.</summary>
         public const string LiveState = "● LIVE";
 
-        /// <summary>app.py:2012, in WARN. The wording is the dashboard's,
-        /// including the em dash and the button's name.</summary>
+        /// <summary>
+        /// app.py:2012, in WARN. The wording is the dashboard's, including the
+        /// em dash and the button's name.
+        ///
+        /// THE WORD "REPLAY" REPLACED A CLOCK GLYPH, on both sides together.
+        /// U+23F1 has emoji presentation by default, so it resolves through an
+        /// OS emoji font rather than the text font: session 21 photographed it
+        /// rendering white and red in Unity, ignoring the amber of the label it
+        /// sits in, while every other character obeyed. On a Linux or Android
+        /// player it may not resolve at all, and this is the one banner whose
+        /// whole job is to say the view is not live, so a box here is the
+        /// worst possible place for one.
+        ///
+        /// Changed in the dashboard as well, rather than only here. A viewer
+        /// that quietly substitutes its own wording is exactly the drift
+        /// invariant 6 forbids; the fix is to move the single definition, not
+        /// to fork it.
+        /// </summary>
         public static string ScrubState(int year) =>
-            string.Format(Inv, "⏱ VIEWING YEAR {0} — press Live to return", year);
+            string.Format(Inv, "REPLAY · VIEWING YEAR {0} — press Live to return", year);
 
         public static Color LiveColor => InspectorFormat.Good;
         public static Color ScrubColor => InspectorFormat.Warn;
