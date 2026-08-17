@@ -34,6 +34,10 @@ namespace ExtNPC.View
         public bool showDemeRings = true;
         public bool showGround = true;
 
+        [Tooltip("Survey grid on the ground, one line every 10 MAP units. " +
+                 "Scale reference only; nothing about it comes from the data.")]
+        public bool showGroundGrid = true;
+
         [Tooltip("Draw migration routes from flows.csv. Empty in a single-deme " +
                  "world — with one settlement there is nowhere to migrate.")]
         public bool showFlows = true;
@@ -51,6 +55,11 @@ namespace ExtNPC.View
         private WorldBundle _bundle;
         private Transform _villagerRoot, _demeRoot;
         private GameObject _ground;
+
+        // Which villager the inspector is describing, by NAME rather than by
+        // view: the views are pooled and the name is what survives a death.
+        private string _selected;
+        private GameObject _selectionRing;
 
         // Pooled by NAME, not by index. A villager's row position within a
         // frame is not stable across ticks (the engine iterates the living, and
@@ -219,6 +228,11 @@ namespace ExtNPC.View
             if (tick != _renderedTick || !Mathf.Approximately(_alpha, _renderedAlpha))
                 Render(tick);
             if (InputCompat.LeftPressedThisFrame) TrySelect();
+
+            // After Render, so a villager who died this year has already been
+            // retired and the ring goes out with them in the same frame rather
+            // than hanging over an empty patch of ground for one.
+            UpdateSelectionRing();
         }
 
         /// <summary>
@@ -577,7 +591,53 @@ namespace ExtNPC.View
                                  out RaycastHit hit, 5000f)) return;
 
             var view = hit.collider.GetComponent<VillagerView>();
-            if (view != null) VillagerSelected?.Invoke(view.Row);
+            if (view == null) return;
+
+            _selected = view.Row.Name;
+            VillagerSelected?.Invoke(view.Row);
+        }
+
+        /// <summary>
+        /// A ring on the ground under the selected villager, moved each frame.
+        ///
+        /// WHY THIS EXISTS. Clicking a villager filled a panel on the far side
+        /// of the screen and changed nothing where the cursor was, so in a
+        /// crowd there was no way to tell which capsule the panel was
+        /// describing, and no way to find them again after orbiting. The ring
+        /// is the answer to "which one is this".
+        ///
+        /// It follows the body rather than being parented to it, because the
+        /// body is POOLED: parenting would hand the ring to whoever inherited
+        /// that view when the selected villager died, and it would sink into
+        /// the ground with them during a death blend.
+        ///
+        /// Deliberately NOT a colour on the villager. Colour is spoken for by
+        /// lineage (lineage.py:105) and tinting the selected body would
+        /// overwrite the one channel that carries ancestry, which is the same
+        /// reason Stage 3 encoded sex as a shape.
+        /// </summary>
+        private void UpdateSelectionRing()
+        {
+            bool has = _selected != null &&
+                       _views.TryGetValue(_selected, out VillagerView view) &&
+                       view.gameObject.activeSelf;
+
+            if (!has)
+            {
+                if (_selectionRing != null) _selectionRing.SetActive(false);
+                return;
+            }
+
+            if (_selectionRing == null)
+            {
+                _selectionRing = DemeRingView.CreateMarker(
+                    transform, ringMaterial, "Selection");
+            }
+
+            _selectionRing.SetActive(true);
+            Vector3 p = _views[_selected].transform.position;
+            _selectionRing.transform.position =
+                new Vector3(p.x, groundY + 0.04f, p.z);
         }
 
         // ------------------------------------------------------------------
@@ -631,7 +691,69 @@ namespace ExtNPC.View
                 r.sharedMaterial.SetColor("_Color", c);
             }
 
+            if (showGroundGrid) BuildGroundGrid(side);
         }
 
+        /// <summary>
+        /// A survey grid on the ground, one line every ten MAP units.
+        ///
+        /// WHY IT IS WORTH THE LINES. The map is 100x100 arbitrary units and
+        /// every position on it comes from `community.person_map_offset`, but
+        /// on a bare plane there is nothing to judge distance or drift against:
+        /// two demes twenty units apart and forty units apart look much the
+        /// same from an orbiting camera. The grid gives the eye a ruler, which
+        /// is the difference between a scene and an instrument.
+        ///
+        /// IT IS NOT DATA, and it is spaced in MAP units rather than metres on
+        /// purpose, so a reader counting squares is counting the engine's own
+        /// coordinate system rather than a rendering convenience. Nothing here
+        /// is read from the bundle and nothing is derived from it.
+        ///
+        /// One mesh with one draw call, built once. A line renderer per line
+        /// would be twenty two components for a static backdrop.
+        /// </summary>
+        private void BuildGroundGrid(float side)
+        {
+            var go = new GameObject("Ground Grid");
+            go.transform.SetParent(transform, false);
+            // A hair above the plane: coplanar geometry z-fights, and the
+            // artefact only appears at grazing camera angles, which is exactly
+            // where an orbit camera spends its time.
+            go.transform.localPosition = new Vector3(0f, groundY + 0.02f, 0f);
+
+            const int cells = 10;                  // every 10 map units
+            float half = side * 0.5f;
+            float step = side / cells;
+
+            var verts = new List<Vector3>((cells + 1) * 4);
+            var indices = new List<int>((cells + 1) * 4);
+            for (int i = 0; i <= cells; i++)
+            {
+                float p = -half + i * step;
+                indices.Add(verts.Count); verts.Add(new Vector3(p, 0f, -half));
+                indices.Add(verts.Count); verts.Add(new Vector3(p, 0f, half));
+                indices.Add(verts.Count); verts.Add(new Vector3(-half, 0f, p));
+                indices.Add(verts.Count); verts.Add(new Vector3(half, 0f, p));
+            }
+
+            var mesh = new Mesh { name = "extNPC Ground Grid" };
+            mesh.SetVertices(verts);
+            mesh.SetIndices(indices.ToArray(), MeshTopology.Lines, 0);
+            mesh.RecalculateBounds();
+
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var mr = go.AddComponent<MeshRenderer>();
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            mr.receiveShadows = false;
+            mr.sharedMaterial = CreateDefaultMaterial("extNPC/Grid");
+            if (mr.sharedMaterial != null)
+            {
+                // Faint: a grid that competes with the villagers has replaced
+                // the thing it was drawn to help read.
+                var c = new Color(0.30f, 0.32f, 0.35f);
+                mr.sharedMaterial.SetColor("_BaseColor", c);
+                mr.sharedMaterial.SetColor("_Color", c);
+            }
+        }
     }
 }
