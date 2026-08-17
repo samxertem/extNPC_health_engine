@@ -6,11 +6,11 @@
   "Selin-24_t0.0": {
     "rendered": "true",
     "subject_fraction": 0.357,
-    "mean_luma": 70.04,
+    "mean_luma": 72.4,
     "backdrop_rgb": [
-      51.0,
-      35.0,
-      30.0
+      56.0,
+      37.0,
+      34.0
     ],
     "subject_box": "0,0,228,210",
     "png": "C:\\Users\\samal\\Desktop\\extNPC_health_engine\\outputs\\mpfb\\portraits\\portrait_Selin-24_t0.0.png"
@@ -18,11 +18,11 @@
   "Selin-24_t3.7": {
     "rendered": "true",
     "subject_fraction": 0.3768,
-    "mean_luma": 73.17,
+    "mean_luma": 75.47,
     "backdrop_rgb": [
-      51.0,
-      35.0,
-      30.0
+      56.0,
+      37.0,
+      34.0
     ],
     "subject_box": "0,0,231,213",
     "png": "C:\\Users\\samal\\Desktop\\extNPC_health_engine\\outputs\\mpfb\\portraits\\portrait_Selin-24_t3.7.png"
@@ -30,11 +30,11 @@
   "Tomas-28_t0.0": {
     "rendered": "true",
     "subject_fraction": 0.3562,
-    "mean_luma": 70.8,
+    "mean_luma": 73.38,
     "backdrop_rgb": [
-      30.0,
-      39.0,
-      51.0
+      28.0,
+      42.0,
+      62.0
     ],
     "subject_box": "0,0,231,206",
     "png": "C:\\Users\\samal\\Desktop\\extNPC_health_engine\\outputs\\mpfb\\portraits\\portrait_Tomas-28_t0.0.png"
@@ -42,13 +42,61 @@
   "Tomas-28_t3.7": {
     "rendered": "true",
     "subject_fraction": 0.3975,
-    "mean_luma": 75.72,
+    "mean_luma": 78.14,
     "backdrop_rgb": [
-      30.0,
-      39.0,
-      51.0
+      28.0,
+      42.0,
+      62.0
     ],
     "subject_box": "5,0,231,212",
     "png": "C:\\Users\\samal\\Desktop\\extNPC_health_engine\\outputs\\mpfb\\portraits\\portrait_Tomas-28_t3.7.png"
+  },
+  "Kaya-07_t0.0": {
+    "rendered": "true",
+    "subject_fraction": 0.3686,
+    "mean_luma": 75.94,
+    "backdrop_rgb": [
+      40.0,
+      55.0,
+      36.0
+    ],
+    "subject_box": "0,0,231,212",
+    "png": "C:\\Users\\samal\\Desktop\\extNPC_health_engine\\outputs\\mpfb\\portraits\\portrait_Kaya-07_t0.0.png"
+  },
+  "Kaya-07_t3.7": {
+    "rendered": "true",
+    "subject_fraction": 0.3437,
+    "mean_luma": 72.36,
+    "backdrop_rgb": [
+      40.0,
+      55.0,
+      36.0
+    ],
+    "subject_box": "0,0,223,209",
+    "png": "C:\\Users\\samal\\Desktop\\extNPC_health_engine\\outputs\\mpfb\\portraits\\portrait_Kaya-07_t3.7.png"
+  },
+  "Sena-76_t0.0": {
+    "rendered": "true",
+    "subject_fraction": 0.3819,
+    "mean_luma": 77.98,
+    "backdrop_rgb": [
+      50.0,
+      32.0,
+      57.0
+    ],
+    "subject_box": "0,0,231,210",
+    "png": "C:\\Users\\samal\\Desktop\\extNPC_health_engine\\outputs\\mpfb\\portraits\\portrait_Sena-76_t0.0.png"
+  },
+  "Sena-76_t3.7": {
+    "rendered": "true",
+    "subject_fraction": 0.3565,
+    "mean_luma": 74.73,
+    "backdrop_rgb": [
+      50.0,
+      32.0,
+      57.0
+    ],
+    "subject_box": "0,0,231,206",
+    "png": "C:\\Users\\samal\\Desktop\\extNPC_health_engine\\outputs\\mpfb\\portraits\\portrait_Sena-76_t3.7.png"
   }
 }

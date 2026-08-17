@@ -237,19 +237,32 @@ namespace ExtNPC.View
             _camera.Render();
         }
 
+        /// <summary>The HUD's own dark neutral, which the backdrop fades toward.</summary>
+        private static readonly Color BackdropFloor = new Color(0.06f, 0.07f, 0.09f);
+
+        /// <summary>How far toward that floor. High, because a face has to read
+        /// against it and a saturated lineage hue at full strength does not.</summary>
+        private const float BackdropFade = 0.80f;
+
         /// <summary>
         /// The lineage colour, taken down to something a face reads against.
         ///
-        /// Kept as a named function because it is the one place the portrait
-        /// touches a colour that came from the data, and invariant 6 says the
-        /// rule that produced that colour lives in simulation/lineage.py. This
-        /// darkens it for legibility; it does not recompute it.
+        /// A STRAIGHT LERP, and not the obvious HSV version, which is what this
+        /// was first written as. `tests/test_unity_contract.py` forbids
+        /// `HSVToRGB` anywhere in the runtime and caught it: the lineage rule
+        /// IS an HSV rule (hue by founder, saturation by ancestry purity, value
+        /// by alive or dead) and it lives once, in simulation/lineage.py. Any
+        /// C# that reassembles a colour out of hue and saturation is a second
+        /// place that rule could come to exist, whatever the author meant by
+        /// it, and the point of a bright line is that it does not need
+        /// case-by-case judgement.
+        ///
+        /// A lerp toward a fixed neutral cannot be mistaken for a colour rule.
+        /// It darkens and desaturates in one step, and the result differs from
+        /// the HSV version by a couple of levels per channel.
         /// </summary>
-        public static Color Backdrop(Color lineage)
-        {
-            Color.RGBToHSV(lineage, out float h, out float s, out float v);
-            return Color.HSVToRGB(h, Mathf.Min(s, 0.42f), Mathf.Min(v, 0.20f));
-        }
+        public static Color Backdrop(Color lineage) =>
+            Color.Lerp(lineage, BackdropFloor, BackdropFade);
 
         private void OnDestroy()
         {

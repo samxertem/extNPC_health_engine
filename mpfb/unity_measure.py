@@ -220,6 +220,13 @@ public static class CheckMpfbPortrait
         {
             ("Selin-24", true, 170.5, new Color(0.85f, 0.45f, 0.30f)),
             ("Tomas-28", false, 178.0, new Color(0.30f, 0.55f, 0.85f)),
+            // A child and the tallest plausible adult. The framing is
+            // proportional to stature, so both should be composed the same
+            // way; if the child comes back as a forehead or as a distant
+            // figure, PortraitPose.CameraDistance is wrong for small bodies
+            // and no arithmetic test would have shown it.
+            ("Kaya-07", true, 98.0, new Color(0.55f, 0.80f, 0.35f)),
+            ("Sena-76", false, 199.3, new Color(0.75f, 0.35f, 0.75f)),
         };
         double[] times = { 0.0, 3.7 };
 
