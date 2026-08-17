@@ -15,6 +15,15 @@ nothing anyone could re-run. This script is the re-runnable version.
     python run_mpfb_probe.py --skip-unity    # calibration only
     python run_mpfb_probe.py --blender "C:/.../blender.exe"
 
+    python run_mpfb_probe.py --export-bodies              # bake the two bodies
+    python run_mpfb_probe.py --install-bodies <project>   # verify, then install
+    python run_mpfb_probe.py --check-portrait             # render the face
+    python run_mpfb_probe.py --shoot-village <bundle>     # the A/B pictures
+    python run_mpfb_probe.py --perf                       # the 600-at-60 budget
+
+The last three need a graphics device and so run WITHOUT `-nographics`,
+unlike everything else here.
+
 It runs `mpfb/blender_probe.py` inside Blender, then imports the FBX files
 that produced into the throwaway Unity project `run_unity_tests.py` already
 knows how to generate, and compares the two sides.
@@ -247,6 +256,94 @@ def portrait(args) -> int:
     return 1 if failed else 0
 
 
+def _editor_and_project():
+    """The throwaway consuming project and an editor that matches the package."""
+    import run_unity_tests as rut
+
+    manifest = json.loads((rut.PACKAGE / "package.json").read_text(encoding="utf-8"))
+    editor = rut.find_editor(manifest.get("unity", "6000.0"))
+    project = rut.DEFAULT_PROJECT
+    return editor, project, project.parent / (project.name + "-logs")
+
+
+def village(args) -> int:
+    """Photograph a bundle with the bodies and without them.
+
+    The A/B is the point. Two pictures of the same year from the same camera,
+    differing only in whether a body asset existed, is what makes "villagers
+    are people now" falsifiable rather than decorative.
+    """
+    from mpfb import unity_village
+
+    bundle = args.shoot_village.resolve()
+    if not (bundle / "manifest.json").exists():
+        print(f"  {bundle} does not look like a bundle (no manifest.json). "
+              f"Make one with: python export_for_unity.py")
+        return 1
+
+    editor, project, log_dir = _editor_and_project()
+    png_dir = (args.out / "village").resolve()
+    result = unity_village.both(project, log_dir, editor, bundle, png_dir)
+    unity_village.write_json(result, args.out / "unity_village.json")
+
+    failed = 0
+    for arm in ("capsules", "bodies"):
+        scene = result.get(arm, {}).get("scene", {})
+        load = result.get(arm, {}).get("load", {})
+        drawn = scene.get("bodies_in_scene", 0)
+        ok = drawn > 0 and str(scene.get("headcount_ok", "")).lower() == "true"
+        failed += not ok
+        print(f"  [{'PASS' if ok else 'FAIL'}] {arm}: {drawn:.0f} villagers, "
+              f"headcount {scene.get('headcount_ok')}, tallest localScale.y "
+              f"{scene.get('tallest_local_scale_y')}, body installed "
+              f"{load.get('body_installed')}")
+
+    cap = result.get("capsules", {}).get("scene", {}).get("tallest_local_scale_y")
+    bod = result.get("bodies", {}).get("scene", {}).get("tallest_local_scale_y")
+    # The A/B in one number. A primitive's origin is its centre so it scales by
+    # half the stature; a baked body's origin is its soles so it scales by the
+    # whole of it. Equal values mean the mesh never reached VillagerView.
+    differ = cap is not None and bod is not None and abs(bod - 2 * cap) < 1e-3
+    print(f"  [{'PASS' if differ else 'FAIL'}] the two arms differ as they "
+          f"should: {cap} against {bod}, the same person under two "
+          f"scaling conventions")
+    failed += not differ
+
+    print(f"\n  pictures in {png_dir}")
+    return 1 if failed else 0
+
+
+def perf(args) -> int:
+    """Time capsules against bodies, against §4.3's 600-at-60 budget."""
+    from mpfb import unity_perf
+
+    editor, project, log_dir = _editor_and_project()
+    result = unity_perf.both(project, log_dir, editor)
+    unity_perf.write_json(result, args.out / "unity_perf.json")
+
+    print(f"\n{'N':>6} {'capsule ms':>11} {'body ms':>9} {'ratio':>7} "
+          f"{'body fps':>9}")
+    budget_ok = None
+    for count in (28, 100, 300, 600, 1000):
+        cap = result.get("capsules", {}).get(f"n{count}", {}).get("ms_min")
+        bod = result.get("bodies", {}).get(f"n{count}", {}).get("ms_min")
+        if not cap or not bod:
+            continue
+        print(f"{count:>6} {cap:>11.3f} {bod:>9.3f} {bod / cap:>7.2f} "
+              f"{1000 / bod:>9.1f}")
+        if count == 600:
+            budget_ok = (1000 / bod) >= 60.0
+
+    if budget_ok is None:
+        print("\n  no 600-villager sample; cannot judge the budget")
+        return 1
+    print(f"\n  [{'PASS' if budget_ok else 'FAIL'}] UNITY_PLAN.md section 4.3: "
+          f"600 villagers at 60 fps")
+    print("  Offscreen editor rendering, not a frame rate and not a build. "
+          "About 1.2 ms of readback sits inside every number.")
+    return 0 if budget_ok else 1
+
+
 # ---------------------------------------------------------------------
 # the two viewer bodies
 # ---------------------------------------------------------------------
@@ -409,10 +506,18 @@ def main() -> int:
                         help="a Unity project to copy the bodies into, at "
                              "Assets/Resources/extnpc/. Implies --export-bodies "
                              "if the files are not already there.")
+    parser.add_argument("--shoot-village", type=Path, default=None,
+                        metavar="BUNDLE",
+                        help="photograph a world bundle twice, with the body "
+                             "pack installed and with it moved aside. Needs a "
+                             "graphics device.")
+    parser.add_argument("--perf", action="store_true",
+                        help="time 28 to 1000 villagers, capsules against "
+                             "bodies, against the plan's 600-at-60 budget. "
+                             "Needs a graphics device.")
     parser.add_argument("--check-portrait", action="store_true",
                         help="render the inspector's portrait head to PNG and "
-                             "report on it. Needs a graphics device, so this is "
-                             "the one command here that is not -nographics.")
+                             "report on it. Needs a graphics device.")
     args = parser.parse_args()
 
     exe = args.blender or find_blender()
@@ -422,6 +527,12 @@ def main() -> int:
 
     if args.check_portrait:
         return portrait(args)
+
+    if args.shoot_village is not None:
+        return village(args)
+
+    if args.perf:
+        return perf(args)
 
     if args.export_bodies or args.install_bodies:
         return bodies(exe, args)
