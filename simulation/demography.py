@@ -33,6 +33,7 @@ Pieces
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Callable, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -66,13 +67,28 @@ from health_engine.npc import NPC
 #
 # These are STYLISED age patterns, not fitted schedules.
 #
-# CAVEAT, because it is easy to misread: the curves are NOT normalised to
-# equal area, so switching schedule changes the overall fertility LEVEL as
-# well as its shape. `preindustrial` in particular integrates to less than
-# `legacy` over the same window, and a natural-fertility population is
-# supposed to have HIGHER total fertility (TFR 6-10, Eaton & Mayer 1953), not
-# lower. Reaching that needs `birth_rate` and `max_children` raised alongside
-# the schedule; the schedule alone only says at WHICH AGES births happen.
+# EQUAL-AREA NORMALISATION. The knots below are peak-normalised (each curve
+# tops out at 1.0), which makes them readable but means they integrate to
+# DIFFERENT areas over the fertility window. Left uncorrected, switching
+# schedule would change the overall fertility LEVEL as well as its shape, so
+# a `preindustrial` run would differ from a `modern` one in how many children
+# happen as well as at which ages -- a confounded comparison, and the one
+# thing a reader is most likely to draw a conclusion from.
+#
+# `schedule_level_correction` removes that confound: it rescales each
+# schedule so its MEAN over the fertility window matches `legacy`'s. After
+# the correction a schedule says only at WHICH AGES births happen, which is
+# the only claim these stylised curves can support.
+#
+# `legacy` corrects by exactly 1.0 by construction, so the default world is
+# bit-identical and no calibrated quantity moves.
+#
+# What this does NOT do is set a realistic total fertility rate. A
+# natural-fertility population has TFR 6-10 (Eaton & Mayer 1953) and the
+# engine's `birth_rate`/`max_children` are nowhere near that; reaching it
+# remains a matter of raising those parameters alongside the schedule.
+# Normalisation makes the schedules COMPARABLE TO EACH OTHER, not calibrated
+# to any real population.
 
 @dataclass(frozen=True)
 class FertilitySchedule:
@@ -141,6 +157,38 @@ def relative_fecundity(age: float, schedule: str = DEFAULT_FERTILITY_SCHEDULE
     ages = [k[0] for k in spec.knots]
     vals = [k[1] for k in spec.knots]
     return float(np.clip(np.interp(float(age), ages, vals), 0.0, 1.0))
+
+
+@lru_cache(maxsize=None)
+def schedule_level_correction(schedule: str,
+                              lo: int = 18, hi: int = 45) -> float:
+    """
+    The scalar that makes `schedule` area-matched to the default over the
+    fertility window [lo, hi], so that switching schedule changes only the
+    AGE PATTERN of births and not how many the age taper permits.
+
+    The knots are peak-normalised, so each curve integrates to a different
+    area; without this correction `preindustrial` and `modern` would differ
+    from `legacy` in fertility LEVEL as well as shape, and any comparison
+    between two schedules would be confounded by the difference in level.
+
+    Returns exactly 1.0 for the default schedule, by construction rather than
+    by arithmetic that happens to land there, so the default world stays
+    bit-identical (invariant P3).
+
+    The window defaults to the engine's hard fertility gate (18-45); ages
+    outside it cannot reproduce at all, so area outside it is not fertility
+    the engine can express and must not enter the normalisation.
+    """
+    if schedule == DEFAULT_FERTILITY_SCHEDULE or schedule not in FERTILITY_SCHEDULES:
+        return 1.0
+    ages = np.arange(float(lo), float(hi) + 1.0)
+    own = float(np.mean([relative_fecundity(a, schedule) for a in ages]))
+    ref = float(np.mean([relative_fecundity(a, DEFAULT_FERTILITY_SCHEDULE)
+                         for a in ages]))
+    if own <= 0.0:
+        return 1.0
+    return ref / own
 
 
 def mean_reproductive_age(schedule: str = DEFAULT_FERTILITY_SCHEDULE,
@@ -368,9 +416,15 @@ def wants_child(mother: NPC, father: NPC, n_children: int, years_since_last: int
         return False
     # female fecundability by age. The "legacy" schedule IS the original
     # straight taper, so the default call is unchanged to the last bit.
-    age_taper = relative_fecundity(
-        mother.age, getattr(params, "fertility_schedule",
-                            DEFAULT_FERTILITY_SCHEDULE))
+    schedule = getattr(params, "fertility_schedule",
+                       DEFAULT_FERTILITY_SCHEDULE)
+    age_taper = relative_fecundity(mother.age, schedule)
+    # Area-match the schedule to the default so that switching it moves only
+    # the AGE PATTERN of births, not the level. Exactly 1.0 on the default,
+    # and multiplying by 1.0 is exact, so the default path is untouched.
+    age_taper *= schedule_level_correction(
+        schedule, int(params.female_fertility[0]),
+        int(params.female_fertility[1]))
     # resource access (in [0,1]) gates fertility: the resource-poor breed less.
     # 1.0 is neutral, so the default call is unchanged.
     p = params.birth_rate * age_taper * carrying_factor(n_alive, params)

@@ -237,6 +237,46 @@ def test_adolescent_subfecundity_is_present_in_both_presets():
             relative_fecundity(25, schedule)
 
 
+def test_schedules_are_area_matched_so_shape_moves_without_level():
+    """A schedule must say at WHICH AGES births happen, not how many.
+
+    The knots are peak-normalised, so raw areas differ by up to a third
+    (`modern` integrates to 0.52 against `legacy`'s 0.70). Uncorrected, a
+    comparison between two schedules is confounded by the level difference,
+    which is exactly the conclusion a reader would draw from it.
+    """
+    from simulation.demography import (FERTILITY_SCHEDULES, relative_fecundity,
+                                       schedule_level_correction)
+    ages = np.arange(18.0, 46.0)
+    ref = np.mean([relative_fecundity(a, "legacy") for a in ages])
+    for schedule in FERTILITY_SCHEDULES:
+        corrected = np.mean([relative_fecundity(a, schedule) for a in ages]) \
+            * schedule_level_correction(schedule)
+        assert corrected == pytest.approx(ref, rel=1e-9), \
+            f"{schedule} integrates to {corrected:.4f} against legacy's {ref:.4f}"
+
+
+def test_the_correction_is_exactly_one_on_the_default_schedule():
+    """Not approximately one. The determinism invariant requires the default
+    world to be bit-identical, and `p * 1.0` is exact where `p * 0.9999` is
+    not."""
+    from simulation.demography import (DEFAULT_FERTILITY_SCHEDULE,
+                                       schedule_level_correction)
+    assert schedule_level_correction(DEFAULT_FERTILITY_SCHEDULE) == 1.0
+    assert schedule_level_correction("not-a-schedule") == 1.0
+
+
+def test_area_matching_does_not_flatten_the_schedules_it_matches():
+    """The correction must remove the level difference and NOTHING else. If it
+    also collapsed the age patterns together, the schedules would be
+    area-matched and useless."""
+    from simulation.demography import (FERTILITY_SCHEDULES,
+                                       mean_reproductive_age)
+    means = {s: mean_reproductive_age(s) for s in FERTILITY_SCHEDULES}
+    assert means["preindustrial"] < means["legacy"] < means["modern"], means
+    assert means["modern"] - means["preindustrial"] > 1.5, means
+
+
 def test_an_unknown_schedule_name_falls_back_instead_of_raising():
     """The value arrives from a dashboard dropdown; a stale one must not take
     the whole world down."""
