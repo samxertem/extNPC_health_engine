@@ -131,11 +131,76 @@ two modes, loudly:
   diagnoses (`dx GJB2` → *GJB2 nonsyndromic deafness*, resolved through
   `diseases.csv`), carrier status, heterozygosity, conditions, and the 25
   `trait_*` mature phenotypes.
-- **Any earlier year** — frame fields only, behind a `⏱ historical view`
+- **Any earlier year** — frame fields only, behind a `historical view`
   banner. `people.csv` is *cross-sectional*: joining it to a past frame would
   describe a year-40 villager with year-90 genetics and show no seam. The
   banner exists so a thinner panel reads as *a year with less recorded*, not
   *a villager with less going on*.
+
+## Real bodies and the portrait (Stage 6)
+
+**The package ships no assets, and that is deliberate.** It is what lets
+`GameObject/extNPC/World Viewer` build a working scene from an empty one, and
+MPFB output could not live here anyway: MPFB's code is GPLv3 and only its CC0
+output may be distributed (see the licence note below). So the bodies are
+looked up at run time and **their absence is a supported state**: with none
+installed every villager is a capsule, exactly as in Stage 3, and the inspector
+says so in a sentence rather than showing a blank box.
+
+To get people instead of capsules, from the engine repo:
+
+```
+python run_mpfb_probe.py --export-bodies
+python run_mpfb_probe.py --install-bodies <path to this Unity project>
+```
+
+which puts `human_female.fbx` and `human_male.fbx` in
+`Assets/Resources/extnpc/`. `HumanMesh` finds them there; a single
+`Assets/Resources/extnpc/human.fbx` serves both sexes if you prefer one body.
+
+`HumanMesh` does one non-obvious thing and it is the reason it exists. **You
+cannot take the `Mesh` off an imported FBX and use it.** Unity leaves the mesh
+datablock in the FBX's own *centimetre, Z-up* space and hangs the correction on
+the imported hierarchy's transform, so a 1.754592 m character's
+`mesh.bounds.size` reads `(0.0114, 0.0048, 0.0175)` and the obvious assignment
+gives you a 1.7 cm body lying on its side. `Bake` folds the hierarchy transform
+into the vertices, which also keeps every villager a cheap `MeshFilter` rather
+than a `SkinnedMeshRenderer` with 53 bones. The result is normalised to
+soles-on-origin and exactly 1 m tall, so `VillagerView` scales by
+`height_cm / 100` and **the rendered stature is the exported stature**.
+
+### The portrait
+
+`VillagerInspector` draws a live head at the top of the panel: a second camera
+and a copy of the shared body rendered into a `RenderTexture`. It sways, nods,
+breathes and glances.
+
+- **No randomness.** The phase offsets come from the villager's *name*, through
+  FNV-1a with a finaliser, so the same villager animates identically in every
+  session on every machine. `string.GetHashCode()` would not: it is documented
+  as unstable across runs, and the seeds are pinned as golden values in
+  `PortraitPoseTests` so that substituting it cannot pass quietly.
+- **The rig lives 2000 m below the world**, with the portrait camera's far
+  plane at 6 m. A package cannot add a layer, because layers are a project
+  setting and requiring one would break the empty-scene property above. 2000 m
+  rather than 100 km because float32 resolves about 0.2 mm at 2000 m and about
+  8 mm at 100 km, and 8 mm of quantisation is visible on a face.
+- **The skin is not tinted by `skin_tone`.** Turning a unitless 0..1 into an
+  albedo is a colour decision the engine has not made, and inventing a ramp
+  would be the viewer inventing variance. The lineage colour goes on the
+  backdrop and the card frame instead.
+- Set `showPortrait = false` on the inspector to turn it off.
+
+**What it does not do yet.** The `age` macro is not driven, so a 98 cm child is
+rendered as an adult scaled to 98 cm: the size is right, the proportions and
+the face are not. That is Stage 7.
+
+### Cost
+
+600 real bodies render in 10.8 ms against 7.3 ms for 600 capsules, measured
+offscreen at 1280x720 as the minimum of 40 passes. That is 92 fps and inside
+the plan's budget of 600 at 60. The ceiling is near 850. Regenerate with
+`python run_mpfb_probe.py --check-portrait` and the perf harness in `mpfb/`.
 
 ## The timeline (Stage 5)
 
