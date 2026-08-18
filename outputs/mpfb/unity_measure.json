@@ -1,4 +1,52 @@
 {
+  "human_female.fbx": {
+    "useFileScale": "True fileScale=0.01",
+    "cached_renderer_bounds": [
+      0.988407,
+      1.759032,
+      0.576491
+    ],
+    "local_mesh_bounds": [
+      0.009712,
+      0.003841,
+      0.015912
+    ],
+    "blendShapes": "0 bones=53",
+    "vertex_span": [
+      0.97117,
+      1.59123,
+      0.384066
+    ],
+    "vertex_min": [
+      -0.485585,
+      -0.000461,
+      -0.091515
+    ]
+  },
+  "human_male.fbx": {
+    "useFileScale": "True fileScale=0.01",
+    "cached_renderer_bounds": [
+      1.155884,
+      1.910521,
+      0.585821
+    ],
+    "local_mesh_bounds": [
+      0.011298,
+      0.004761,
+      0.017291
+    ],
+    "blendShapes": "0 bones=53",
+    "vertex_span": [
+      1.129782,
+      1.729108,
+      0.476142
+    ],
+    "vertex_min": [
+      -0.564891,
+      -0.000868,
+      -0.100004
+    ]
+  },
   "mpfb_baked.fbx": {
     "useFileScale": "True fileScale=0.01",
     "cached_renderer_bounds": [
