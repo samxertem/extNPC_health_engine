@@ -126,6 +126,7 @@ namespace ExtNPC.View
             foreach (var skinned in model.GetComponentsInChildren<SkinnedMeshRenderer>(true))
             {
                 if (skinned.sharedMesh == null) continue;
+                if (!Readable(skinned.sharedMesh, model)) return null;
                 combines.Add(new CombineInstance
                 {
                     mesh = skinned.sharedMesh,
@@ -135,6 +136,7 @@ namespace ExtNPC.View
             foreach (var filter in model.GetComponentsInChildren<MeshFilter>(true))
             {
                 if (filter.sharedMesh == null) continue;
+                if (!Readable(filter.sharedMesh, model)) return null;
                 combines.Add(new CombineInstance
                 {
                     mesh = filter.sharedMesh,
@@ -157,7 +159,46 @@ namespace ExtNPC.View
 
             Normalise(baked, out authoredStatureM);
             baked.RecalculateBounds();
+
+            // A combine that failed still returns a Mesh, just an empty one,
+            // and an empty mesh on a villager is INVISIBLE rather than wrong:
+            // present in the hierarchy, counted by the headcount check,
+            // selectable, and not there. Capsules are a far better failure.
+            if (baked.vertexCount == 0)
+            {
+                Debug.LogError($"[extNPC] '{model.name}' baked to an empty mesh; " +
+                               "villagers fall back to primitives. See the console " +
+                               "above for what Unity refused.");
+                authoredStatureM = 0f;
+                return null;
+            }
             return baked;
+        }
+
+        /// <summary>
+        /// Refuse to combine a mesh whose CPU copy Unity has thrown away.
+        ///
+        /// Unity imports models with <c>isReadable = false</c>, uploads them and
+        /// drops the CPU copy. <c>Mesh.CombineMeshes</c> then logs "Cannot
+        /// combine mesh that does not allow access" and hands back an EMPTY
+        /// mesh, which is the invisible-villager failure above.
+        ///
+        /// <c>ExtNpcModelPostprocessor</c> sets the flag on import so this
+        /// should never fire. It is here because when it did fire, the symptom
+        /// was a village that loaded, counted correctly, logged
+        /// "69 villagers drawn" and showed nothing, and the only clue was a
+        /// warning three screens up the console.
+        /// </summary>
+        private static bool Readable(Mesh mesh, GameObject model)
+        {
+            if (mesh.isReadable) return true;
+            Debug.LogError(
+                $"[extNPC] '{model.name}' has Read/Write disabled, so its mesh " +
+                "cannot be baked and villagers stay primitives. Tick Read/Write " +
+                "on the model importer, or reimport it now that the package's " +
+                "ExtNpcModelPostprocessor is present (right-click the asset, " +
+                "Reimport).");
+            return false;
         }
 
         /// <summary>

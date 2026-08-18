@@ -82,5 +82,28 @@ namespace ExtNPC.View
             pivot = Vector3.zero;
             distance = MapProjection.MapSize * metresPerMapUnit * 0.9f;
         }
+
+        /// <summary>
+        /// Stand next to one villager.
+        ///
+        /// WHY THIS IS NEEDED AND NOT A LUXURY. FrameWorld puts the camera 90 m
+        /// back to fit a 100 m map, and a 1.7 m person is then under 2% of the
+        /// frame height: the default view of a village of real bodies is a grey
+        /// plane with coloured specks on it. Everything works and nothing is
+        /// visible, which reads as nothing working.
+        ///
+        /// The pitch is flattened because looking down at 42 degrees from four
+        /// metres shows the top of a head.
+        /// </summary>
+        /// <param name="ground">Where the villager stands, in world space.</param>
+        /// <param name="statureM">Their height, so the pivot lands on the face
+        /// rather than on the feet.</param>
+        public void Focus(Vector3 ground, float statureM)
+        {
+            pivot = ground + new Vector3(0f, statureM * 0.75f, 0f);
+            distance = Mathf.Max(statureM * 2.4f, minDistance);
+            pitch = 12f;
+            Apply();
+        }
     }
 }

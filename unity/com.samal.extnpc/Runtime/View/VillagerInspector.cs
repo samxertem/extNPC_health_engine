@@ -67,6 +67,21 @@ namespace ExtNPC.View
         /// <summary>The villager currently inspected, or null.</summary>
         public string SelectedName => _selected;
 
+        /// <summary>
+        /// True when a portrait head is being rendered right now.
+        ///
+        /// Exposed for the play-mode capture harness, which otherwise cannot
+        /// tell "the portrait drew nothing" apart from "no villager is
+        /// selected" or "no body pack is installed": all three show the same
+        /// empty card, and the first is a bug while the other two are not.
+        /// </summary>
+        public bool PortraitIsLive => _portrait != null && _portrait.Texture != null;
+
+        /// <summary>The portrait's render target, or null. Read-only, and
+        /// exposed for the same harness: capturing the Game view needs a real
+        /// Game view, which a batch editor does not have.</summary>
+        public Texture PortraitTexture => _portrait != null ? _portrait.Texture : null;
+
         public void Select(string name) => _selected = name;
         public void ClearSelection() => _selected = null;
 
@@ -269,8 +284,33 @@ namespace ExtNPC.View
             }
 
             GUILayout.Space(10f);
+            GUILayout.BeginHorizontal();
+            // "go to" before "clear", because it is the one people want. The
+            // default camera frames the whole 100 m map, where a 1.7 m villager
+            // is under 2% of the frame: without this the only way to actually
+            // look at the body you just selected is to scroll-zoom and hunt.
+            if (GUILayout.Button("go to villager")) FocusCameraOn(row);
             if (GUILayout.Button("clear selection")) ClearSelection();
+            GUILayout.EndHorizontal();
             GUILayout.Space(6f);
+        }
+
+        /// <summary>
+        /// Move the orbit camera to stand next to this villager.
+        ///
+        /// Reaches for the camera through Camera.main rather than holding a
+        /// reference: the package does not own the camera, SceneSetup only adds
+        /// an OrbitCamera if the scene has none, and a host project may have
+        /// replaced it. Absent or replaced, this button does nothing rather
+        /// than throwing.
+        /// </summary>
+        private void FocusCameraOn(in FrameRow row)
+        {
+            Camera main = Camera.main;
+            OrbitCamera orbit = main != null ? main.GetComponent<OrbitCamera>() : null;
+            if (orbit == null) return;
+            Vector3 ground = _renderer.Projection.ToWorld(row.X, row.Y);
+            orbit.Focus(ground, (float)(System.Math.Max(row.HeightCm, 1.0) * 0.01));
         }
 
         // ---- identity ----------------------------------------------------

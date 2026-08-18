@@ -1,0 +1,26 @@
+{
+  "setup": {
+    "device": "Direct3D12",
+    "body_installed": "True"
+  },
+  "play": {
+    "is_playing": "True",
+    "bundle_loaded": "True",
+    "visible_count": 28.0,
+    "body_installed": "True",
+    "bodies_with_geometry": 28.0,
+    "tallest": "Ines-38"
+  },
+  "portrait": {
+    "selected": "Ines-38",
+    "portrait_is_live": "True"
+  },
+  "capture": {
+    "world_png_written": "True",
+    "world_png": "C:\\Users\\samal\\Desktop\\extNPC_health_engine\\outputs\\mpfb\\playmode\\playmode_world.png",
+    "closeup_png_written": "True",
+    "closeup_png": "C:\\Users\\samal\\Desktop\\extNPC_health_engine\\outputs\\mpfb\\playmode\\playmode_closeup.png",
+    "portrait_png_written": "True",
+    "portrait_png": "C:\\Users\\samal\\Desktop\\extNPC_health_engine\\outputs\\mpfb\\playmode\\playmode_portrait.png"
+  }
+}
