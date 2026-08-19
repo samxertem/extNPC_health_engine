@@ -22,6 +22,7 @@ Run:  python run_dashboard.py   ->  http://127.0.0.1:8050
 
 from __future__ import annotations
 
+import time
 from dataclasses import replace
 
 from dash import (ALL, Dash, dcc, html, Input, Output, State, ctx, no_update,
@@ -72,6 +73,61 @@ def params_from_controls(K, birth, mort, sel, mut, recomb, assort, inbreed,
 
 def build_world(seed, n_founders, params: DemographyParams) -> World:
     return World(n_founders=int(n_founders), seed=int(seed), params=params)
+
+
+# ---------------------------------------------------------------------
+# Pacing: never ask the browser for ticks faster than the server can serve
+# ---------------------------------------------------------------------
+# `dcc.Interval` fires on a wall clock and Dash applies no back pressure, so
+# if a tick costs more than the interval the requests queue without bound and
+# the tab locks. Measured at 81 living on this machine: World.step() 91.9 ms,
+# render_always 0.8 ms, render_overview 44.8 ms, so 137.5 ms of server work
+# against a 100 ms interval at speed 10. That is the freeze.
+#
+# The floor below is derived from the step time rather than from the total,
+# because the step is the only part measurable from inside the callback. In
+# the measurement above the full server cost was 1.5x the step, and the
+# browser then re-renders the same figures, so 3x the step is the round-trip
+# estimate. It is a bound on the REQUEST RATE, never on the simulation: no
+# tick is skipped and no result changes, ticks are only spaced further apart.
+REDRAW_EVERY = 2          # while playing, redraw charts on 1 tick in 2
+CYCLE_TO_INTERVAL = 3.0   # round trip estimated from measured step time
+# Below this the world is cheap enough that the charts cost more than the
+# simulation, so throttling them buys nothing and only makes the view stutter.
+# A step this cheap is roughly a village of thirty on the measured machine.
+CHEAP_STEP_MS = 25.0
+_PACE = {"step_ms": 0.0, "running": False}
+
+
+def _note_step(seconds: float) -> None:
+    """Exponential moving average of the step cost, in milliseconds."""
+    ms = seconds * 1000.0
+    prev = _PACE["step_ms"]
+    _PACE["step_ms"] = ms if prev <= 0.0 else 0.7 * prev + 0.3 * ms
+
+
+def _interval_floor_ms() -> int:
+    return int(_PACE["step_ms"] * CYCLE_TO_INTERVAL)
+
+
+def _skip_redraw(tick) -> bool:
+    """
+    True when this tick's chart redraw can be skipped.
+
+    Only ever skips a redraw driven by the timer while playing. Anything the
+    user did -- selecting a villager, changing tab, dragging the timeline --
+    arrives with a different `ctx.triggered_id` and always redraws, and every
+    chart is redrawn on the next multiple of REDRAW_EVERY and on pause, so no
+    view can be left showing a stale number once the world stops moving.
+    """
+    if not _PACE["running"] or ctx.triggered_id != "tick":
+        return False
+    if _PACE["step_ms"] < CHEAP_STEP_MS:
+        return False
+    try:
+        return int(tick) % REDRAW_EVERY != 0
+    except (TypeError, ValueError):
+        return False
 
 
 WORLD = build_world(DEFAULTS["seed"], DEFAULTS["n_founders"], DemographyParams(
@@ -1375,7 +1431,12 @@ def advance(_n, _step, _reset, seed, nfounders, *rest):
     # live-apply every non-structural knob, then advance one year
     keep_demes = WORLD.params.n_demes
     WORLD.params = replace(params, n_demes=keep_demes)  # demes only change on reset
+    # Derived from what drove this tick rather than from the play toggle, so a
+    # page reload cannot leave a stale flag that throttles a manual Step.
+    _PACE["running"] = (trig == "timer")
+    t0 = time.perf_counter()
     WORLD.step()
+    _note_step(time.perf_counter() - t0)
     return WORLD.tick, selected
 
 
@@ -1404,9 +1465,20 @@ def toggle_play(_n, running):
                                           "background": _rgba_hdr(MUTED, 0.12)}))
 
 
-@app.callback(Output("timer", "interval"), Input("speed", "value"))
-def set_speed(v):
-    return int(1000 / max(0.5, float(v)))
+@app.callback(Output("timer", "interval"),
+              Input("speed", "value"), Input("tick", "data"))
+def set_speed(v, _tick):
+    """
+    The speed slider asks for a rate; this returns the fastest rate the
+    server can actually sustain, which is never faster.
+
+    `tick` is an input so the floor is re-evaluated as the population grows.
+    A village of 20 costs a few milliseconds a year and the slider gets what
+    it asked for; a village of 80 costs about 90 ms and the interval widens
+    to match instead of queueing requests the server cannot answer.
+    """
+    requested = int(1000 / max(0.5, float(v)))
+    return max(requested, _interval_floor_ms())
 
 
 @app.callback(Output("selected", "data", allow_duplicate=True),
@@ -1532,7 +1604,7 @@ def render_always(_tick):
     Input("timeline", "data"),
 )
 def render_overview(_tick, selected, active, scrub):
-    if active != "overview":
+    if active != "overview" or _skip_redraw(_tick):
         return (no_update,) * 4
     cols = panels.history_columns_upto(WORLD, scrub)
     scatter = (panels.scatter_figure_from_frame(WORLD, WORLD.frame_at(scrub), selected)
@@ -1550,7 +1622,7 @@ def render_overview(_tick, selected, active, scrub):
     Input("timeline", "data"), Input("map-layer", "data"),
 )
 def render_map(_tick, selected, active, scrub, layer):
-    if active != "map":
+    if active != "map" or _skip_redraw(_tick):
         return no_update, no_update
     frame = WORLD.frame_at(scrub)
     return (build_mapdata(WORLD, selected, frame, layer or "default",
@@ -1589,7 +1661,7 @@ def render_genetics(_tick, active, scrub):
     live population, which is the honest behaviour -- the alternative is
     inventing data or blanking half the tab.
     """
-    if active != "genetics":
+    if active != "genetics" or _skip_redraw(_tick):
         return (no_update,) * 14
     cols = panels.history_columns_upto(WORLD, scrub)
     return (panels.traits_figure(cols),
@@ -1616,7 +1688,7 @@ def render_genetics(_tick, active, scrub):
     Input("tick", "data"), Input("active-tab", "data"), Input("timeline", "data"),
 )
 def render_community(_tick, active, scrub):
-    if active != "community":
+    if active != "community" or _skip_redraw(_tick):
         return (no_update,) * 6
     cols = panels.history_columns_upto(WORLD, scrub)
     return (panels.fst_figure(cols, WORLD.params.n_demes),
@@ -1635,7 +1707,7 @@ def render_community(_tick, active, scrub):
     Input("tick", "data"), Input("selected", "data"), Input("active-tab", "data"),
 )
 def render_individual(_tick, selected, active):
-    if active != "individual":
+    if active != "individual" or _skip_redraw(_tick):
         return (no_update,) * 7
     if not selected or selected not in WORLD.people:
         return (_EMPTY, _EMPTY, _EMPTY, _EMPTY, _EMPTY,
