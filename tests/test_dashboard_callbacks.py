@@ -264,19 +264,50 @@ def test_an_inactive_tab_returns_only_no_update(name, call):
 # State machines: tabs, play/pause, speed, timeline, drawer mode
 # =====================================================================
 
-def test_speed_slider_maps_ticks_per_second_to_an_interval():
+@pytest.fixture
+def idle_pace():
+    """`set_speed` reads module-level pacing state, so pin it and put it back.
+
+    Without this the assertions below depend on whatever the last test that
+    stepped a world left in `_PACE`, which is the kind of order-dependent pass
+    that looks fine until the suite is run with -p no:randomly.
+    """
+    saved = dict(A._PACE)
+    A._PACE["step_ms"] = 0.0
+    yield A._PACE
+    A._PACE.update(saved)
+
+
+def test_speed_slider_maps_ticks_per_second_to_an_interval(idle_pace):
     """The interval is milliseconds per tick, so it must be the RECIPROCAL of
     the slider; getting this backwards makes the fast end the slow end."""
-    fast, slow = A.set_speed(8), A.set_speed(0.5)
+    # The second argument is the tick. It is an Input rather than an unused
+    # parameter so the floor below is re-evaluated as the population grows.
+    fast, slow = A.set_speed(8, 0), A.set_speed(0.5, 0)
     assert fast < slow
-    assert A.set_speed(4) == pytest.approx(250, abs=1)
-    assert A.set_speed(1) == pytest.approx(1000, abs=1)
+    assert A.set_speed(4, 0) == pytest.approx(250, abs=1)
+    assert A.set_speed(1, 0) == pytest.approx(1000, abs=1)
 
 
-def test_speed_slider_never_returns_a_zero_or_negative_interval():
+def test_speed_slider_is_floored_by_the_measured_step_cost(idle_pace):
+    """The slider asks for a rate; it gets the fastest the server can sustain.
+
+    The reciprocal mapping above only holds while the world is cheap. Once a
+    step costs real time the interval must widen instead, or the timer queues
+    requests the server cannot answer -- which is the defect the floor was
+    added for, so it is asserted rather than left to the previous test's
+    silence about it.
+    """
+    idle_pace["step_ms"] = 90.0                       # about a village of 80
+    floor = int(90.0 * A.CYCLE_TO_INTERVAL)
+    assert A.set_speed(8, 0) == floor, "a fast slider must not beat the floor"
+    assert A.set_speed(0.5, 0) == 2000, "a slow slider is still slower than it"
+
+
+def test_speed_slider_never_returns_a_zero_or_negative_interval(idle_pace):
     for v in (0, -1, None, 0.001):
         try:
-            out = A.set_speed(v)
+            out = A.set_speed(v, 0)
         except Exception:
             continue                     # rejecting bad input is acceptable
         assert out is no_update or out > 0
