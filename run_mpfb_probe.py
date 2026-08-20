@@ -266,6 +266,68 @@ def _editor_and_project():
     return editor, project, project.parent / (project.name + "-logs")
 
 
+def install_assets(exe: Path, args) -> int:
+    """Item A2. Download the CC0 pack, unpack it where MPFB looks, catalogue it.
+
+    The catalogue at the end is not a flourish. `.mhm` bodypart lines carry a
+    name AND a uuid, and MPFB's fallback when it cannot match both fits some
+    other asset instead of failing, so nothing in this project may hardcode an
+    asset name. The catalogue is what the writer is allowed to choose from.
+    """
+    from mpfb import asset_pack
+
+    cache = (args.out / "assetpack").resolve()
+    print(f"  cache {cache}")
+    zip_path = asset_pack.download(cache)
+
+    data_dir = _mpfb_data_dir(exe)
+    if data_dir is None:
+        print("  could not ask Blender where MPFB keeps its data.")
+        return 1
+    print(f"  unpacking into {data_dir}")
+    families = asset_pack.extract(zip_path, Path(data_dir))
+    if not families:
+        print("  nothing was unpacked; the archive layout may have changed.")
+        return 1
+    for name, count in sorted(families.items()):
+        print(f"    {name:14s} {count:5d} files")
+
+    return list_assets(exe, args)
+
+
+def _mpfb_data_dir(exe: Path):
+    """Ask the installed Blender where MPFB's data directory is.
+
+    Asked rather than constructed: it depends on the Blender version, on the
+    extension id, and on an MPFB preference that can override it, so a path
+    built here would be right on this machine and wrong on the next one.
+    """
+    expr = (
+        "import bpy,sys\n"
+        "try: bpy.ops.preferences.addon_enable(module='bl_ext.user_default.mpfb')\n"
+        "except Exception: pass\n"
+        "for n in list(sys.modules):\n"
+        "    if n.endswith('mpfb.services.locationservice'):\n"
+        "        print('[DATA]', sys.modules[n].LocationService.get_user_data())\n"
+        "        break\n")
+    code, output = _run_blender(exe, ["--python-expr", expr])
+    for line in output.splitlines():
+        if line.startswith("[DATA] "):
+            return line[len("[DATA] "):].strip()
+    return None
+
+
+def list_assets(exe: Path, args) -> int:
+    """Write the installed-asset catalogue, uuids included."""
+    out = Path("health_engine") / "data" / "mpfb_assets.json"
+    script = Path(__file__).parent / "mpfb" / "list_assets.py"
+    code, output = _run_blender(exe, ["-P", str(script), "--", "--out", str(out)])
+    for line in output.splitlines():
+        if line.startswith("[ASSETS]"):
+            print("  " + line)
+    return code
+
+
 def lineup(args) -> int:
     """Photograph the per-villager bodies side by side, front on.
 
@@ -535,6 +597,15 @@ def main() -> int:
                         help="photograph a world bundle twice, with the body "
                              "pack installed and with it moved aside. Needs a "
                              "graphics device.")
+    parser.add_argument("--install-assets", action="store_true",
+                        help="download and install the CC0 "
+                             "makehuman_system_assets pack (item A2): eyes, "
+                             "eyebrows, eyelashes, teeth, hair, clothes. "
+                             "267 MB, resumable, segmented because the origin "
+                             "throttles one connection to 32 KB/s.")
+    parser.add_argument("--list-assets", action="store_true",
+                        help="catalogue the MPFB assets installed here, with "
+                             "their uuids, to health_engine/data/mpfb_assets.json")
     parser.add_argument("--shoot-lineup", type=Path, default=None,
                         metavar="BUNDLE",
                         help="photograph the bundle's per-villager bodies "
@@ -558,6 +629,12 @@ def main() -> int:
 
     if args.check_portrait:
         return portrait(args)
+
+    if args.install_assets:
+        return install_assets(exe, args)
+
+    if args.list_assets:
+        return list_assets(exe, args)
 
     if args.shoot_village is not None:
         return village(args)
