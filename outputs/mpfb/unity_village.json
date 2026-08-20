@@ -2,22 +2,22 @@
   "capsules": {
     "load": {
       "loaded": "True",
-      "last_tick": 90.0,
+      "last_tick": 110.0,
       "body_installed": "False"
     },
     "scene": {
-      "visible_count": 28.0,
+      "visible_count": 18.0,
       "headcount_ok": "True",
-      "bodies_in_scene": 28.0,
-      "tallest_local_scale_y": 0.934
+      "bodies_in_scene": 18.0,
+      "tallest_local_scale_y": 0.922
     },
     "village_wide_capsules": {
       "png": "C:\\Users\\samal\\Desktop\\extNPC_health_engine\\outputs\\mpfb\\village\\village_wide_capsules.png",
-      "mean_luma": 74.11
+      "mean_luma": 73.49
     },
     "village_close_capsules": {
       "png": "C:\\Users\\samal\\Desktop\\extNPC_health_engine\\outputs\\mpfb\\village\\village_close_capsules.png",
-      "mean_luma": 72.09
+      "mean_luma": 72.78
     },
     "_exit": {
       "code": 0
@@ -26,22 +26,22 @@
   "bodies": {
     "load": {
       "loaded": "True",
-      "last_tick": 90.0,
+      "last_tick": 110.0,
       "body_installed": "True"
     },
     "scene": {
-      "visible_count": 28.0,
+      "visible_count": 18.0,
       "headcount_ok": "True",
-      "bodies_in_scene": 28.0,
-      "tallest_local_scale_y": 1.868
+      "bodies_in_scene": 18.0,
+      "tallest_local_scale_y": 1.844
     },
     "village_wide_bodies": {
       "png": "C:\\Users\\samal\\Desktop\\extNPC_health_engine\\outputs\\mpfb\\village\\village_wide_bodies.png",
-      "mean_luma": 74.06
+      "mean_luma": 73.45
     },
     "village_close_bodies": {
       "png": "C:\\Users\\samal\\Desktop\\extNPC_health_engine\\outputs\\mpfb\\village\\village_close_bodies.png",
-      "mean_luma": 71.78
+      "mean_luma": 72.54
     },
     "_exit": {
       "code": 0

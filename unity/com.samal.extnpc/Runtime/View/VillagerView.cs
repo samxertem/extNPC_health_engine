@@ -95,10 +95,12 @@ namespace ExtNPC.View
             float heightM = (float)(System.Math.Max(row.HeightCm, 1.0) * 0.01);
 
             // Stage 6: a real body if one is installed, a primitive if not.
-            // HumanMesh returns a UNIT body -- 1 m tall, soles on the origin --
-            // so the two cases differ in scale and in where the pivot sits, and
-            // nowhere else.
-            Mesh body = HumanMesh.UnitBody(row.IsFemale);
+            // Stage 8: THIS VILLAGER'S body if one was baked from their own
+            // genome, falling back to the shared one for their sex. Every tier
+            // returns a UNIT body -- 1 m tall, soles on the origin -- so the
+            // scaling below is identical whichever answered, and the only case
+            // that differs in scale or pivot is the primitive fallback.
+            Mesh body = BodyLibrary.UnitBodyFor(row.Name, row.IsFemale);
             _feetPivot = body != null;
 
             if (_feetPivot)

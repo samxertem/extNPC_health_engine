@@ -61,5 +61,44 @@ namespace ExtNPC.Editor
                       "Read/Write enabled, which HumanMesh needs to fold the " +
                       "FBX's centimetre Z-up transform into the vertices.");
         }
+
+        /// <summary>
+        /// Catch bodies that arrive by being MOVED rather than imported.
+        ///
+        /// <see cref="OnPreprocessModel"/> only ever sees an asset Unity is
+        /// importing, and a move is not an import: the .meta travels with the
+        /// file, so an FBX first imported anywhere outside
+        /// <see cref="BodyFolder"/> keeps <c>isReadable = false</c> for ever
+        /// once it is dragged in.
+        ///
+        /// THE ROUTE THAT MADE THIS REAL, because it is not hypothetical and
+        /// it is not a user doing something odd. The village screenshot
+        /// harness (`mpfb/unity_village.py`) takes its A/B pair by moving
+        /// <c>Assets/Resources/extnpc/</c> aside and back. Any body added
+        /// between the two passes is therefore imported while it sits at
+        /// <c>Assets/_parked_extnpc/</c>, where this postprocessor correctly
+        /// ignores it, and is then moved into place already unreadable. The
+        /// symptom is the one the class docstring warns about: a village that
+        /// loads, counts and logs correctly and draws primitives.
+        /// </summary>
+        private static void OnPostprocessAllAssets(
+            string[] imported, string[] deleted, string[] moved, string[] movedFrom)
+        {
+            if (moved == null) return;
+
+            foreach (string path in moved)
+            {
+                if (!IsBodyAsset(path)) continue;
+
+                var importer = AssetImporter.GetAtPath(path) as ModelImporter;
+                if (importer == null || importer.isReadable) continue;
+
+                importer.isReadable = true;
+                importer.SaveAndReimport();
+                Debug.Log($"[extNPC] {System.IO.Path.GetFileName(path)} was moved " +
+                          "into the body folder already unreadable; Read/Write " +
+                          "enabled and reimported.");
+            }
+        }
     }
 }

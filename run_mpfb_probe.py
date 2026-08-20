@@ -266,6 +266,30 @@ def _editor_and_project():
     return editor, project, project.parent / (project.name + "-logs")
 
 
+def lineup(args) -> int:
+    """Photograph the per-villager bodies side by side, front on.
+
+    Separate from `village` because it answers a different question. The
+    village camera shows that the world is populated; this one shows whether
+    the people in it differ from each other, which is the whole of Stage 8.
+    """
+    from mpfb import unity_lineup
+
+    bundle = args.shoot_lineup.resolve()
+    if not (bundle / "bodies" / "bodies.json").exists():
+        print(f"  {bundle} has no bodies/bodies.json. Make one with:\n"
+              f"    python export_bodies.py --years 110 --bundle {bundle}\n"
+              f"    blender -b -P mpfb/bake_bodies.py -- --bodies {bundle}/bodies")
+        return 1
+
+    editor, project, log_dir = _editor_and_project()
+    png_dir = (args.out / "lineup").resolve()
+    result = unity_lineup.shoot(project, log_dir, editor, bundle, png_dir)
+    code = unity_lineup.report(result)
+    print(f"\n  picture in {png_dir}")
+    return code
+
+
 def village(args) -> int:
     """Photograph a bundle with the bodies and without them.
 
@@ -511,6 +535,13 @@ def main() -> int:
                         help="photograph a world bundle twice, with the body "
                              "pack installed and with it moved aside. Needs a "
                              "graphics device.")
+    parser.add_argument("--shoot-lineup", type=Path, default=None,
+                        metavar="BUNDLE",
+                        help="photograph the bundle's per-villager bodies "
+                             "standing in a row, front on. The village camera "
+                             "cannot answer Stage 8's question because twenty "
+                             "humans at 34 m are twenty dots. Needs a graphics "
+                             "device.")
     parser.add_argument("--perf", action="store_true",
                         help="time 28 to 1000 villagers, capsules against "
                              "bodies, against the plan's 600-at-60 budget. "
@@ -530,6 +561,9 @@ def main() -> int:
 
     if args.shoot_village is not None:
         return village(args)
+
+    if args.shoot_lineup is not None:
+        return lineup(args)
 
     if args.perf:
         return perf(args)

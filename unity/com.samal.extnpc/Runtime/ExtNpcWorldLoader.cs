@@ -81,6 +81,28 @@ namespace ExtNPC
                         "as model results.");
                 }
 
+                // Stage 8: per-villager bodies, if this bundle was exported
+                // with them. Read here rather than inside WorldBundle because
+                // it is a rendering concern and WorldBundle is the data layer;
+                // a world with no bodies folder is the normal case and must
+                // stay silent, not warn.
+                string bodiesManifest = Path.Combine(
+                    path, "bodies", ExtNPC.View.BodyLibrary.ManifestName);
+                if (File.Exists(bodiesManifest))
+                {
+                    ExtNPC.View.BodyLibrary.LoadManifest(
+                        File.ReadAllText(bodiesManifest));
+                    ExtNPC.View.BodyLibrary.CheckProvenance(
+                        Bundle.Manifest.Seed, Bundle.Manifest.GitCommit);
+                    Debug.Log($"[extNPC] {ExtNPC.View.BodyLibrary.Declared} " +
+                              $"per-villager bodies declared, ethnicity macro " +
+                              $"'{ExtNPC.View.BodyLibrary.EthnicityPreset}' (item U5).");
+                }
+                else
+                {
+                    ExtNPC.View.BodyLibrary.Forget();
+                }
+
                 if (Bundle.Manifest.Frames.Truncated)
                 {
                     Debug.LogWarning(
