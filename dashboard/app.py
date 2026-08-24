@@ -22,6 +22,7 @@ Run:  python run_dashboard.py   ->  http://127.0.0.1:8050
 
 from __future__ import annotations
 
+import os
 import time
 from dataclasses import replace
 
@@ -32,7 +33,7 @@ from simulation import (World, DemographyParams, SCENARIOS, scenario_list,
                         SHOCK_KINDS, GLOSSARY)
 from simulation.demography import (DEFAULT_FERTILITY_SCHEDULE,
                                    FERTILITY_SCHEDULES, mean_reproductive_age)
-from . import genetics_panels as gpanels, inspector, panels
+from . import genetics_panels as gpanels, inspector, panels, session_sync
 
 # ---------------------------------------------------------------------
 # One long-lived world, mutated by the interval callback.
@@ -903,6 +904,11 @@ app.layout = html.Div(style={
     dcc.Store(id="cmp-on", data=False),
     dcc.Store(id="cmp-b", data=None),
     dcc.Interval(id="timer", interval=1000, disabled=True),
+    # The Unity link (item N1). Runs whether or not a viewer is listening:
+    # polling an absent file is one failed stat every 400 ms, and making it
+    # conditional would need a way to know the viewer had appeared, which is
+    # the connection state a plain file was chosen to avoid having.
+    dcc.Interval(id="sync-timer", interval=400),
 
     # ---- header ------------------------------------------------------
     html.Div(style={"display": "flex", "alignItems": "center",
@@ -2190,6 +2196,70 @@ def render_compare(on, b, a, _tick, active):
     return (inspector.compare_table(WORLD, a, b),
             panels.compare_radar_figure(WORLD, a, b),
             panels.compare_bars_figure(WORLD, a, b))
+
+
+# =====================================================================
+# The Unity link (item N1)
+# =====================================================================
+#
+# Selection and timeline sync with the Unity viewer, through the small file
+# `dashboard/session_sync.py` describes. It does NOT step the simulation: N2
+# measured that at roughly a second per simulated year at 600 people, so
+# export-then-view is the right shape and this only points two viewers at the
+# same thing.
+#
+# `world` is deliberately left unset. The guard it feeds exists so a dashboard
+# running world A cannot drag a viewer showing world B to a villager who does
+# not exist there. But this dashboard drives a LIVE world that was never
+# exported under a name, so it has no honest name to give, and claiming one
+# would be worse than staying quiet. Empty means "not stated" and both sides
+# accept it. Set EXTNPC_SYNC_WORLD when the dashboard really is driving the
+# same export the viewer has open.
+_SYNC = session_sync.SyncClient(
+    session_sync.SOURCE_DASHBOARD,
+    world=os.environ.get("EXTNPC_SYNC_WORLD", ""))
+
+
+@app.callback(
+    Output("selected", "data", allow_duplicate=True),
+    Output("timeline", "data", allow_duplicate=True),
+    Input("sync-timer", "n_intervals"),
+    State("selected", "data"),
+    State("timeline", "data"),
+    prevent_initial_call=True,
+)
+def sync_with_unity(_n, selected, timeline):
+    """Mirror the selection and the viewed year to and from the Unity viewer.
+
+    ONE CALLBACK FOR BOTH DIRECTIONS, on purpose. Reading and writing in the
+    same place is what makes "we just applied their value" and "we are about to
+    publish ours" the same decision. Split across two callbacks they would race
+    on the timer and the loser would republish the value it had just received,
+    which is exactly the feedback loop `slider-echo` already exists to stop
+    elsewhere in this file.
+
+    NEVER RAISES, because it shares the store outputs with the callback that
+    advances the world; an exception here is a dead dashboard, and a viewer
+    that is not running must cost nothing but a failed stat.
+    """
+    try:
+        heard = _SYNC.poll()
+        if heard is not None:
+            # `SyncClient.poll` has already dropped our own writes and anything
+            # we have seen before, so reaching here means the viewer genuinely
+            # moved. `year=None` is "follow the newest", which is what the
+            # timeline store already uses None for, so it passes straight
+            # through rather than being resolved to a tick.
+            return heard.selected, heard.year
+
+        # Nothing incoming, so say where we are. publish() is a no-op on the
+        # wire only in the sense that it always writes; the change check is
+        # here because this runs 2.5 times a second forever.
+        if (selected, timeline) != _SYNC.last_published:
+            _SYNC.publish(selected, timeline)
+        return no_update, no_update
+    except Exception:      # pragma: no cover - a sync bug must not kill the app
+        return no_update, no_update
 
 
 if __name__ == "__main__":

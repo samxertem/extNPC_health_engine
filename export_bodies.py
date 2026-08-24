@@ -123,6 +123,34 @@ def _relations(world, names: Set[str]) -> Dict[str, List[Tuple[str, str]]]:
     return {"siblings": siblings, "parent_child": parent_child, "cousins": cousins}
 
 
+def select_everyone(world) -> List[str]:
+    """Every person who ever lived in this world, in a stable order.
+
+    WHY THIS EXISTS. `select_family` picks a related subset of the LIVING, which
+    is the right choice for the Stage 8 contact sheet: it makes a picture that
+    answers "does genotype-driven variation read as a family". It is the wrong
+    choice for the viewer, where scrubbing the timeline back to year 40 shows
+    the shared male and female body for everyone who had died by the last year.
+
+    THE CAVEAT, and it is a real one. A person gets ONE body, baked at ONE age:
+    their age now if living, their age at death if not. The mesh therefore has
+    the right SHAPE for that age and no other, so a villager who died at 80 is
+    drawn with an eighty-year-old's build when the timeline is scrubbed back to
+    their childhood. Stature is unaffected and stays exactly right at every
+    year, because `VillagerView` scales by the frame's own `height_cm` rather
+    than by anything in the mesh.
+
+    That is a smaller error than the alternative, which is the shared adult
+    body, and it is a much smaller one than item U6's original defect where
+    every child was drawn adult-sized. Baking a body per person PER YEAR is the
+    honest fix and is combinatorial: 53 people over 111 years is 5,883 bakes at
+    about 5.7 s each, which is nine hours and 8 GB of FBX.
+
+    Sorted by name so a re-run produces the same order and the manifest diffs.
+    """
+    return sorted(world.people)
+
+
 def select_family(world, count: int) -> List[str]:
     """`count` living villagers, chosen to maximise visible relatedness.
 
@@ -347,6 +375,12 @@ def main() -> int:
                          "world object. The recommended way to run this: it is "
                          "what guarantees the bodies and the villagers on screen "
                          "are the same people")
+    ap.add_argument("--everyone", action="store_true",
+                    help="export a body for EVERY person who ever lived, not "
+                         "just a related subset of the living. What the viewer "
+                         "wants: scrubbing the timeline back otherwise shows "
+                         "the shared body for anyone who died before the last "
+                         "year. Read the caveat in `select_everyone`.")
     ap.add_argument("--bare", action="store_true",
                     help="write bodies with no eyes, hair or clothes, the way "
                          "this script did before the CC0 asset pack existed. "
@@ -377,7 +411,8 @@ def main() -> int:
                                        note="bodies exported alongside")
         print(f"    bundle -> {bundle_path}")
 
-    names = select_family(world, args.count)
+    names = (select_everyone(world) if args.everyone
+             else select_family(world, args.count))
     catalogue = None
     if not args.bare:
         # Absent pack is a REPORTED fallback, never a silent one. An eyeless

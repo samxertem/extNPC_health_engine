@@ -38,6 +38,14 @@ namespace ExtNPC.Editor
             root.AddComponent<WorldClock>();
             root.AddComponent<TimelineHud>();
 
+            // The dashboard link (N1), added DISABLED. Present so it is one
+            // tick away in the inspector rather than something to be found in
+            // the docs, and off so that opening a scene never starts writing to
+            // the user's home directory unasked. It is the only component here
+            // that touches anything outside the project.
+            var bridge = root.AddComponent<ExtNPC.Sync.SessionSyncBridge>();
+            bridge.enabled = false;
+
             // Default to the engine repo's own export location, resolved
             // relative to the Unity project. Wrong as often as right, but it
             // makes the field's expected shape obvious at a glance.
