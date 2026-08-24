@@ -176,7 +176,19 @@ namespace ExtNPC.View
         public void SetSubject(string villagerName, bool female, double heightCm,
                                Color lineage)
         {
-            Mesh body = HumanMesh.UnitBody(female);
+            // THIS VILLAGER'S OWN BODY, not the shared one for their sex.
+            //
+            // The portrait was built in session 22, before per-villager bodies
+            // existed, so it asked HumanMesh for the shared male or female mesh
+            // and every woman in the village had the same face as every other
+            // woman. That is the one place it matters most: the panel opens
+            // BECAUSE somebody clicked a particular person, and it was showing
+            // them a stand-in.
+            //
+            // UnitBodyFor falls back to exactly the old shared mesh when the
+            // villager has no baked body, so a bundle with no bodies installed
+            // behaves as it did before rather than losing its portrait.
+            Mesh body = BodyLibrary.UnitBodyFor(villagerName, female);
             if (body == null)
             {
                 _hasSubject = false;

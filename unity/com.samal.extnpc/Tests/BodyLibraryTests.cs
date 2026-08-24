@@ -98,6 +98,35 @@ namespace ExtNPC.Tests
         }
 
         [Test]
+        public void AnUnknownVillagerFallsBackToTheSharedBodyForTheirSex()
+        {
+            // The contract CharacterPortrait now depends on. It used to ask
+            // HumanMesh directly for the shared male or female mesh, so every
+            // woman in the village had the same face as every other woman, in
+            // the one panel that exists BECAUSE somebody clicked a particular
+            // person. It asks BodyLibrary now.
+            //
+            // The fallback is what makes that safe: a villager with no baked
+            // body must still get a portrait, and it must be exactly the mesh
+            // the old code would have used. Asserted by reference, and it holds
+            // when both are null, which is the state of a package that ships no
+            // assets.
+            BodyLibrary.LoadManifest(Dressed);
+
+            Assert.AreSame(HumanMesh.UnitBody(true),
+                BodyLibrary.UnitBodyFor("nobody-by-that-name", true));
+            Assert.AreSame(HumanMesh.UnitBody(false),
+                BodyLibrary.UnitBodyFor("nobody-by-that-name", false));
+        }
+
+        [Test]
+        public void ANullVillagerNameIsSurvivable()
+        {
+            // The portrait can be asked to draw before a selection exists.
+            Assert.DoesNotThrow(() => BodyLibrary.UnitBodyFor(null, true));
+        }
+
+        [Test]
         public void MalformedJsonStillLeavesTheVillageDrawable()
         {
             LogAssert.Expect(LogType.Warning, new Regex("not readable"));
