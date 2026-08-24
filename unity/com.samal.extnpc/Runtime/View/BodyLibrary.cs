@@ -145,6 +145,26 @@ namespace ExtNPC.View
                 }
             }
 
+            // A DRESSED bundle whose bodies carry no recorded stature is a
+            // specific, recoverable mistake with a silent symptom, so it gets
+            // named. `export_bodies.py` rewrites bodies.json from scratch and
+            // does not know the statures; only `bake_bodies.py` does. Run the
+            // exporter after the bake and the keys are gone, Bake falls back to
+            // measuring the whole mesh, and every villager loses their hair's
+            // height again with nothing in the log.
+            var channels = root["appearance_channels"];
+            bool dressed = channels != null && (bool?)channels["dressed"] == true;
+            if (dressed && _statures.Count < _stems.Count)
+            {
+                Debug.LogWarning(
+                    "[extNPC] bodies.json says these bodies are dressed but " +
+                    (_stems.Count - _statures.Count) + " of " + _stems.Count +
+                    " carry no body_stature_m, so they will be normalised by " +
+                    "their own hair and shoes and come out short. This is what " +
+                    "running export_bodies.py after bake_bodies.py looks like: " +
+                    "re-run the bake to stamp the statures back in.");
+            }
+
             _manifestSeed = (int?)root["seed"] ?? -1;
             _manifestCommit = (string)root["git_commit"] ?? "";
             _manifestEthnicity = (string)root["ethnicity_preset"] ?? "";

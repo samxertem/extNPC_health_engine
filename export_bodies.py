@@ -46,6 +46,9 @@ from collections import defaultdict
 from typing import Dict, List, Optional, Set, Tuple
 
 from health_engine.phenotype_to_mhm import (
+    CITED_BODYPARTS,
+    COSMETIC_BODYPARTS,
+    EYE_MESH_QUALITY,
     DEFAULT_ETHNICITY,
     ETHNICITY_PRESETS,
     phenotype_to_mhm,
@@ -198,6 +201,35 @@ def _safe_stem(name: str) -> str:
     return "".join(c if (c.isalnum() or c in "-_") else "_" for c in name)
 
 
+def _channel_provenance(catalogue) -> dict:
+    """What each visible channel is, in the manifest, in the file.
+
+    Split three ways rather than two, because "cosmetic" and "constant" are
+    different claims. A cosmetic channel varies between villagers and carries
+    no biology; a constant does not vary at all and is a rendering decision.
+    Blurring them would let `eyes`, which is a poly count, read as a phenotype.
+    """
+    if catalogue is None:
+        return {"dressed": False,
+                "note": "no asset pack installed; bodies carry morphs only"}
+
+    return {
+        "dressed": True,
+        "cited": {channel: trait for channel, trait
+                  in CITED_BODYPARTS.items()},
+        "cosmetic": {channel: "blake2b of the villager's name, salted per "
+                              "channel; carries no biology"
+                     for channel in COSMETIC_BODYPARTS},
+        "constant": {
+            "eyes": f"{EYE_MESH_QUALITY}; a mesh resolution, not eye colour. "
+                    f"Eye colour is a material and travels in `pigmentation`.",
+        },
+        "note": ("`cited` channels are driven by a modelled trait and may be "
+                 "read as phenotype. `cosmetic` channels are invented, "
+                 "reproducibly, from the name alone and must not be."),
+    }
+
+
 def write_bodies(world, names: List[str], out_dir: str,
                  ethnicity: str = DEFAULT_ETHNICITY,
                  catalogue=None) -> dict:
@@ -267,6 +299,13 @@ def write_bodies(world, names: List[str], out_dir: str,
         "ethnicity_preset": ethnicity,
         "ethnicity_macros": ETHNICITY_PRESETS[ethnicity],
         "count": len(entries),
+        # WHICH CHANNELS ARE A MEASUREMENT AND WHICH ARE DRESSING, recorded in
+        # the file rather than left to a caption someone might not carry over.
+        # A reader looking at these bodies has to be able to tell, without
+        # reading the source, that a bald villager is bald because of the AR
+        # allele on the X he had from his mother, and that his haircut is
+        # nothing but a hash of his name.
+        "appearance_channels": _channel_provenance(catalogue),
         "relationships": {
             "sibling_pairs": len(rel["siblings"]),
             "parent_child_pairs": len(rel["parent_child"]),
