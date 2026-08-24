@@ -43,6 +43,12 @@ namespace ExtNPC.View
         // because getting it wrong buries every villager to the waist.
         private bool _feetPivot;
 
+        // The lineage ring, created lazily because a village drawn with the
+        // primitive fallback never needs one: on a capsule, lineage stays on
+        // the body, where it reads as the encoding it is. See LineageRing.
+        private MeshRenderer _ringRenderer;
+        private MaterialPropertyBlock _ringBlock;
+
         /// <summary>The row this view last drew. Read by selection/inspection.</summary>
         public FrameRow Row { get; private set; }
 
@@ -147,11 +153,25 @@ namespace ExtNPC.View
             _emergence = 1f;
             Place();
 
+            // WHERE LINEAGE COLOUR GOES, and it depends on what is being
+            // drawn (item A5).
+            //
+            // On a real body it goes in a ring on the ground and the body is
+            // left a neutral tone. Painting lineage into the albedo of a
+            // clothed human makes every villager one flat colour, which hides
+            // the hair, the clothes, the build and the age the genome just
+            // produced. On the primitive fallback it stays on the body, where a
+            // magenta capsule reads as an encoding rather than as a mistake and
+            // there is no detail for it to hide.
+            Color lineage = row.Color;
+            Color bodyColour = _feetPivot ? LineageRing.NeutralBody : lineage;
+
             _renderer.GetPropertyBlock(_block);
-            Color c = row.Color;
-            _block.SetColor(BaseColorId, c);
-            _block.SetColor(ColorId, c);
+            _block.SetColor(BaseColorId, bodyColour);
+            _block.SetColor(ColorId, bodyColour);
             _renderer.SetPropertyBlock(_block);
+
+            ApplyRing(lineage);
 
             gameObject.name = row.Name;
         }
@@ -196,6 +216,62 @@ namespace ExtNPC.View
         {
             _emergence = Mathf.Clamp01(fraction);
             Place();
+        }
+
+        /// <summary>
+        /// Show or hide the lineage ring, and colour it.
+        ///
+        /// The ring is a CHILD with its own transform, and it deliberately does
+        /// not inherit the body's uniform stature scale in full: the body is
+        /// scaled by height_cm/100, so a ring parented to it would grow with
+        /// stature and turn a measured trait into a circle on the floor that
+        /// looks like it means something. It is scaled by a gentler factor that
+        /// keeps a toddler's ring smaller than an adult's without the radius
+        /// tracking anything.
+        /// </summary>
+        private void ApplyRing(Color lineage)
+        {
+            if (!_feetPivot)
+            {
+                if (_ringRenderer != null) _ringRenderer.enabled = false;
+                return;
+            }
+
+            if (_ringRenderer == null)
+            {
+                var go = new GameObject("lineage_ring");
+                go.transform.SetParent(transform, false);
+                go.layer = gameObject.layer;
+
+                var filter = go.AddComponent<MeshFilter>();
+                filter.sharedMesh = LineageRing.SharedMesh();
+
+                _ringRenderer = go.AddComponent<MeshRenderer>();
+                _ringRenderer.sharedMaterial = _renderer.sharedMaterial;
+                _ringRenderer.shadowCastingMode =
+                    UnityEngine.Rendering.ShadowCastingMode.Off;
+                _ringRenderer.receiveShadows = false;
+                _ringBlock = new MaterialPropertyBlock();
+            }
+
+            _ringRenderer.enabled = true;
+
+            // CONSTANT IN WORLD SPACE. The parent is scaled by stature, so
+            // this divides that back out entirely. The ring is an identifier
+            // and measures nothing, so letting it grow with height would put a
+            // second, wrong reading of stature on the floor beside the right
+            // one, and would make a toddler harder to find than an adult for no
+            // reason a reader could name.
+            float bodyScale = Mathf.Max(transform.localScale.y, 0.01f);
+            float ringScale = 1f / bodyScale;
+            _ringRenderer.transform.localScale = Vector3.one * ringScale;
+            _ringRenderer.transform.localPosition =
+                new Vector3(0f, LineageRing.HeightAboveGroundM / bodyScale, 0f);
+
+            _ringRenderer.GetPropertyBlock(_ringBlock);
+            _ringBlock.SetColor(BaseColorId, lineage);
+            _ringBlock.SetColor(ColorId, lineage);
+            _ringRenderer.SetPropertyBlock(_ringBlock);
         }
 
         private void Place()
