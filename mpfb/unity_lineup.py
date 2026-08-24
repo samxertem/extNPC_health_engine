@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -232,13 +233,59 @@ public static class ShootBodyLineup
 '''
 
 
+def install_bodies(bundle: Path, project: Path) -> int:
+    """Copy the bundle's baked FBX files into the harness project, and say so.
+
+    WHY THIS IS NOT THE CALLER'S JOB ANY MORE. It used to be, and the docstring
+    below used to say "the bodies must already be installed". That instruction
+    is followed by whoever remembers it, and the failure when it is forgotten
+    is not an error: the harness happily photographs LAST WEEK'S bodies and
+    reports `all 18 villagers are wearing their own baked body`, because that
+    check tests identity and never freshness. It was wrong on 2026-08-24 in
+    exactly that way -- a lineup shot after the first dressed bake came back
+    naked, from 948 KB files baked four days earlier, with a PASS on it.
+
+    The picture must be of the bundle it was pointed at, so pointing at a
+    bundle is now the only thing the caller has to get right.
+    """
+    src = bundle / "bodies" / "fbx"
+    if not src.is_dir():
+        raise SystemExit(
+            f"no baked bodies at {src}. Run:\n"
+            f"  blender -b -P mpfb/bake_bodies.py -- --bodies {bundle / 'bodies'}")
+
+    target = project / "Assets" / "Resources" / "extnpc" / "bodies"
+    target.mkdir(parents=True, exist_ok=True)
+
+    # Clear first. A rename between bakes would otherwise leave an orphan FBX
+    # that no manifest names, which is invisible in the picture and inflates
+    # nothing except the next person's confusion.
+    for stale in target.glob("*.fbx"):
+        stale.unlink()
+        meta = stale.with_suffix(".fbx.meta")
+        if meta.exists():
+            meta.unlink()
+
+    copied = 0
+    for path in sorted(src.glob("*.fbx")):
+        shutil.copy2(path, target / path.name)
+        copied += 1
+
+    manifest = bundle / "bodies" / "bodies.json"
+    if manifest.is_file():
+        shutil.copy2(manifest, target / "bodies.json")
+    print(f"  installed {copied} bodies from {src}")
+    return copied
+
+
 def shoot(project: Path, log_dir: Path, editor: Path, bundle: Path,
           png_dir: Path) -> dict:
-    """One pass. The bodies must already be installed under Assets/Resources."""
+    """One pass. Installs the bundle's bodies first, then photographs them."""
     import run_unity_tests as rut
     from mpfb import unity_measure
 
     rut.ensure_project(editor, project, log_dir)
+    install_bodies(bundle, project)
     editor_dir = project / "Assets" / "Editor"
     editor_dir.mkdir(parents=True, exist_ok=True)
     (editor_dir / "ShootBodyLineup.cs").write_text(LINEUP_CS, encoding="utf-8")

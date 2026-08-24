@@ -65,10 +65,18 @@ def deserialization_settings() -> dict:
     600-character performance budget was measured against. Accepting the
     default would quietly invalidate that measurement.
 
-    `load_clothes` is False because a `.mhm` written by
-    `health_engine.phenotype_to_mhm` carries no clothes lines. Saying so
-    explicitly costs nothing and documents that naked villagers are item A3,
-    not an accident here.
+    `load_clothes` is True as of item A3: a `.mhm` written by
+    `health_engine.phenotype_to_mhm` now carries a suit line and a shoes line,
+    both chosen from the probed catalogue.
+
+    BOTH DEEP SEARCHES STAY OFF, and this is the important one. With deep
+    search on, a name MPFB cannot match falls through to a last-resort loop
+    that compares each candidate asset against its OWN internal name and
+    returns the first self-consistent one, so a stale name silently dresses the
+    villager in something else. Off, the same case simply fails to load the
+    part, which is a difference we can see. The engine side never guesses a
+    name anyway -- `health_engine/mhm_assets.py` reads them out of this very
+    install -- so nothing legitimate needs the fallback.
     """
     human_service = PROBE.dynamic_import("mpfb.services.humanservice", "HumanService")
     settings = dict(human_service.get_default_deserialization_settings())
@@ -76,7 +84,7 @@ def deserialization_settings() -> dict:
         "clothes_deep_search": False,
         "bodypart_deep_search": False,
         "subdiv_levels": 0,
-        "load_clothes": False,
+        "load_clothes": True,
     })
     return settings
 
@@ -92,10 +100,31 @@ def bake_one(mhm_path: str, fbx_path: str, settings: dict) -> dict:
     object_service = PROBE.dynamic_import("mpfb.services.objectservice", "ObjectService")
     human_service = PROBE.dynamic_import("mpfb.services.humanservice", "HumanService")
 
+    # STATURE IS MEASURED UNDRESSED, and that is not fastidiousness.
+    # A garment's `.mhclo` DELETES the body vertices it covers, so a clothed
+    # basemesh is not a whole body and its bounding box is the height of
+    # whatever the clothes left behind. Measured on 2026-08-24: with
+    # `Female casualsuit01` on her, Leyla-46 measured 0.7323 m instead of
+    # 1.4182 m, because the suit takes the legs and the shoes take the feet,
+    # so the box ran crown-to-hip. Four of eighteen villagers were affected and
+    # the other fourteen were exactly right, which is the reason this needs
+    # saying out loud: the failure depends on WHICH GARMENT the villager drew,
+    # so a spot check of one body finds nothing.
+    #
+    # Unity divides by this number to stand the villager 1 m tall, so a body
+    # measured at half height renders at twice the size. An undressed load
+    # costs one extra deserialization per villager, about four seconds, and it
+    # is the only measurement here that answers "how tall is this person".
+    _clear_scene()
+    bare_settings = dict(settings)
+    bare_settings["load_clothes"] = False
+    bare = human_service.deserialize_from_mhm(mhm_path, bare_settings)
+    authored = PROBE.stature(bare)
+
     _clear_scene()
 
     basemesh = human_service.deserialize_from_mhm(mhm_path, settings)
-    authored = PROBE.stature(basemesh)
+    clothed = PROBE.stature(basemesh)
 
     root = export_service.create_character_copy(basemesh, name_suffix="_body")
     mesh = object_service.find_object_of_type_amongst_nearest_relatives(root, "Basemesh")
@@ -113,11 +142,80 @@ def bake_one(mhm_path: str, fbx_path: str, settings: dict) -> dict:
 
     return {
         "fbx": os.path.basename(fbx_path),
+        # The number Unity normalises by. Undressed, for the reason above.
         "authored_stature_m": authored,
+        # The same body with its clothes on, and therefore with the covered
+        # vertices deleted. Recorded rather than discarded because the gap
+        # between the two IS the masking, and a silent gap is how this was
+        # wrong for four villagers in the first place.
+        "clothed_basemesh_stature_m": clothed,
         "baked_stature_m": PROBE.stature(mesh),
+        "masked_away_m": round(authored - clothed, 6),
         "shape_keys_baked": dropped,
         "verts": len(mesh.data.vertices),
     }
+
+
+def _record_statures(bodies_dir: str, manifest: dict, results: list) -> None:
+    """Write each baked body's own height back into `bodies.json`.
+
+    WHY UNITY CANNOT WORK THIS OUT FOR ITSELF, which is the whole reason this
+    function exists. `HumanMesh.Bake` flattens everything in the imported
+    hierarchy into one mesh and, until now, divided by that mesh's height to
+    stand the villager exactly 1 m tall so `VillagerView` could scale by
+    `height_cm/100`. That is only the same number while the FBX contains
+    nothing but a body. Add hair and it sits above the crown: the combined mesh
+    is taller than the person, and dividing by it shrinks the BODY until
+    hair-tip-to-sole measures 1 m. Every villager would lose height in
+    proportion to their hairstyle, and `cosmetic.py` picks hairstyles from the
+    villager's NAME, so a channel built to be non-genetic would be modulating
+    stature, the best-predicted trait in the model at target_pgs_r2=0.40 after
+    Yengo 2022. Nothing on screen would look wrong.
+
+    This is the only stage that can tell the difference, because it holds the
+    basemesh alone before the export selects its children, so it measures it
+    here and Unity reads the answer.
+
+    WHICH NUMBER, and this was got wrong once already. `authored_stature_m`,
+    measured on an UNDRESSED load of the same `.mhm`. The obvious choice is
+    `baked_stature_m`, on the grounds that it is the geometry the FBX actually
+    receives, and it is wrong: a garment deletes the body vertices it covers,
+    so the exported basemesh of a villager in a full suit measures crown to
+    hip. Leyla-46 came out at 0.7323 m against a real 1.4182 m, which Unity
+    would have rendered at twice life size. The number wanted here is the
+    person's height, and only the undressed body has it.
+
+    WRITING TO AN INPUT, said plainly rather than left to be discovered.
+    `bodies.json` is produced by `export_bodies.py` and read by this script, so
+    writing to it makes a later build stage amend an earlier one's file. That
+    is deliberate: the bundle is a build artifact rather than a source, and the
+    alternative, a second manifest beside the first, hands the Unity side two
+    files that can disagree about which villagers exist. Re-running
+    `export_bodies.py` regenerates the file without these keys, which is a
+    downgrade and not a corruption: a missing key means "measure it yourself",
+    which is the old behaviour and is correct for a body with nothing on it.
+    """
+    # `authored_stature_m`, the UNDRESSED measurement. Not `baked_stature_m`:
+    # that is the exported basemesh, whose covered vertices the garments have
+    # deleted, so for a villager in a full suit it is the height of their head
+    # and arms rather than of them.
+    by_stem = {r["stem"]: r["authored_stature_m"] for r in results}
+    touched = 0
+    for entry in manifest["bodies"]:
+        stature = by_stem.get(entry["stem"])
+        if stature is None:
+            # A --limit run leaves the rest of the manifest alone rather than
+            # stamping a stale number over bodies it never looked at.
+            continue
+        entry["body_stature_m"] = round(float(stature), 6)
+        touched += 1
+
+    manifest_path = os.path.join(bodies_dir, "bodies.json")
+    with open(manifest_path, "w", encoding="utf-8", newline="\n") as fh:
+        json.dump(manifest, fh, indent=1)
+        fh.write("\n")
+    print(f"[BAKE] recorded body_stature_m for {touched}/{len(manifest['bodies'])} "
+          f"-> {manifest_path}")
 
 
 def main() -> int:
@@ -174,6 +272,8 @@ def main() -> int:
     with open(report_path, "w", encoding="utf-8", newline="\n") as fh:
         json.dump(report, fh, indent=2)
         fh.write("\n")
+
+    _record_statures(bodies_dir, manifest, results)
 
     statures = sorted(r["baked_stature_m"] for r in results)
     verts = {r["verts"] for r in results}

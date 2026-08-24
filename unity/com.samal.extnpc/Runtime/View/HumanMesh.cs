@@ -117,6 +117,17 @@ namespace ExtNPC.View
         /// </param>
         internal static Mesh Bake(GameObject model, out float authoredStatureM)
         {
+            return Bake(model, 0f, out authoredStatureM);
+        }
+
+        /// <summary>
+        /// Flatten and normalise, dividing by a stature the caller already
+        /// knows. See <see cref="Normalise(Mesh, float, out float, out float)"/>
+        /// for why a body carrying hair cannot measure itself.
+        /// </summary>
+        internal static Mesh Bake(GameObject model, float bodyStatureM,
+                                  out float authoredStatureM)
+        {
             authoredStatureM = 0f;
             if (model == null) return null;
 
@@ -157,7 +168,9 @@ namespace ExtNPC.View
             baked.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
             baked.CombineMeshes(combines.ToArray(), true, true, false);
 
-            Normalise(baked, out authoredStatureM);
+            float combinedExtentM;
+            Normalise(baked, bodyStatureM, out authoredStatureM,
+                      out combinedExtentM);
             baked.RecalculateBounds();
 
             // A combine that failed still returns a Mesh, just an empty one,
@@ -208,8 +221,54 @@ namespace ExtNPC.View
         /// </summary>
         internal static void Normalise(Mesh mesh, out float authoredStatureM)
         {
+            float ignored;
+            Normalise(mesh, 0f, out authoredStatureM, out ignored);
+        }
+
+        /// <summary>
+        /// Normalise, dividing by a stature the caller already knows.
+        ///
+        /// WHY THE CALLER HAS TO TELL US. This scales by the BODY's height, and
+        /// once the FBX carries hair or clothes the mesh in front of us is no
+        /// longer only a body. Hair sits above the crown, so the combined
+        /// y-extent is taller than the person is, and dividing by it would
+        /// shrink the body until hair-tip-to-sole measured 1 m. Every villager
+        /// would then lose height according to their HAIRSTYLE, which
+        /// <see cref="ExtNPC"/>'s cosmetic layer picks from their NAME: a
+        /// deliberately non-genetic channel would be modulating the
+        /// best-predicted trait in the model, and the village would still look
+        /// entirely plausible.
+        ///
+        /// Blender measures the basemesh alone during the bake and records it
+        /// per villager in `bodies.json`, so the number exists and is not
+        /// guessable from here. Passing 0 keeps the old behaviour -- measure
+        /// the whole mesh -- which is correct for the shared bodies, which have
+        /// no manifest entry and carry no assets.
+        ///
+        /// SOLES, NOT HEELS. The origin still comes from the combined mesh's
+        /// lowest point, so shoes land on the ground rather than sinking into
+        /// it. The divisor and the origin answer two different questions on
+        /// purpose: `height_cm` is barefoot stature, so the BODY is what must
+        /// measure it, while what touches the floor is whatever is lowest.
+        /// </summary>
+        /// <param name="bodyStatureM">
+        /// The body's own height in metres, or 0 to measure the whole mesh.
+        /// </param>
+        /// <param name="authoredStatureM">The divisor actually used.</param>
+        /// <param name="combinedExtentM">
+        /// The whole mesh's y-extent before scaling. Equal to
+        /// <paramref name="authoredStatureM"/> for a bare body and larger when
+        /// assets stick out past it; SMALLER is impossible, because the body is
+        /// part of the mesh being measured, and is reported as an error rather
+        /// than quietly used.
+        /// </param>
+        internal static void Normalise(Mesh mesh, float bodyStatureM,
+                                       out float authoredStatureM,
+                                       out float combinedExtentM)
+        {
             Vector3[] vertices = mesh.vertices;
             authoredStatureM = 0f;
+            combinedExtentM = 0f;
             if (vertices.Length == 0) return;
 
             Vector3 lo = vertices[0], hi = vertices[0];
@@ -219,7 +278,35 @@ namespace ExtNPC.View
                 hi = Vector3.Max(hi, vertices[i]);
             }
 
-            float stature = hi.y - lo.y;
+            combinedExtentM = hi.y - lo.y;
+            float stature = combinedExtentM;
+
+            if (bodyStatureM > 0f)
+            {
+                // The body cannot be taller than a mesh it is part of. If it
+                // reads that way the manifest belongs to a different bake, and
+                // trusting it would scale every villager by a wrong constant --
+                // the exact failure this parameter exists to prevent, arriving
+                // through the fix instead of through the defect.
+                if (combinedExtentM > 0f &&
+                    bodyStatureM > combinedExtentM * 1.001f)
+                {
+                    Debug.LogError(
+                        "[extNPC] bodies.json says this body is " +
+                        bodyStatureM.ToString("0.0000") + " m but its mesh is only " +
+                        combinedExtentM.ToString("0.0000") + " m tall, which is " +
+                        "impossible. The manifest and the FBX are from different " +
+                        "bakes; re-run the bake, or re-install both together. " +
+                        "Falling back to measuring the mesh, so this villager's " +
+                        "height is whatever the FBX says rather than what the " +
+                        "engine says.");
+                }
+                else
+                {
+                    stature = bodyStatureM;
+                }
+            }
+
             authoredStatureM = stature;
             if (stature <= 0f) return;
 

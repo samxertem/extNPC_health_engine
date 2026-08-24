@@ -1,0 +1,587 @@
+{
+  "blender": "4.4.3",
+  "families": {
+    "clothes": {
+      "assets": [
+        {
+          "fragment": "fedora_cocked/fedora_cocked.mhclo",
+          "key": "Fedora cocked",
+          "label": "Fedora cocked",
+          "name_in_file": "fedora_cocked",
+          "uuid": "4cd07df0-831a-401f-86de-77a7d5e28142"
+        },
+        {
+          "fragment": "fedora01/fedora01.mhclo",
+          "key": "Fedora01",
+          "label": "Fedora01",
+          "name_in_file": "fedora",
+          "uuid": "566dbd52-71d1-4d76-a799-0474a5a384db"
+        },
+        {
+          "fragment": "female_casualsuit01/female_casualsuit01.mhclo",
+          "key": "Female casualsuit01",
+          "label": "Female casualsuit01",
+          "name_in_file": "female_casualsuit01",
+          "uuid": "a8b0e841-144b-4f03-8b9e-ea8fdce8c863"
+        },
+        {
+          "fragment": "female_casualsuit02/female_casualsuit02.mhclo",
+          "key": "Female casualsuit02",
+          "label": "Female casualsuit02",
+          "name_in_file": "female_casualsuit02",
+          "uuid": "9896f4a4-a718-4bdd-8482-52e1855160f6"
+        },
+        {
+          "fragment": "female_elegantsuit01/female_elegantsuit01.mhclo",
+          "key": "Female elegantsuit01",
+          "label": "Female elegantsuit01",
+          "name_in_file": "female_elegantsuit01",
+          "uuid": "8bb26477-c09f-4439-b05f-961516acf662"
+        },
+        {
+          "fragment": "female_sportsuit01/female_sportsuit01.mhclo",
+          "key": "Female sportsuit01",
+          "label": "Female sportsuit01",
+          "name_in_file": "female_sportsuit01",
+          "uuid": "e38d3a5b-718f-41d5-8404-299def30b43f"
+        },
+        {
+          "fragment": "male_casualsuit01/male_casualsuit01.mhclo",
+          "key": "Male casualsuit01",
+          "label": "Male casualsuit01",
+          "name_in_file": "male_casualsuit01",
+          "uuid": "79ced554-1d8a-4c14-a6a8-e1de90b09c32"
+        },
+        {
+          "fragment": "male_casualsuit02/male_casualsuit02.mhclo",
+          "key": "Male casualsuit02",
+          "label": "Male casualsuit02",
+          "name_in_file": "male_casualsuit02",
+          "uuid": "eca0f141-c21a-4d32-9fed-66fde6559940"
+        },
+        {
+          "fragment": "male_casualsuit03/male_casualsuit03.mhclo",
+          "key": "Male casualsuit03",
+          "label": "Male casualsuit03",
+          "name_in_file": "male_casualsuit03",
+          "uuid": "39864dca-8d5c-4d7c-84ce-c00982e93cb7"
+        },
+        {
+          "fragment": "male_casualsuit04/male_casualsuit04.mhclo",
+          "key": "Male casualsuit04",
+          "label": "Male casualsuit04",
+          "name_in_file": "male_casualsuit04",
+          "uuid": "402c35f6-0cf4-4d22-af5b-0cc58fb2b617"
+        },
+        {
+          "fragment": "male_casualsuit05/male_casualsuit05.mhclo",
+          "key": "Male casualsuit05",
+          "label": "Male casualsuit05",
+          "name_in_file": "male_casualsuit05",
+          "uuid": "02e8aa01-466f-4eb4-a375-e209cb4a77d8"
+        },
+        {
+          "fragment": "male_casualsuit06/male_casualsuit06.mhclo",
+          "key": "Male casualsuit06",
+          "label": "Male casualsuit06",
+          "name_in_file": "male_casualsuit06",
+          "uuid": "be449715-fd7d-49d1-bca1-7fdd4264bc2d"
+        },
+        {
+          "fragment": "male_elegantsuit01/male_elegantsuit01.mhclo",
+          "key": "Male elegantsuit01",
+          "label": "Male elegantsuit01",
+          "name_in_file": "male_elegantsuit01",
+          "uuid": "1d2e3843-dda5-40a8-84a0-96666aa681bb"
+        },
+        {
+          "fragment": "male_worksuit01/male_worksuit01.mhclo",
+          "key": "Male worksuit01",
+          "label": "Male worksuit01",
+          "name_in_file": "male_worksuit01",
+          "uuid": "6afd98fa-381b-456f-aa46-3dd15b27b2f0"
+        },
+        {
+          "fragment": "shoes01/shoes01.mhclo",
+          "key": "Shoes01",
+          "label": "Shoes01",
+          "name_in_file": "shoes01",
+          "uuid": "6e0c552e-e207-44df-8f70-c9bfdeddd8c6"
+        },
+        {
+          "fragment": "shoes02/shoes02.mhclo",
+          "key": "Shoes02",
+          "label": "Shoes02",
+          "name_in_file": "shoes02",
+          "uuid": "8887caca-d6fb-4d73-af10-1d4fb740a936"
+        },
+        {
+          "fragment": "shoes03/shoes03.mhclo",
+          "key": "Shoes03",
+          "label": "Shoes03",
+          "name_in_file": "shoes03",
+          "uuid": "ad622a26-da1e-4e3c-9f8e-454edf10d504"
+        },
+        {
+          "fragment": "shoes04/shoes04.mhclo",
+          "key": "Shoes04",
+          "label": "Shoes04",
+          "name_in_file": "shoes04",
+          "uuid": "0d753f2e-55f9-4d60-9a78-261f42b494fc"
+        },
+        {
+          "fragment": "shoes05/shoes05.mhclo",
+          "key": "Shoes05",
+          "label": "Shoes05",
+          "name_in_file": "shoes05",
+          "uuid": "8ef14ff4-8547-419c-a495-17bab919568b"
+        },
+        {
+          "fragment": "shoes06/shoes06.mhclo",
+          "key": "Shoes06",
+          "label": "Shoes06",
+          "name_in_file": "shoes06",
+          "uuid": "35abc230-ebaa-48d4-8ff7-6d84168291a0"
+        }
+      ],
+      "count": 20
+    },
+    "eyebrows": {
+      "assets": [
+        {
+          "fragment": "eyebrow001/eyebrow001.mhclo",
+          "key": "Eyebrow001",
+          "label": "Eyebrow001",
+          "name_in_file": "eyebrow001",
+          "uuid": "9c81ec3a-faa5-4c94-9cdb-992300ba3084"
+        },
+        {
+          "fragment": "eyebrow002/eyebrow002.mhclo",
+          "key": "Eyebrow002",
+          "label": "Eyebrow002",
+          "name_in_file": "eyebrow002",
+          "uuid": "a4e73c2f-3a12-47c8-b706-31a68cac6907"
+        },
+        {
+          "fragment": "eyebrow003/eyebrow003.mhclo",
+          "key": "Eyebrow003",
+          "label": "Eyebrow003",
+          "name_in_file": "eyebrow003",
+          "uuid": "4089e4e3-b842-40f4-91a4-0686118f7535"
+        },
+        {
+          "fragment": "eyebrow004/eyebrow004.mhclo",
+          "key": "Eyebrow004",
+          "label": "Eyebrow004",
+          "name_in_file": "eyebrow004",
+          "uuid": "eb028b6d-3ff8-40c7-a2ea-4d9aa808b38d"
+        },
+        {
+          "fragment": "eyebrow005/eyebrow005.mhclo",
+          "key": "Eyebrow005",
+          "label": "Eyebrow005",
+          "name_in_file": "eyebrow005",
+          "uuid": "9da0aea6-fdf3-4862-baa4-0d122074179a"
+        },
+        {
+          "fragment": "eyebrow006/eyebrow006.mhclo",
+          "key": "Eyebrow006",
+          "label": "Eyebrow006",
+          "name_in_file": "eyebrow006",
+          "uuid": "bb953a1a-db43-44db-a0ad-ed8a5d6000c9"
+        },
+        {
+          "fragment": "eyebrow007/eyebrow007.mhclo",
+          "key": "Eyebrow007",
+          "label": "Eyebrow007",
+          "name_in_file": "eyebrow007",
+          "uuid": "f2092456-86eb-423f-a5c6-2e0b3117d664"
+        },
+        {
+          "fragment": "eyebrow008/eyebrow008.mhclo",
+          "key": "Eyebrow008",
+          "label": "Eyebrow008",
+          "name_in_file": "eyebrow008",
+          "uuid": "79ea307f-a942-40dd-bf50-bbaa41f02034"
+        },
+        {
+          "fragment": "eyebrow009/eyebrow009.mhclo",
+          "key": "Eyebrow009",
+          "label": "Eyebrow009",
+          "name_in_file": "eyebrow009",
+          "uuid": "55b3b52a-379e-426d-b320-562ed57202b3"
+        },
+        {
+          "fragment": "eyebrow010/eyebrow010.mhclo",
+          "key": "Eyebrow010",
+          "label": "Eyebrow010",
+          "name_in_file": "eyebrow010",
+          "uuid": "8261cde8-7ce2-47f3-a7a2-edf459c50887"
+        },
+        {
+          "fragment": "eyebrow011/eyebrow011.mhclo",
+          "key": "Eyebrow011",
+          "label": "Eyebrow011",
+          "name_in_file": "eyebrow011",
+          "uuid": "19e43555-4613-4457-ac6e-c30bf350d275"
+        },
+        {
+          "fragment": "eyebrow012/eyebrow012.mhclo",
+          "key": "Eyebrow012",
+          "label": "Eyebrow012",
+          "name_in_file": "eyebrow012",
+          "uuid": "1c16325c-7831-4166-831a-05c5b609c219"
+        }
+      ],
+      "count": 12
+    },
+    "eyelashes": {
+      "assets": [
+        {
+          "fragment": "eyelashes01/eyelashes01.mhclo",
+          "key": "Eyelashes01",
+          "label": "Eyelashes01",
+          "name_in_file": "Eyelashes01",
+          "uuid": "d533836f-13ad-4836-8b65-051108253cd2"
+        },
+        {
+          "fragment": "eyelashes02/eyelashes02.mhclo",
+          "key": "Eyelashes02",
+          "label": "Eyelashes02",
+          "name_in_file": "eyelashes02",
+          "uuid": "04a0718e-aaa4-4480-a013-ad51703bef6b"
+        },
+        {
+          "fragment": "eyelashes03/eyelashes03.mhclo",
+          "key": "Eyelashes03",
+          "label": "Eyelashes03",
+          "name_in_file": "eyelashes03",
+          "uuid": "a311babf-a7fb-4d65-a1fc-94ab99fe520f"
+        },
+        {
+          "fragment": "eyelashes04/eyelashes04.mhclo",
+          "key": "Eyelashes04",
+          "label": "Eyelashes04",
+          "name_in_file": "eyelashes04",
+          "uuid": "efd75993-8de1-43fb-b410-adc203091d25"
+        }
+      ],
+      "count": 4
+    },
+    "eyes": {
+      "assets": [
+        {
+          "fragment": "high-poly/high-poly.mhclo",
+          "key": "High-poly",
+          "label": "High-poly",
+          "name_in_file": "HighPolyEyes",
+          "uuid": "2c12f43b-1303-432c-b7ce-d78346baf2e6"
+        },
+        {
+          "fragment": "low-poly/low-poly.mhclo",
+          "key": "Low-poly",
+          "label": "Low-poly",
+          "name_in_file": "Low-Poly",
+          "uuid": "1cc97a30-85a1-42e6-a9f7-b3e753732baa"
+        }
+      ],
+      "count": 2
+    },
+    "hair": {
+      "assets": [
+        {
+          "fragment": "afro01/afro01.mhclo",
+          "key": "Afro01",
+          "label": "Afro01",
+          "name_in_file": "afro01",
+          "uuid": "59627022-32e9-4126-9cf1-036d4b9335fc"
+        },
+        {
+          "fragment": "bob01/bob01.mhclo",
+          "key": "Bob01",
+          "label": "Bob01",
+          "name_in_file": "bob01",
+          "uuid": "a153cb9b-2a28-45fa-a526-04e45146268e"
+        },
+        {
+          "fragment": "bob02/bob02.mhclo",
+          "key": "Bob02",
+          "label": "Bob02",
+          "name_in_file": "bob02",
+          "uuid": "cd7840cf-b340-49e9-a505-8a5a22a86db2"
+        },
+        {
+          "fragment": "braid01/braid01.mhclo",
+          "key": "Braid01",
+          "label": "Braid01",
+          "name_in_file": "Braid01",
+          "uuid": "eead6f99-d6c6-4f6b-b6c2-210459d7a62e"
+        },
+        {
+          "fragment": "long01/long01.mhclo",
+          "key": "Long01",
+          "label": "Long01",
+          "name_in_file": "long01",
+          "uuid": "6c6b0bb1-3608-40b8-9108-4bfd8fa71e39"
+        },
+        {
+          "fragment": "ponytail01/ponytail01.mhclo",
+          "key": "Ponytail01",
+          "label": "Ponytail01",
+          "name_in_file": "ponytail01",
+          "uuid": "44e0340e-c7a6-4d22-814c-0632968d2dde"
+        },
+        {
+          "fragment": "short01/short01.mhclo",
+          "key": "Short01",
+          "label": "Short01",
+          "name_in_file": "short01",
+          "uuid": "766436e9-63ed-4f6a-afa9-99f3acff70a8"
+        },
+        {
+          "fragment": "short02/short02.mhclo",
+          "key": "Short02",
+          "label": "Short02",
+          "name_in_file": "short02",
+          "uuid": "c104cd4a-1edc-43f9-8b94-f63345a44638"
+        },
+        {
+          "fragment": "short03/short03.mhclo",
+          "key": "Short03",
+          "label": "Short03",
+          "name_in_file": "short03",
+          "uuid": "a6cb8ad2-2e0d-4655-81ef-bfce1676ec67"
+        },
+        {
+          "fragment": "short04/short04.mhclo",
+          "key": "Short04",
+          "label": "Short04",
+          "name_in_file": "short04",
+          "uuid": "e09bfd91-f83f-4f9a-ba8c-4635cd1ae0d8"
+        }
+      ],
+      "count": 10
+    },
+    "proxymeshes": {
+      "assets": [
+        {
+          "fragment": "female_generic/female_generic.proxy",
+          "key": "Female generic",
+          "label": "Female generic"
+        },
+        {
+          "fragment": "female_muscle_13442/female_muscle_13442.proxy",
+          "key": "Female muscle 13442",
+          "label": "Female muscle 13442"
+        },
+        {
+          "fragment": "female1605/female1605.proxy",
+          "key": "Female1605",
+          "label": "Female1605"
+        },
+        {
+          "fragment": "male_generic/male_generic.proxy",
+          "key": "Male generic",
+          "label": "Male generic"
+        },
+        {
+          "fragment": "male_muscle_13290/male_muscle_13290.proxy",
+          "key": "Male muscle 13290",
+          "label": "Male muscle 13290"
+        },
+        {
+          "fragment": "male1591/male1591.proxy",
+          "key": "Male1591",
+          "label": "Male1591"
+        },
+        {
+          "fragment": "proxy741/proxy741.proxy",
+          "key": "Proxy741",
+          "label": "Proxy741"
+        }
+      ],
+      "count": 7
+    },
+    "skins": {
+      "assets": [
+        {
+          "fragment": "middleage_african_female/middleage_african_female.mhmat",
+          "key": "Middleage african female",
+          "label": "Middleage african female"
+        },
+        {
+          "fragment": "middleage_african_male/middleage_african_male.mhmat",
+          "key": "Middleage african male",
+          "label": "Middleage african male"
+        },
+        {
+          "fragment": "middleage_asian_female/middleage_asian_female.mhmat",
+          "key": "Middleage asian female",
+          "label": "Middleage asian female"
+        },
+        {
+          "fragment": "middleage_asian_male/middleage_asian_male.mhmat",
+          "key": "Middleage asian male",
+          "label": "Middleage asian male"
+        },
+        {
+          "fragment": "middleage_caucasian_female/middleage_caucasian_female.mhmat",
+          "key": "Middleage caucasian female",
+          "label": "Middleage caucasian female"
+        },
+        {
+          "fragment": "middleage_caucasian_male/middleage_caucasian_male.mhmat",
+          "key": "Middleage caucasian male",
+          "label": "Middleage caucasian male"
+        },
+        {
+          "fragment": "old_african_female/old_african_female.mhmat",
+          "key": "Old african female",
+          "label": "Old african female"
+        },
+        {
+          "fragment": "old_african_male/old_african_male.mhmat",
+          "key": "Old african male",
+          "label": "Old african male"
+        },
+        {
+          "fragment": "old_asian_female/old_asian_female.mhmat",
+          "key": "Old asian female",
+          "label": "Old asian female"
+        },
+        {
+          "fragment": "old_asian_male/old_asian_male.mhmat",
+          "key": "Old asian male",
+          "label": "Old asian male"
+        },
+        {
+          "fragment": "old_caucasian_female/old_caucasian_female.mhmat",
+          "key": "Old caucasian female",
+          "label": "Old caucasian female"
+        },
+        {
+          "fragment": "old_caucasian_male/old_caucasian_male.mhmat",
+          "key": "Old caucasian male",
+          "label": "Old caucasian male"
+        },
+        {
+          "fragment": "toon01/toon01.mhmat",
+          "key": "Toon01",
+          "label": "Toon01"
+        },
+        {
+          "fragment": "young_african_female/young_african_female.mhmat",
+          "key": "Young african female",
+          "label": "Young african female"
+        },
+        {
+          "fragment": "young_african_male/young_african_male.mhmat",
+          "key": "Young african male",
+          "label": "Young african male"
+        },
+        {
+          "fragment": "young_asian_female/young_asian_female.mhmat",
+          "key": "Young asian female",
+          "label": "Young asian female"
+        },
+        {
+          "fragment": "young_asian_male/young_asian_male.mhmat",
+          "key": "Young asian male",
+          "label": "Young asian male"
+        },
+        {
+          "fragment": "young_caucasian_female/young_caucasian_female.mhmat",
+          "key": "Young caucasian female",
+          "label": "Young caucasian female"
+        },
+        {
+          "fragment": "young_caucasian_female_special_suit/young_caucasian_female_special_suit.mhmat",
+          "key": "Young caucasian female special suit",
+          "label": "Young caucasian female special suit"
+        },
+        {
+          "fragment": "young_caucasian_female2/young_caucasian_female2.mhmat",
+          "key": "Young caucasian female2",
+          "label": "Young caucasian female2"
+        },
+        {
+          "fragment": "young_caucasian_male/young_caucasian_male.mhmat",
+          "key": "Young caucasian male",
+          "label": "Young caucasian male"
+        },
+        {
+          "fragment": "young_caucasian_male_special_suit/young_caucasian_male_special_suit.mhmat",
+          "key": "Young caucasian male special suit",
+          "label": "Young caucasian male special suit"
+        },
+        {
+          "fragment": "young_caucasian_male2/young_caucasian_male2.mhmat",
+          "key": "Young caucasian male2",
+          "label": "Young caucasian male2"
+        }
+      ],
+      "count": 23
+    },
+    "teeth": {
+      "assets": [
+        {
+          "fragment": "teeth_base/teeth_base.mhclo",
+          "key": "Teeth base",
+          "label": "Teeth base",
+          "name_in_file": "Teeth_Base",
+          "uuid": "0a5ec82a-0d5f-43ce-a765-8f076f95692d"
+        },
+        {
+          "fragment": "teeth_shape01/teeth_shape01.mhclo",
+          "key": "Teeth shape01",
+          "label": "Teeth shape01",
+          "name_in_file": "Teeth_Shape01",
+          "uuid": "784ee1fc-0362-42b6-8f13-c36294bb4bd3"
+        },
+        {
+          "fragment": "teeth_shape02/teeth_shape02.mhclo",
+          "key": "Teeth shape02",
+          "label": "Teeth shape02",
+          "name_in_file": "Teeth_Shape02",
+          "uuid": "a59089de-3180-40e6-8406-bda05bb837ff"
+        },
+        {
+          "fragment": "teeth_shape03/teeth_shape03.mhclo",
+          "key": "Teeth shape03",
+          "label": "Teeth shape03",
+          "name_in_file": "Teeth_Shape03",
+          "uuid": "2acf6643-1298-4137-aefa-4864060321b4"
+        },
+        {
+          "fragment": "teeth_shape04/teeth_shape04.mhclo",
+          "key": "Teeth shape04",
+          "label": "Teeth shape04",
+          "name_in_file": "Teeth_Shape04",
+          "uuid": "6bfa48b9-fbb2-4e67-ba6e-6ab49863a1d4"
+        },
+        {
+          "fragment": "teeth_shape05/teeth_shape05.mhclo",
+          "key": "Teeth shape05",
+          "label": "Teeth shape05",
+          "name_in_file": "Teeth_Shape05",
+          "uuid": "c6096ff1-46b6-4fdf-b992-49c1bc67f18b"
+        }
+      ],
+      "count": 6
+    },
+    "tongue": {
+      "assets": [
+        {
+          "fragment": "tongue01/tongue01.mhclo",
+          "key": "Tongue01",
+          "label": "Tongue01",
+          "name_in_file": "tongue01",
+          "uuid": "52ad91a3-caad-4e50-8c38-67634e5e789c"
+        }
+      ],
+      "count": 1
+    }
+  },
+  "mpfb": "(2, 0, 17)",
+  "user_data": "C:\\Users\\samal\\AppData\\Roaming\\Blender Foundation\\Blender\\4.4\\extensions\\.user\\user_default\\mpfb\\data"
+}

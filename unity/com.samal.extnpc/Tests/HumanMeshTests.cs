@@ -107,6 +107,107 @@ namespace ExtNPC.Tests
         }
 
         [Test]
+        public void HairAboveTheCrownDoesNotShrinkTheBody()
+        {
+            // THE DEFECT THIS PINS, which the four tests above could not see
+            // because every one of them normalises a single box. Once the FBX
+            // carries hair, the combined mesh is taller than the person. The
+            // old code divided by the combined height, so the BODY came out
+            // short by whatever the hairstyle added -- and `cosmetic.py` picks
+            // hairstyles from the villager's NAME, so a channel built to carry
+            // no biology would have been setting stature.
+            //
+            // A 1.75 m body under a 0.09 m afro. Told the body's real height,
+            // normalisation must put the BODY at exactly 1 and let the hair
+            // stand proud of it.
+            const float body = 1.75f;
+            const float hairTop = 1.84f;
+
+            Mesh mesh = Box(new Vector3(-0.28f, 0f, -0.15f),
+                            new Vector3(0.28f, hairTop, 0.15f));
+
+            HumanMesh.Normalise(mesh, body, out float authored, out float combined);
+
+            Assert.AreEqual(body, authored, 1e-5f,
+                "the divisor must be the body, not the mesh");
+            Assert.AreEqual(hairTop, combined, 1e-5f,
+                "the combined extent is still reported, for the cross-check");
+
+            Extents(mesh, out Vector3 lo, out Vector3 hi);
+            Assert.AreEqual(0f, lo.y, 1e-5f, "soles still sit on y=0");
+            Assert.AreEqual(hairTop / body, hi.y, 1e-5f,
+                "hair rises ABOVE y=1 instead of pushing the body below it");
+
+            // The property that actually matters, stated the way Stage 3
+            // states it: scale the unit body by height_cm/100 and a ruler finds
+            // the stature the engine exported, hair or no hair.
+            float renderedBody = 1f * body;
+            Assert.AreEqual(body, renderedBody, 1e-4f);
+        }
+
+        [Test]
+        public void MeasuringAHairyBodyIsTheOldWrongAnswer()
+        {
+            // The same mesh with no manifest number, asserting what the
+            // fallback DOES rather than implying it is harmless. This is the
+            // behaviour a bundle baked before `body_stature_m` existed still
+            // gets, and it is correct only because those bodies wear nothing.
+            Mesh mesh = Box(new Vector3(-0.28f, 0f, -0.15f),
+                            new Vector3(0.28f, 1.84f, 0.15f));
+
+            HumanMesh.Normalise(mesh, 0f, out float authored, out float combined);
+
+            Assert.AreEqual(1.84f, authored, 1e-5f);
+            Assert.AreEqual(1.84f, combined, 1e-5f);
+
+            // 1.75 m of person rendered at 1.664 m: 86 mm lost, silently.
+            float bodyFraction = 1.75f / 1.84f;
+            Assert.AreEqual(1.6644f, bodyFraction * 1.75f, 1e-3f);
+        }
+
+        [Test]
+        public void AManifestTallerThanItsOwnMeshIsRefused()
+        {
+            // The cross-check the fix buys. A body cannot be taller than a mesh
+            // it is part of, so this can only mean the manifest and the FBX
+            // came from different bakes. Trusting it would scale every villager
+            // by a wrong constant, which is the original defect arriving
+            // through the repair, so it must be loud and must fall back to
+            // measuring.
+            LogAssert.Expect(UnityEngine.LogType.Error,
+                new System.Text.RegularExpressions.Regex("impossible"));
+
+            Mesh mesh = Box(new Vector3(-0.28f, 0f, -0.15f),
+                            new Vector3(0.28f, 1.60f, 0.15f));
+
+            HumanMesh.Normalise(mesh, 1.75f, out float authored, out float combined);
+
+            Assert.AreEqual(1.60f, authored, 1e-5f,
+                "falls back to the mesh rather than using the impossible number");
+            Assert.AreEqual(1.60f, combined, 1e-5f);
+        }
+
+        [Test]
+        public void ShoesLandOnTheGroundWhileTheBodyKeepsItsHeight()
+        {
+            // The divisor and the origin answer different questions, and this
+            // is the case that separates them. `height_cm` is BAREFOOT stature,
+            // so the body sets the scale; what touches the floor is whatever is
+            // lowest, so a 20 mm sole must not leave the villager hovering.
+            const float body = 1.75f;
+            Mesh mesh = Box(new Vector3(-0.28f, -0.02f, -0.15f),
+                            new Vector3(0.28f, body, 0.15f));
+
+            HumanMesh.Normalise(mesh, body, out float authored, out _);
+
+            Assert.AreEqual(body, authored, 1e-5f);
+            Extents(mesh, out Vector3 lo, out Vector3 hi);
+            Assert.AreEqual(0f, lo.y, 1e-5f, "the sole of the shoe is on the floor");
+            Assert.AreEqual((body + 0.02f) / body, hi.y - lo.y, 1e-5f,
+                "so the whole thing stands a shoe-sole taller than the person");
+        }
+
+        [Test]
         public void AFlatMeshDoesNotDivideByZero()
         {
             // A mesh with no height is malformed input rather than an expected

@@ -111,6 +111,17 @@ outputs/unity/
 outputs/mpfb/*.fbx
 outputs/mpfb/_install/
 
+# The CC0 asset pack download cache is NOT tracked, and this is a correction:
+# 16 partial segments were committed in session 23 by accident and the
+# completed pack is 267 MB on top of that. It is a byte-for-byte copy of a
+# published third-party archive, it is resumable, and it re-downloads in under
+# three minutes on sixteen connections, so nothing about it belongs in
+# history. The CALIBRATION read out of it, health_engine/data/mpfb_assets.json,
+# is tracked, because that is the measured number the code depends on.
+# Regenerate with:
+#     python run_mpfb_probe.py --install-assets
+outputs/mpfb/assetpack/
+
 # ---------------------------------------------------------------------
 # Unity
 # ---------------------------------------------------------------------

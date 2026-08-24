@@ -51,6 +51,7 @@ from health_engine.phenotype_to_mhm import (
     phenotype_to_mhm,
     pigmentation,
 )
+from health_engine.mhm_assets import MissingAssetPack, load_catalogue
 from simulation import DemographyParams, World
 from simulation.export import git_commit
 
@@ -198,8 +199,16 @@ def _safe_stem(name: str) -> str:
 
 
 def write_bodies(world, names: List[str], out_dir: str,
-                 ethnicity: str = DEFAULT_ETHNICITY) -> dict:
-    """Write one `.mhm` per villager plus `bodies.json`. Returns the manifest."""
+                 ethnicity: str = DEFAULT_ETHNICITY,
+                 catalogue=None) -> dict:
+    """Write one `.mhm` per villager plus `bodies.json`. Returns the manifest.
+
+    `catalogue` is an `mhm_assets.AssetCatalogue`, or None for bare bodies. It
+    is threaded in rather than loaded here so that a caller with no asset pack
+    installed still gets the Stage 8 bodies it always got, and so the choice
+    between dressed and undressed is visible at the call site rather than
+    decided by whether a file happens to exist.
+    """
     os.makedirs(out_dir, exist_ok=True)
 
     entries = []
@@ -210,8 +219,20 @@ def write_bodies(world, names: List[str], out_dir: str,
         # age-blind by construction, so using it here is precisely the "a
         # child is a small adult" defect (item U6) that this stage fixes.
         pheno = npc.phenotype_at_age(npc.age)
-        text = phenotype_to_mhm(pheno, npc.sex, npc.age,
-                                name=stem, ethnicity=ethnicity)
+
+        # The X-linked phenotypes are a SEPARATE dict on NPC and do not come
+        # through `phenotype_at_age`, which returns TRAIT_TABLE traits only.
+        # `pattern_baldness` is merged in because the bodypart layer cites it:
+        # a bald villager gets no hair asset, and the reason he is bald is the
+        # AR allele on the X he had from his mother. Merged rather than passed
+        # separately so the value travels with the phenotype it belongs to and
+        # cannot be forgotten by one of the two call sites.
+        dressed = dict(pheno)
+        dressed.update(npc.x_linked_phenotype())
+
+        text = phenotype_to_mhm(dressed, npc.sex, npc.age,
+                                name=stem, ethnicity=ethnicity,
+                                catalogue=catalogue, villager_name=name)
         path = os.path.join(out_dir, f"{stem}.mhm")
         with open(path, "w", encoding="utf-8", newline="\n") as fh:
             fh.write(text)
@@ -231,6 +252,10 @@ def write_bodies(world, names: List[str], out_dir: str,
             "father": father or "",
             "pedigree_f": round(float(world.inbreeding_of(name)), 6),
             "pigmentation": pigmentation(pheno),
+            # Cited, so it belongs in the manifest beside the trait values
+            # rather than only in the geometry: a reader looking at a bald
+            # villager has to be able to check the claim against the pedigree.
+            "pattern_baldness": bool(dressed.get("pattern_baldness", False)),
         })
 
     rel = _relations(world, set(names))
@@ -283,6 +308,11 @@ def main() -> int:
                          "world object. The recommended way to run this: it is "
                          "what guarantees the bodies and the villagers on screen "
                          "are the same people")
+    ap.add_argument("--bare", action="store_true",
+                    help="write bodies with no eyes, hair or clothes, the way "
+                         "this script did before the CC0 asset pack existed. "
+                         "Also the automatic behaviour when the pack is not "
+                         "installed, in which case the reason is printed.")
     ap.add_argument("--allow-unrelated", action="store_true",
                     help="do not fail when the selection contains no siblings "
                          "or no cousin pair")
@@ -309,7 +339,21 @@ def main() -> int:
         print(f"    bundle -> {bundle_path}")
 
     names = select_family(world, args.count)
-    manifest = write_bodies(world, names, out_dir, ethnicity=args.ethnicity)
+    catalogue = None
+    if not args.bare:
+        # Absent pack is a REPORTED fallback, never a silent one. An eyeless
+        # mannequin is what item A2 existed to stop, and a run that quietly
+        # produces one again is a regression nobody would attribute to this
+        # line.
+        try:
+            catalogue = load_catalogue()
+            print(f"  dressing from {len(catalogue.families())} asset families "
+                  f"({catalogue.source})")
+        except MissingAssetPack as exc:
+            print(f"  NO ASSET PACK, bodies will be bare: {exc}")
+
+    manifest = write_bodies(world, names, out_dir, ethnicity=args.ethnicity,
+                            catalogue=catalogue)
     rel = manifest["relationships"]
 
     print(f"\n  wrote {manifest['count']} .mhm files -> {out_dir}")

@@ -49,6 +49,22 @@ namespace ExtNPC.View
 
         private static readonly Dictionary<string, string> _stems =
             new Dictionary<string, string>();
+
+        /// <summary>
+        /// Stem to the baked BODY's height in metres, as Blender measured it.
+        ///
+        /// Read rather than recomputed, for the reason the name-to-stem map
+        /// above is read rather than recomputed. Once an FBX carries hair or
+        /// clothes, its combined mesh is taller than the person, and a
+        /// villager who measured themselves would shrink by the height of a
+        /// hairstyle that <c>cosmetic.py</c> picked from their NAME. Blender
+        /// measures the basemesh alone during the bake; this is that number
+        /// arriving intact. Missing entries mean an older bundle and fall back
+        /// to measuring, which is exactly right for a body with no assets on
+        /// it.
+        /// </summary>
+        private static readonly Dictionary<string, float> _statures =
+            new Dictionary<string, float>();
         private static readonly Dictionary<string, Mesh> _cache =
             new Dictionary<string, Mesh>();
 
@@ -83,6 +99,7 @@ namespace ExtNPC.View
         public static void Forget()
         {
             _stems.Clear();
+            _statures.Clear();
             _cache.Clear();
             _absent.Clear();
             ProvenanceWarning = null;
@@ -113,8 +130,19 @@ namespace ExtNPC.View
             {
                 string name = (string)entry["name"];
                 string stem = (string)entry["stem"];
-                if (!string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(stem))
-                    _stems[name] = stem;
+                if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(stem))
+                    continue;
+                _stems[name] = stem;
+
+                // Absent in a bundle baked before the key existed, and absent
+                // is a supported state rather than an error: those bodies wear
+                // nothing, so measuring them gives the same answer.
+                var stature = entry["body_stature_m"];
+                if (stature != null)
+                {
+                    float metres = (float)stature;
+                    if (metres > 0f) _statures[stem] = metres;
+                }
             }
 
             _manifestSeed = (int?)root["seed"] ?? -1;
@@ -189,8 +217,11 @@ namespace ExtNPC.View
                 return HumanMesh.UnitBody(female);
             }
 
+            float known;
+            if (!_statures.TryGetValue(stem, out known)) known = 0f;
+
             float authored;
-            Mesh baked = HumanMesh.Bake(model, out authored);
+            Mesh baked = HumanMesh.Bake(model, known, out authored);
             if (baked == null)
             {
                 // Bake returns null for a non-readable mesh, which is an import

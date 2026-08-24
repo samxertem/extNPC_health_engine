@@ -59,7 +59,7 @@ library's version into the hash.
 
 from __future__ import annotations
 
-from typing import Dict, Mapping, Tuple
+from typing import Dict, Mapping, Sequence, Tuple
 
 __all__ = [
     "ETHNICITY_PRESETS",
@@ -71,6 +71,10 @@ __all__ = [
     "pigmentation",
     "macros_to_mhm",
     "phenotype_to_mhm",
+    "COSMETIC_BODYPARTS",
+    "CITED_BODYPARTS",
+    "EYE_MESH_QUALITY",
+    "bodypart_lines",
 ]
 
 
@@ -256,6 +260,120 @@ def pigmentation(phenotype: Mapping[str, object]) -> Dict[str, object]:
 
 
 # ----------------------------------------------------------------------
+# bodyparts: which channels are modelled, and which are dressing
+# ----------------------------------------------------------------------
+
+# Families picked from the villager's NAME and nothing else. Each of these is
+# a real visual difference between two people that the engine does not model,
+# so it is invented on purpose, reproducibly, and labelled wherever it shows.
+# `cosmetic.cosmetic_choice` is the only route to them.
+COSMETIC_BODYPARTS: Tuple[str, ...] = ("hair", "eyebrows", "eyelashes",
+                                       "teeth", "clothes")
+
+# Families driven by a modelled trait, mapped to the trait that drives them.
+# Currently one entry, and it is a presence rather than a choice: whether a
+# villager wears hair at all is `pattern_baldness`, the sex-limited
+# androgenetic-alopecia phenotype from the AR locus at Xq12 (roadmap #2,
+# `sexchrom.py`). Which of the ten styles a non-bald villager wears is not
+# modelled and stays in COSMETIC_BODYPARTS above.
+#
+# WHY THIS ONE IS WORTH THE COMPLICATION. The X-linked layer is validated and
+# already has a figure, but until now it was only ever a number in a panel.
+# Citing it here makes sex-limited inheritance visible in the lineup: the bald
+# men are bald because of the X they got from their mother, and a reader can
+# check that against her other sons. That is a claim the pedigree can be
+# audited against, which is the opposite of a cosmetic choice.
+CITED_BODYPARTS: Dict[str, str] = {"hair_presence": "pattern_baldness"}
+
+# The eyes family is POLY COUNT, not eye colour: the CC0 pack ships
+# `High-poly` and `Low-poly` and nothing else. Eye colour is a material and
+# leaves through `pigmentation()` with the rest of it. So this is a rendering
+# budget decision and not a phenotype at all, and it is a constant rather than
+# a cosmetic channel because varying it between villagers would vary their
+# vertex count for no reason a reader could name.
+#
+# Low-poly by default because the shipped budget is 600 villagers at 60 fps
+# and an eyeball is a couple of pixels at village range. A portrait that wants
+# the detail can pass the other one.
+EYE_MESH_QUALITY = "Low-poly"
+
+
+def _clothing_for(sex: str) -> Tuple[str, str]:
+    """The two clothes families a villager draws from: a suit, and shoes.
+
+    The CC0 pack labels its suits `Male ...` and `Female ...`, so respecting
+    that is reading the asset's own metadata rather than the engine asserting
+    anything about who wears what. Shoes are unlabelled and shared. The
+    fedoras are deliberately not offered: they are headwear, they collide with
+    every hairstyle in the pack, and one villager in twenty wearing a hat that
+    intersects their own hair reads as a bug in the bake.
+    """
+    return ("Male " if str(sex).lower().startswith("m") else "Female "), "Shoes"
+
+
+def bodypart_lines(villager_name: str,
+                   phenotype: Mapping[str, object],
+                   sex: str,
+                   catalogue,
+                   eye_quality: str = EYE_MESH_QUALITY) -> Tuple[str, ...]:
+    """The `.mhm` bodypart and clothes lines for one villager.
+
+    PURE, and that is load-bearing rather than tidy. `catalogue` is passed in
+    rather than loaded here so this module keeps the property its whole
+    docstring rests on: no filesystem, no RNG, no clock, and therefore the same
+    villager gets the same body in a year's time. `mhm_assets.load_catalogue()`
+    is the impure half and lives in its own file.
+
+    EVERY NAME COMES FROM THE CATALOGUE. Not one asset name is written down in
+    this module. The catalogue is probed out of the installed MPFB, and asking
+    it for something absent raises. That is not defensive style: MPFB's
+    bodypart matcher, when it cannot match name AND uuid, falls back to
+    comparing each candidate against ITSELF and returns the first
+    self-consistent one, so a hardcoded name that went stale would put some
+    other asset on the villager and log nothing. `mhm_assets` quotes the
+    source.
+    """
+    from .cosmetic import cosmetic_choice
+
+    lines = []
+
+    # Eyes: a constant, for the reason at EYE_MESH_QUALITY.
+    lines.append(catalogue.line("eyes", eye_quality))
+
+    # Hair. Presence is cited to a trait; style is not.
+    bald = bool(phenotype.get("pattern_baldness", False))
+    if not bald:
+        style = cosmetic_choice(villager_name, catalogue.keys("hair"),
+                                channel="hair")
+        lines.append(catalogue.line("hair", style))
+
+    for family in ("eyebrows", "eyelashes", "teeth"):
+        choice = cosmetic_choice(villager_name, catalogue.keys(family),
+                                 channel=family)
+        lines.append(catalogue.line(family, choice))
+
+    # Tongue has exactly one asset in the pack, so there is nothing to choose;
+    # it still goes through the catalogue so the uuid is never written down.
+    tongues = catalogue.keys("tongue")
+    if tongues:
+        lines.append(catalogue.line("tongue", tongues[0]))
+
+    # Clothes: a suit and a pair of shoes, each on its own line. Suits are
+    # filtered by the asset pack's own sex labelling; see `_clothing_for`.
+    suit_prefix, shoe_prefix = _clothing_for(sex)
+    everything = catalogue.keys("clothes")
+    suits = tuple(k for k in everything if k.startswith(suit_prefix))
+    shoes = tuple(k for k in everything if k.startswith(shoe_prefix))
+    for family_options, channel in ((suits, "suit"), (shoes, "shoes")):
+        if not family_options:
+            continue
+        choice = cosmetic_choice(villager_name, family_options, channel=channel)
+        lines.append(catalogue.line("clothes", choice))
+
+    return tuple(lines)
+
+
+# ----------------------------------------------------------------------
 # the format
 # ----------------------------------------------------------------------
 
@@ -269,7 +387,8 @@ MHM_VERSION = "v1.2.0"
 def macros_to_mhm(macros: Mapping[str, float],
                   name: str = "extnpc",
                   skeleton: str = "game_engine.mhskel",
-                  subdivide: bool = False) -> str:
+                  subdivide: bool = False,
+                  bodyparts: Sequence[str] = ()) -> str:
     """A macro vector to `.mhm` text. Deterministic, LF line endings.
 
     The skeleton default is not arbitrary: `game_engine` is the rig the probe
@@ -290,6 +409,11 @@ def macros_to_mhm(macros: Mapping[str, float],
             raise KeyError(f"macro vector is missing {key!r}")
         lines.append(
             f"modifier {group}/{key} {_VALUE_FORMAT.format(float(macros[key]))}")
+    # Bodyparts sit between the modifiers and the skeleton, which is where
+    # MakeHuman itself writes them. Emitted in the order given rather than
+    # sorted here: `bodypart_lines` already fixes the order, and sorting a
+    # second time would put the tie-break in two places.
+    lines.extend(bodyparts)
     lines.append(f"skeleton {skeleton}")
     lines.append(f"subdivide {subdivide}")
     return "\n".join(lines) + "\n"
@@ -300,7 +424,25 @@ def phenotype_to_mhm(phenotype: Mapping[str, object],
                      age_years: float,
                      name: str = "extnpc",
                      ethnicity: str = DEFAULT_ETHNICITY,
-                     skeleton: str = "game_engine.mhskel") -> str:
-    """One villager's phenotype to one `.mhm` file's text. The Stage 7 entry point."""
+                     skeleton: str = "game_engine.mhskel",
+                     catalogue=None,
+                     villager_name: str = "") -> str:
+    """One villager's phenotype to one `.mhm` file's text. The Stage 7 entry point.
+
+    Pass `catalogue` (from `mhm_assets.load_catalogue()`) to dress the body in
+    eyes, hair, brows, teeth and clothes. Omitting it yields the bare body this
+    function has always produced, which is still what the golden fixture pins,
+    so the dressed and undressed paths stay separately checkable rather than
+    becoming one path with a flag buried in it.
+
+    `villager_name` is the cosmetic seed, and it is deliberately separate from
+    `name`, which is only the `.mhm`'s own internal label. They are usually the
+    same string; when they are not, cosmetics must follow the PERSON, because
+    two exports of one villager under different file labels have to produce the
+    same haircut or nothing downstream is reproducible.
+    """
     macros = phenotype_to_macros(phenotype, sex, age_years, ethnicity=ethnicity)
-    return macros_to_mhm(macros, name=name, skeleton=skeleton)
+    parts: Tuple[str, ...] = ()
+    if catalogue is not None:
+        parts = bodypart_lines(villager_name or name, phenotype, sex, catalogue)
+    return macros_to_mhm(macros, name=name, skeleton=skeleton, bodyparts=parts)
