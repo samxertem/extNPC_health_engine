@@ -30,6 +30,19 @@ namespace ExtNPC.View
     /// name-to-stem mapping and C# only ever looks it up. The day the Python
     /// rule changes, nothing here needs to know.
     ///
+    /// PER LIFE STAGE, since item U6. A bundle may carry several bodies for
+    /// one person, keyed <c>Name@stage</c> (<c>Ada-16@child</c>), baked from
+    /// the phenotype that person expressed at the middle of that stage. The
+    /// engine bakes only the stages a frame actually recorded, so a founder
+    /// who arrives aged 29 has no childhood body and needs none: the timeline
+    /// cannot be scrubbed back to a year the run does not contain.
+    ///
+    /// Lookup falls back in a fixed order, and the order is the whole
+    /// compatibility story: <c>Name@stage</c>, then <c>Name</c>, then the
+    /// shared mesh for the sex. So a STAGED bundle read by this code gives
+    /// per-stage bodies, a LEGACY bundle gives the one body per person it
+    /// always gave, and neither needs to know which it is.
+    ///
     /// WHAT IS STILL SHARED, and it matters for reading the picture. Every
     /// baked body comes off the same fixed-topology base mesh, so the vertex
     /// count is identical for all of them; only the positions differ. The
@@ -68,11 +81,81 @@ namespace ExtNPC.View
         private static readonly Dictionary<string, Mesh> _cache =
             new Dictionary<string, Mesh>();
 
+        /// <summary>Villager name to the stem of their MOST MATURE baked body,
+        /// chosen by the `age` the manifest already records.
+        ///
+        /// This is what a caller with no life stage gets, and choosing it by
+        /// age rather than by a stage name matters twice. It reproduces the
+        /// pre-U6 semantic exactly -- `select_everyone` baked one body at the
+        /// person's age now, or at death, which is their maximum -- and it
+        /// needs no list of stage names in C#. The stage BOUNDARIES are solved
+        /// from the fitted growth curve and differ by sex; a copy of even
+        /// their ORDER here would be a second definition to keep in step.
+        ///
+        /// Without this a staged bundle would resolve nothing for any caller
+        /// that has no stage to offer, and every such villager would silently
+        /// fall back to the shared mesh. `mpfb/unity_lineup.py` is exactly
+        /// that caller, and its whole verdict is "did anyone fall back".</summary>
+        /// <summary>Stem to `channel -> colour`, from the manifest's `colors`.
+        ///
+        /// PER BODY, not per person, and the difference is real: the phenotype
+        /// is read at the body's own age and `skin_tone` carries a nonzero
+        /// v_gxe for UV exposure, so a villager's skin need not be the same
+        /// colour at 5 as at 50.</summary>
+        private static readonly Dictionary<string, Dictionary<string, Color>> _colors =
+            new Dictionary<string, Dictionary<string, Color>>();
+
+        /// <summary>Stem to `source mesh name -> channel`, from the manifest's
+        /// `submeshes`, which the BAKE wrote because only it holds the real
+        /// Blender objects and the manifest at the same moment. Never derived
+        /// from a name here: hairstyles, suits and shoes are all just strings
+        /// from whatever pack is installed.</summary>
+        private static readonly Dictionary<string, Dictionary<string, string>> _channels =
+            new Dictionary<string, Dictionary<string, string>>();
+
+        /// <summary>Per-submesh colours, cached beside the baked mesh so a
+        /// villager re-rendered every tick costs one dictionary probe.</summary>
+        private static readonly Dictionary<string, Color[]> _submeshColors =
+            new Dictionary<string, Color[]>();
+
+        private static readonly Dictionary<string, string> _mature =
+            new Dictionary<string, string>();
+        private static readonly Dictionary<string, float> _matureAge =
+            new Dictionary<string, float>();
+
         /// <summary>Stems looked up and found absent, so the miss costs one
         /// dictionary probe rather than a Resources.Load per villager per
         /// frame. A negative result is cached as deliberately as a positive
         /// one; the village re-renders every tick.</summary>
         private static readonly HashSet<string> _absent = new HashSet<string>();
+
+        /// <summary>Villagers the manifest says were NEVER RENDERABLE, with
+        /// the reason. On the measured village these are stillbirths from
+        /// inbreeding depression: born and dead inside one tick, so they are
+        /// in no frame and no body was baked.
+        ///
+        /// Held separately from a plain miss because the two need opposite
+        /// treatment. A miss means the bundle is incomplete and the shared
+        /// body is the best guess available. This means the person had no
+        /// rendered form at all, and falling back to the shared ADULT mesh
+        /// would draw a stillborn infant as a grown adult, which is item U6's
+        /// defect arrived at from the other side.</summary>
+        private static readonly Dictionary<string, string> _neverRendered =
+            new Dictionary<string, string>();
+
+        /// <summary>Why this villager was never rendered, or null if they
+        /// were. Callers that show a portrait should show nothing and say
+        /// this, rather than show a body that was never alive to have one.</summary>
+        public static string NeverRenderedReason(string villagerName)
+        {
+            string why;
+            if (villagerName != null &&
+                _neverRendered.TryGetValue(villagerName, out why)) return why;
+            return null;
+        }
+
+        /// <summary>True when this bundle carries per-life-stage bodies.</summary>
+        public static bool Staged { get; private set; }
 
         /// <summary>Villagers named by the manifest, whether or not their FBX
         /// is installed.</summary>
@@ -102,6 +185,13 @@ namespace ExtNPC.View
             _statures.Clear();
             _cache.Clear();
             _absent.Clear();
+            _neverRendered.Clear();
+            _mature.Clear();
+            _matureAge.Clear();
+            _colors.Clear();
+            _channels.Clear();
+            _submeshColors.Clear();
+            Staged = false;
             ProvenanceWarning = null;
         }
 
@@ -132,7 +222,53 @@ namespace ExtNPC.View
                 string stem = (string)entry["stem"];
                 if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(stem))
                     continue;
-                _stems[name] = stem;
+
+                // `key` is `Name@stage` in a staged bundle and `Name` in every
+                // older one. Falling back to `name` rather than skipping is
+                // what lets schema 1 bundles keep working unchanged.
+                string key = (string)entry["key"];
+                if (string.IsNullOrEmpty(key)) key = name;
+                _stems[key] = stem;
+
+                // Ties and a missing age both resolve to "the first one seen",
+                // which is stable because the exporter writes sorted entries.
+                var colors = entry["colors"] as JObject;
+                if (colors != null)
+                {
+                    var byChannel = new Dictionary<string, Color>();
+                    foreach (var prop in colors.Properties())
+                    {
+                        // `colors` also carries the numbers that JUSTIFY the
+                        // skin colour (its L*a*b* point, its ITA and class)
+                        // and a provenance block. Only the hex strings are
+                        // colours; everything else is evidence for a reader
+                        // and is skipped rather than guessed at.
+                        string hex = prop.Value.Type == JTokenType.String
+                            ? (string)prop.Value : null;
+                        Color c;
+                        if (!string.IsNullOrEmpty(hex) && hex[0] == '#' &&
+                            ColorUtility.TryParseHtmlString(hex, out c))
+                            byChannel[prop.Name] = c;
+                    }
+                    if (byChannel.Count > 0) _colors[stem] = byChannel;
+                }
+
+                var subs = entry["submeshes"] as JObject;
+                if (subs != null)
+                {
+                    var map = new Dictionary<string, string>();
+                    foreach (var prop in subs.Properties())
+                        map[prop.Name.ToLowerInvariant()] = (string)prop.Value;
+                    if (map.Count > 0) _channels[stem] = map;
+                }
+
+                float age = (float?)entry["age"] ?? 0f;
+                float best;
+                if (!_matureAge.TryGetValue(name, out best) || age > best)
+                {
+                    _matureAge[name] = age;
+                    _mature[name] = stem;
+                }
 
                 // Absent in a bundle baked before the key existed, and absent
                 // is a supported state rather than an error: those bodies wear
@@ -163,6 +299,23 @@ namespace ExtNPC.View
                     "their own hair and shoes and come out short. This is what " +
                     "running export_bodies.py after bake_bodies.py looks like: " +
                     "re-run the bake to stamp the statures back in.");
+            }
+
+            Staged = (bool?)root["staged"] ?? false;
+
+            var unrendered = root["never_rendered"] as JArray;
+            if (unrendered != null)
+            {
+                foreach (var u in unrendered)
+                {
+                    string who = (string)u["name"];
+                    if (string.IsNullOrEmpty(who)) continue;
+                    string why = (string)u["reason"];
+                    string cause = (string)u["death_cause"];
+                    if (!string.IsNullOrEmpty(cause))
+                        why = (why ?? "no body") + " (" + cause + ")";
+                    _neverRendered[who] = why ?? "no body was baked";
+                }
             }
 
             _manifestSeed = (int?)root["seed"] ?? -1;
@@ -214,6 +367,133 @@ namespace ExtNPC.View
                                  "to a different run.");
         }
 
+        /// <summary>The key a body is stored under: <c>Name@stage</c> when a
+        /// stage is known, otherwise the bare name.
+        ///
+        /// This mirrors `BodyTarget.key` on the Python side, and it is the one
+        /// piece of that side's naming this class does reproduce. It is a
+        /// two-character join rather than a sanitisation rule: the stem, which
+        /// IS a sanitisation, is still only ever read from the manifest.</summary>
+        public static string KeyFor(string villagerName, string lifeStage)
+        {
+            if (string.IsNullOrEmpty(lifeStage)) return villagerName;
+            return villagerName + "@" + lifeStage;
+        }
+
+        /// <summary>
+        /// Which baked body answers for this villager at this stage, or null
+        /// if none does. The resolution step of <see cref="UnitBodyFor"/>,
+        /// separated out because it is the part with logic in it.
+        ///
+        /// FALLS BACK IN A FIXED ORDER: the staged body <c>Name@stage</c>,
+        /// then the person's single body <c>Name</c>, then their most mature
+        /// baked body, then null.
+        ///
+        /// The second step keeps every pre-U6 bundle working: the renderer
+        /// now always passes a stage, so without it a schema 1 bundle would
+        /// resolve nothing and the whole village would silently drop to the
+        /// shared mesh. The third covers a stage that was never baked (a
+        /// founder has no childhood in this run) and every caller that has no
+        /// stage to offer at all.
+        ///
+        /// Public so an EditMode test can assert on it. Resolving a stem to a
+        /// Mesh needs `Resources.Load` and an imported FBX, which a test has
+        /// neither of, and a lookup that picked the wrong stem would still
+        /// render a body and pass every count-based assertion.
+        /// </summary>
+        public static string StemFor(string villagerName, string lifeStage)
+        {
+            if (string.IsNullOrEmpty(villagerName)) return null;
+
+            string stem;
+            if (_stems.TryGetValue(KeyFor(villagerName, lifeStage), out stem))
+                return stem;
+            if (_stems.TryGetValue(villagerName, out stem))
+                return stem;
+            // Their most mature body. Reached when a staged bundle is asked
+            // for a stage it did not bake -- a founder has no childhood in
+            // the run -- and whenever the caller has no stage at all. Their
+            // own body at the wrong age is a far better picture than the
+            // shared mesh, which is nobody's body.
+            if (_mature.TryGetValue(villagerName, out stem))
+                return stem;
+            return null;
+        }
+
+        /// <summary>
+        /// The colour of every submesh of this villager's baked body, in
+        /// submesh order, or null when the bundle carries no colours.
+        ///
+        /// Null rather than an array of white: a caller that gets colours
+        /// paints them, and a caller that gets null must keep whatever the
+        /// material already says. Handing back white would silently repaint
+        /// every villager on a pre-colour bundle.
+        /// </summary>
+        public static Color[] SubmeshColorsFor(string villagerName,
+                                               string lifeStage)
+        {
+            string stem = StemFor(villagerName, lifeStage);
+            if (stem == null) return null;
+            Color[] colors;
+            return _submeshColors.TryGetValue(stem, out colors) ? colors : null;
+        }
+
+        /// <summary>
+        /// Match each submesh to its channel, then to its colour.
+        ///
+        /// Submesh i came from source renderer i (see <see cref="HumanMesh"/>),
+        /// so this is an index-free lookup by NAME and does not depend on the
+        /// order Unity happened to walk the hierarchy in. The name Unity gives
+        /// a child of an imported FBX is prefixed with the root's name
+        /// (`Ada-16_adult.afro01_body`), so the prefix is stripped before the
+        /// manifest is asked.
+        ///
+        /// AN UNKNOWN CHANNEL FALLS BACK TO SKIN rather than to white. The
+        /// parts with no colour of their own -- teeth, tongue, eyebrows,
+        /// eyelashes -- are all things that read acceptably in skin tone and
+        /// unacceptably in white, and a white tongue is a more visible error
+        /// than a slightly-too-pink one.
+        /// </summary>
+        private static Color[] ResolveColors(string stem, string[] sourceNames)
+        {
+            Dictionary<string, Color> byChannel;
+            if (!_colors.TryGetValue(stem, out byChannel) || sourceNames == null)
+                return null;
+
+            Dictionary<string, string> byName;
+            _channels.TryGetValue(stem, out byName);
+
+            Color skin;
+            if (!byChannel.TryGetValue("skin", out skin)) skin = Color.white;
+
+            var out_ = new Color[sourceNames.Length];
+            for (int i = 0; i < sourceNames.Length; i++)
+            {
+                out_[i] = skin;
+                string raw = sourceNames[i];
+                if (string.IsNullOrEmpty(raw)) continue;
+
+                int dot = raw.LastIndexOf('.');
+                string local = (dot >= 0 ? raw.Substring(dot + 1) : raw)
+                    .ToLowerInvariant();
+                if (local.EndsWith("_body"))
+                    local = local.Substring(0, local.Length - 5);
+
+                string channel;
+                if (byName == null || !byName.TryGetValue(local, out channel))
+                    continue;
+
+                Color c;
+                // `suit` and `shoes` are separate channels in the engine but
+                // the manifest names the garment colour `clothes`, so a suit
+                // asks for `suit` first and settles for `clothes`.
+                if (byChannel.TryGetValue(channel, out c) ||
+                    (channel == "suit" && byChannel.TryGetValue("clothes", out c)))
+                    out_[i] = c;
+            }
+            return out_;
+        }
+
         /// <summary>
         /// This villager's own body, or the shared one for their sex, or null.
         ///
@@ -222,9 +502,31 @@ namespace ExtNPC.View
         /// </summary>
         public static Mesh UnitBodyFor(string villagerName, bool female)
         {
-            string stem;
-            if (villagerName == null || !_stems.TryGetValue(villagerName, out stem))
-                return HumanMesh.UnitBody(female);
+            return UnitBodyFor(villagerName, null, female);
+        }
+
+        /// <summary>
+        /// This villager's body AT A LIFE STAGE, so scrubbing the timeline
+        /// back to their childhood draws a child rather than a small adult
+        /// (item U6).
+        ///
+        /// Falls back in a fixed order, and every step of it is reachable in
+        /// practice: <c>Name@stage</c> is the staged body; <c>Name</c> catches
+        /// a legacy bundle, and also a staged bundle asked for a stage it did
+        /// not bake; the shared mesh for the sex catches a villager with no
+        /// body at all. Pass a null or empty stage to ask for the person's
+        /// single body directly.
+        ///
+        /// Stature is NOT read from the stage. <see cref="VillagerView"/>
+        /// scales by the frame's own <c>height_cm</c>, so a child is already
+        /// the right height before this is called; what a stage body changes
+        /// is proportion and face, which a uniform scale cannot produce.
+        /// </summary>
+        public static Mesh UnitBodyFor(string villagerName, string lifeStage,
+                                       bool female)
+        {
+            string stem = StemFor(villagerName, lifeStage);
+            if (stem == null) return HumanMesh.UnitBody(female);
 
             Mesh cached;
             if (_cache.TryGetValue(stem, out cached)) return cached;
@@ -241,7 +543,8 @@ namespace ExtNPC.View
             if (!_statures.TryGetValue(stem, out known)) known = 0f;
 
             float authored;
-            Mesh baked = HumanMesh.Bake(model, known, out authored);
+            string[] sourceNames;
+            Mesh baked = HumanMesh.Bake(model, known, out authored, out sourceNames);
             if (baked == null)
             {
                 // Bake returns null for a non-readable mesh, which is an import
@@ -254,6 +557,7 @@ namespace ExtNPC.View
 
             baked.name = "extnpc_body_" + stem;
             _cache[stem] = baked;
+            _submeshColors[stem] = ResolveColors(stem, sourceNames);
             return baked;
         }
     }

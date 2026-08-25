@@ -62,6 +62,7 @@ public static class ShootBodyLineup
     private sealed class Body
     {
         public string Name;
+        public string LifeStage;
         public bool Female;
         public double Age;
         public double HeightCm;
@@ -103,6 +104,7 @@ public static class ShootBodyLineup
             bodies.Add(new Body
             {
                 Name = (string)e["name"],
+                LifeStage = (string)e["life_stage"],
                 Female = ((string)e["sex"]) == "female",
                 Age = (double)e["age"],
                 HeightCm = (double)e["height_cm"],
@@ -111,6 +113,13 @@ public static class ShootBodyLineup
                 Father = (string)e["father"],
             });
         }
+        // Optionally narrow to ONE person, which is the only way to see a
+        // life rather than a village: 141 staged bodies in a row is a
+        // hundred-metre wall of thumbnails.
+        string only = System.Environment.GetEnvironmentVariable("EXTNPC_LINEUP_PERSON");
+        if (!string.IsNullOrEmpty(only))
+            bodies = bodies.FindAll(b => b.Name == only);
+
         bodies.Sort((a, b) => a.Age.CompareTo(b.Age));
 
         sb.AppendLine($"{Marker} BEGIN load");
@@ -137,7 +146,11 @@ public static class ShootBodyLineup
         float tallest = 0f;
         foreach (var b in bodies)
         {
-            Mesh mesh = BodyLibrary.UnitBodyFor(b.Name, b.Female);
+            // BY STAGE, item U6. Without the stage every entry of a staged
+            // bundle resolves to that person's most mature body, so a lineup
+            // sorted by age would draw the same adult at every age and look
+            // like proof that nothing had changed.
+            Mesh mesh = BodyLibrary.UnitBodyFor(b.Name, b.LifeStage, b.Female);
             if (mesh == null) continue;
 
             // Did this villager get their OWN body, or fall back to the shared
@@ -174,7 +187,8 @@ public static class ShootBodyLineup
         float centre = width * 0.5f;
         // Far enough back to fit the row, high enough to look at chest height.
         float dist = width * 0.62f + 1.9f;
-        Shoot(sb, outDir, "lineup_all",
+        Shoot(sb, outDir,
+              string.IsNullOrEmpty(only) ? "lineup_all" : "lineup_" + only,
               new Vector3(centre, tallest * 0.55f, -dist),
               new Vector3(centre, tallest * 0.48f, 0f), 46f);
 
@@ -297,6 +311,8 @@ def shoot(project: Path, log_dir: Path, editor: Path, bundle: Path,
     env = dict(os.environ,
                EXTNPC_BUNDLE=str(bundle),
                EXTNPC_LINEUP_OUT=str(png_dir))
+    if os.environ.get("EXTNPC_LINEUP_PERSON"):
+        env["EXTNPC_LINEUP_PERSON"] = os.environ["EXTNPC_LINEUP_PERSON"]
     cmd = [str(editor), "-batchmode", "-accept-apiupdate",
            "-logFile", str(log), "-projectPath", str(project),
            "-executeMethod", "ShootBodyLineup.Run"]

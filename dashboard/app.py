@@ -34,6 +34,7 @@ from simulation import (World, DemographyParams, SCENARIOS, scenario_list,
 from simulation.demography import (DEFAULT_FERTILITY_SCHEDULE,
                                    FERTILITY_SCHEDULES, mean_reproductive_age)
 from . import genetics_panels as gpanels, inspector, panels, session_sync
+from .export_job import JOB, default_out_dir, export_now, world_lock
 
 # ---------------------------------------------------------------------
 # One long-lived world, mutated by the interval callback.
@@ -910,6 +911,11 @@ app.layout = html.Div(style={
     # the connection state a plain file was chosen to avoid having.
     dcc.Interval(id="sync-timer", interval=400),
 
+    # The bake. Disabled until an export starts one and disabled again when it
+    # ends, because a bake is minutes long and rare: a poll that ran always
+    # would be a request a second forever to report "idle".
+    dcc.Interval(id="bake-timer", interval=1000, disabled=True),
+
     # ---- header ------------------------------------------------------
     html.Div(style={"display": "flex", "alignItems": "center",
                     "justifyContent": "space-between", "marginBottom": "6px"},
@@ -1224,6 +1230,36 @@ app.layout = html.Div(style={
                 ]),
                 html.Div(id="shock-msg", style={"color": WARN, "fontSize": "11px",
                                                 "marginTop": "8px", "minHeight": "16px"}),
+
+                html.Div("EXPORT FOR UNITY", style={**LBL, "color": ACCENT,
+                                                    "margin": "18px 0 8px"}),
+                html.Div("Writes THIS world: the bundle and one body per "
+                         "villager per life stage. Bodies are baked in "
+                         "Blender afterwards, in the background.",
+                         style={"color": MUTED, "fontSize": "11px",
+                                "marginBottom": "8px"}),
+                dcc.Checklist(
+                    id="export-opts",
+                    options=[
+                        {"label": " a body per life stage", "value": "staged"},
+                        {"label": " bake in Blender", "value": "bake"},
+                    ],
+                    value=["staged", "bake"],
+                    style={"color": INK, "fontSize": "11px"},
+                    labelStyle={"display": "block", "marginBottom": "3px"}),
+                html.Div(style={"display": "flex", "gap": "8px",
+                                "marginTop": "8px"}, children=[
+                    btn("⇩ Export for Unity", "btn-export", primary=True),
+                    btn("✕ Stop bake", "btn-bake-cancel"),
+                ]),
+                html.Div(id="unity-export-msg", style={"color": INK, "fontSize": "11px",
+                                                 "marginTop": "8px",
+                                                 "minHeight": "16px",
+                                                 "whiteSpace": "pre-wrap"}),
+                html.Div(id="bake-msg", style={"color": MUTED, "fontSize": "11px",
+                                               "marginTop": "4px",
+                                               "minHeight": "16px",
+                                               "whiteSpace": "pre-wrap"}),
             ]),
             html.Div(style={**CARD, "maxHeight": "420px", "overflowY": "auto"}, children=[
                 html.Div("GLOSSARY", style={**LBL, "marginBottom": "8px"}),
@@ -1441,7 +1477,14 @@ def advance(_n, _step, _reset, seed, nfounders, *rest):
     # page reload cannot leave a stale flag that throttles a manual Step.
     _PACE["running"] = (trig == "timer")
     t0 = time.perf_counter()
-    WORLD.step()
+    # Held so an export cannot read the world half way through a step. Dash
+    # serves callbacks on threads, so this genuinely overlaps: the export
+    # would come out with some people captured at this tick and some at the
+    # next, and `frames.csv` disagreeing with `bodies.json` about who exists
+    # is the exact mismatch the export button was added to remove. Every
+    # other callback only reads, and a panel one tick stale is harmless.
+    with world_lock():
+        WORLD.step()
     _note_step(time.perf_counter() - t0)
     return WORLD.tick, selected
 
@@ -1575,6 +1618,106 @@ def fire_shock(_p, _f, _b, mag):
     kind = trig.replace("shock-", "")
     WORLD.queue_shock(kind, float(mag))
     return f"{kind.capitalize()} queued (magnitude {mag:.1f}) — fires on the next tick."
+
+
+# ---- export for Unity ------------------------------------------------
+@app.callback(
+    Output("unity-export-msg", "children"),
+    Output("bake-timer", "disabled"),
+    Input("btn-export", "n_clicks"),
+    State("export-opts", "value"),
+    prevent_initial_call=True,
+)
+def export_for_unity(_n, opts):
+    """Export the world ON SCREEN, then start the bake if it was asked for.
+
+    SYNCHRONOUS on purpose, and it is the shorter half: 1.5 s for a 60-year,
+    10-founder world. Threading it would let the timer step the world
+    underneath the read. See `dashboard/export_job.py`.
+    """
+    opts = opts or []
+    staged = "staged" in opts
+    out_dir = default_out_dir(WORLD)
+    try:
+        result = export_now(WORLD, out_dir, staged=staged)
+    except Exception as exc:                              # noqa: BLE001
+        return f"Export failed: {exc}", True
+
+    unit = "bodies" if result.staged else "villagers"
+    lines = [f"Exported tick {WORLD.tick}, seed {int(WORLD.seed)}: "
+             f"{result.bodies} {unit} for {result.people} people "
+             f"in {result.seconds:.1f}s.",
+             f"  {result.bundle_dir}"]
+
+    # Named, not left to be discovered as a missing file. These are people the
+    # viewer can never place, and a consumer that just finds no body falls
+    # back to the shared ADULT mesh -- which draws a stillbirth as a grown
+    # adult, the defect item U6 exists to remove.
+    if result.never_rendered:
+        who = ", ".join(u["name"] for u in result.never_rendered[:3])
+        extra = len(result.never_rendered) - 3
+        more = "" if extra <= 0 else f" and {extra} more"
+        lines.append(f"  {len(result.never_rendered)} never rendered "
+                     f"({who}{more}): born and dead inside one tick, so they "
+                     f"are in no frame and have no body.")
+
+    if "bake" not in opts:
+        lines.append("  Bodies NOT baked. Until they are, every villager "
+                     "draws on the shared mesh.")
+        return "\n".join(lines), True
+
+    status = JOB.start(result.bodies_dir, expected=result.bodies)
+    if status.phase == "failed":
+        lines.append(f"  Bake did not start: {status.error}")
+        return "\n".join(lines), True
+
+    lines.append(f"  Baking {result.bodies} bodies in Blender. The bundle is "
+                 f"readable now; bodies appear as they land.")
+    return "\n".join(lines), False
+
+
+@app.callback(
+    Output("bake-msg", "children"),
+    Output("bake-timer", "disabled", allow_duplicate=True),
+    Input("bake-timer", "n_intervals"),
+    prevent_initial_call=True,
+)
+def poll_bake(_n):
+    """Report the bake, and stop polling when it ends.
+
+    The ETA is computed from the rate THIS run has achieved rather than from
+    the 2.50 s a body the village measured, because a different machine, a
+    bigger asset pack or another subdivision level all move it and a borrowed
+    benchmark would be a guess wearing a number's clothes.
+    """
+    st = JOB.status()
+    if st.phase == "baking":
+        eta = st.eta_seconds()
+        tail = "" if eta is None else f", about {eta / 60:.1f} min left"
+        return (f"Baking {st.done}/{st.total} "
+                f"({100 * st.fraction:.0f}%{tail})"), False
+    if st.phase == "done":
+        return (f"Bake finished: {st.done} bodies in "
+                f"{st.elapsed / 60:.1f} min -> {st.bodies_dir}\\fbx\n"
+                f"  Copy that folder into the consuming project's "
+                f"Assets/Resources/extnpc/bodies/ -- a package reference "
+                f"carries code, not assets."), True
+    if st.phase == "failed":
+        return f"Bake failed: {st.error}\n{st.message}", True
+    return "", True
+
+
+@app.callback(
+    Output("bake-msg", "children", allow_duplicate=True),
+    Input("btn-bake-cancel", "n_clicks"),
+    prevent_initial_call=True,
+)
+def cancel_bake(_n):
+    if not JOB.status().running:
+        return "No bake is running."
+    JOB.cancel()
+    return ("Bake stopped. The bodies already written are whole files and "
+            "stay; the rest of the village draws on the shared mesh.")
 
 
 # ---- always-on rendering (header, KPIs, chronicle, summary) --------

@@ -152,7 +152,8 @@ namespace ExtNPC.View
             {
                 if (frame[i].Name != _selected) continue;
                 _portrait ??= CharacterPortrait.Create(transform);
-                _portrait.SetSubject(frame[i].Name, frame[i].IsFemale,
+                _portrait.SetSubject(frame[i].Name, frame[i].LifeStage,
+                                     frame[i].IsFemale,
                                      frame[i].HeightCm, frame[i].Color);
                 // Time.timeAsDouble rather than Time.time: a session left open
                 // long enough loses animation resolution in a float, and the

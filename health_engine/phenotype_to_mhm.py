@@ -75,6 +75,8 @@ __all__ = [
     "CITED_BODYPARTS",
     "EYE_MESH_QUALITY",
     "bodypart_lines",
+    "bodypart_choices",
+    "bodypart_channels",
 ]
 
 
@@ -311,6 +313,83 @@ def _clothing_for(sex: str) -> Tuple[str, str]:
     return ("Male " if str(sex).lower().startswith("m") else "Female "), "Shoes"
 
 
+def bodypart_choices(villager_name: str,
+                     phenotype: Mapping[str, object],
+                     sex: str,
+                     catalogue,
+                     eye_quality: str = EYE_MESH_QUALITY
+                     ) -> Tuple[Tuple[str, str, str], ...]:
+    """`(channel, family, key)` for every part this villager wears.
+
+    THE SINGLE PLACE THE CHOICES ARE MADE. `bodypart_lines` renders these to
+    `.mhm` text and `bodypart_channels` renders them to a name-to-channel map
+    for the renderer; both delegate here, so the file the bake reads and the
+    map the viewer colours by cannot disagree about who is wearing what.
+
+    CHANNEL IS FINER THAN FAMILY, and that difference is the reason this
+    exists. A suit and a pair of shoes are both `clothes` to MPFB and must be
+    two different colours on screen, so the channel splits them. Nothing
+    downstream may recover that from an asset NAME: hairstyles, suits and
+    shoes are all just strings from the installed pack, and a viewer matching
+    on `afro` or `Shoes` would hold a second, silent copy of a rule that
+    lives here.
+    """
+    from .cosmetic import cosmetic_choice
+
+    out = []
+    out.append(("eyes", "eyes", eye_quality))
+
+    bald = bool(phenotype.get("pattern_baldness", False))
+    if not bald:
+        out.append(("hair", "hair",
+                    cosmetic_choice(villager_name, catalogue.keys("hair"),
+                                    channel="hair")))
+
+    for family in ("eyebrows", "eyelashes", "teeth"):
+        out.append((family, family,
+                    cosmetic_choice(villager_name, catalogue.keys(family),
+                                    channel=family)))
+
+    tongues = catalogue.keys("tongue")
+    if tongues:
+        out.append(("tongue", "tongue", tongues[0]))
+
+    suit_prefix, shoe_prefix = _clothing_for(sex)
+    everything = catalogue.keys("clothes")
+    suits = tuple(k for k in everything if k.startswith(suit_prefix))
+    shoes = tuple(k for k in everything if k.startswith(shoe_prefix))
+    for options, channel in ((suits, "suit"), (shoes, "shoes")):
+        if not options:
+            continue
+        out.append((channel, "clothes",
+                    cosmetic_choice(villager_name, options, channel=channel)))
+    return tuple(out)
+
+
+def bodypart_channels(villager_name: str,
+                      phenotype: Mapping[str, object],
+                      sex: str,
+                      catalogue,
+                      eye_quality: str = EYE_MESH_QUALITY) -> Dict[str, str]:
+    """`{written token: channel}`, which is how a renderer identifies a part.
+
+    Keyed on the TOKEN, not the key, because the token is what is written to
+    the `.mhm`, what MPFB names the object, and therefore what survives the
+    FBX round trip into the mesh name the viewer can see. A key with a space
+    in it (`Male casualsuit02`) is written as its token and only the token is
+    recoverable downstream.
+
+    The body itself is included under the name MPFB gives the base mesh, so a
+    consumer has one map covering every part rather than one map plus a
+    special case for the only part that matters most.
+    """
+    out = {"body": "skin"}
+    for channel, family, key in bodypart_choices(
+            villager_name, phenotype, sex, catalogue, eye_quality):
+        out[catalogue.token(key)] = channel
+    return out
+
+
 def bodypart_lines(villager_name: str,
                    phenotype: Mapping[str, object],
                    sex: str,
@@ -333,44 +412,10 @@ def bodypart_lines(villager_name: str,
     other asset on the villager and log nothing. `mhm_assets` quotes the
     source.
     """
-    from .cosmetic import cosmetic_choice
-
-    lines = []
-
-    # Eyes: a constant, for the reason at EYE_MESH_QUALITY.
-    lines.append(catalogue.line("eyes", eye_quality))
-
-    # Hair. Presence is cited to a trait; style is not.
-    bald = bool(phenotype.get("pattern_baldness", False))
-    if not bald:
-        style = cosmetic_choice(villager_name, catalogue.keys("hair"),
-                                channel="hair")
-        lines.append(catalogue.line("hair", style))
-
-    for family in ("eyebrows", "eyelashes", "teeth"):
-        choice = cosmetic_choice(villager_name, catalogue.keys(family),
-                                 channel=family)
-        lines.append(catalogue.line(family, choice))
-
-    # Tongue has exactly one asset in the pack, so there is nothing to choose;
-    # it still goes through the catalogue so the uuid is never written down.
-    tongues = catalogue.keys("tongue")
-    if tongues:
-        lines.append(catalogue.line("tongue", tongues[0]))
-
-    # Clothes: a suit and a pair of shoes, each on its own line. Suits are
-    # filtered by the asset pack's own sex labelling; see `_clothing_for`.
-    suit_prefix, shoe_prefix = _clothing_for(sex)
-    everything = catalogue.keys("clothes")
-    suits = tuple(k for k in everything if k.startswith(suit_prefix))
-    shoes = tuple(k for k in everything if k.startswith(shoe_prefix))
-    for family_options, channel in ((suits, "suit"), (shoes, "shoes")):
-        if not family_options:
-            continue
-        choice = cosmetic_choice(villager_name, family_options, channel=channel)
-        lines.append(catalogue.line("clothes", choice))
-
-    return tuple(lines)
+    return tuple(
+        catalogue.line(family, key)
+        for _channel, family, key in bodypart_choices(
+            villager_name, phenotype, sex, catalogue, eye_quality))
 
 
 # ----------------------------------------------------------------------

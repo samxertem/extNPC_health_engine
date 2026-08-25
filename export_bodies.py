@@ -43,7 +43,7 @@ import os
 import sys
 import time
 from collections import defaultdict
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, NamedTuple, Optional, Set, Tuple
 
 from health_engine.phenotype_to_mhm import (
     CITED_BODYPARTS,
@@ -54,6 +54,8 @@ from health_engine.phenotype_to_mhm import (
     phenotype_to_mhm,
     pigmentation,
 )
+from health_engine.appearance_color import appearance_colors
+from health_engine.phenotype_to_mhm import bodypart_channels
 from health_engine.mhm_assets import MissingAssetPack, load_catalogue
 from simulation import DemographyParams, World
 from simulation.export import git_commit
@@ -142,13 +144,138 @@ def select_everyone(world) -> List[str]:
 
     That is a smaller error than the alternative, which is the shared adult
     body, and it is a much smaller one than item U6's original defect where
-    every child was drawn adult-sized. Baking a body per person PER YEAR is the
-    honest fix and is combinatorial: 53 people over 111 years is 5,883 bakes at
-    about 5.7 s each, which is nine hours and 8 GB of FBX.
+    every child was drawn adult-sized. It is no longer the best available:
+    `select_everyone_staged` bakes per (person, life stage) and costs 136
+    bodies against this world's 43 people, about 5.5 minutes.
+
+    WHY NOT A BODY PER YEAR, which is the fully honest fix: it is
+    combinatorial. 43 people over their lifespans is thousands of bakes, and
+    at the MEASURED rate below that is hours and gigabytes of FBX.
+
+    THE MEASURED RATE, from `fbx/bake_report.json` rather than from an
+    estimate: the 53-body dressed village took 132.6 s, so 2.50 s a body
+    (median 2.40, max 4.32) at about 1.77 MB of FBX each. An earlier revision
+    of this docstring said 5.7 s, which no bake report supports.
 
     Sorted by name so a re-run produces the same order and the manifest diffs.
     """
     return sorted(world.people)
+
+
+# ----------------------------------------------------------------------
+# Life stages: which bodies a person needs, and when they can be seen
+# ----------------------------------------------------------------------
+
+class BodyTarget(NamedTuple):
+    """One body to bake: a person, optionally at one stage of their life.
+
+    `stage` is None for the one-body-per-person mode that Stage 8's contact
+    sheet uses. `age` is the age the mesh is baked AT, which is what makes a
+    child a child rather than a small adult.
+    """
+    name: str
+    stage: Optional[str]
+    age: float
+
+    @property
+    def key(self) -> str:
+        """The identity Unity looks a body up by. Name alone in legacy mode."""
+        return self.name if self.stage is None else f"{self.name}@{self.stage}"
+
+
+def observable_age_floor(world, name: str) -> float:
+    """The youngest age this person can ever be SHOWN at, in this run.
+
+    Founders arrive aged 18 to 35 (`world.py`, `start_age`), so the timeline
+    cannot be scrubbed back to their childhood: it does not exist. Baking a
+    founder an infant body is 2.5 s and 1.8 MB spent on a mesh no frame can
+    ever reference, and on the measured village that is 34 of 167 bakes.
+
+    DERIVED FROM THE TIMELINE, NOT FROM `birth_tick`, and that is deliberate:
+    `PersonMeta.birth_tick` is stamped 0 for every founder even though they
+    are already adults at tick 0, so it is not a birth date for them and any
+    age computed from it is wrong by their starting age. Ageing is one year
+    per tick, so `final_age - final_tick` is the age at tick 0 and needs no
+    trust in that field. Clamped at 0 for anyone actually born in the run.
+    """
+    npc = world.people[name]
+    meta = world.meta.get(name)
+    death_tick = getattr(meta, "death_tick", None)
+    final_tick = world.tick if death_tick is None else int(death_tick)
+    return max(0.0, float(npc.age) - float(final_tick))
+
+
+def bake_age_for_span(stage: str, lo: float, hi: float) -> float:
+    """The single age a body for `(stage, lo, hi)` is baked at.
+
+    THE TRADE-OFF, because there is no free answer. One mesh stands in for a
+    whole span, and `child` runs from 2 to about 9.6, over which proportions
+    change more than they do across the whole of adulthood. A midpoint body
+    is too old at the start of its span and too young at the end; an early
+    body is right on entry and wrong on exit. The midpoint is taken because
+    it bounds the worst error at half the span rather than all of it, and
+    because stature is corrected per frame anyway -- `VillagerView` scales by
+    the frame's own `height_cm` -- so what one mesh has to cover is
+    proportion and face, which vary more smoothly than height does.
+
+    If a 3-year-old beside an 8-year-old looks wrong in a picture, the fix is
+    to split `child` in the engine's own `life_stage`, not to bias this
+    number: a bias would make every stage wrong in order to make one right.
+    """
+    return 0.5 * (lo + hi)
+
+
+def select_everyone_staged(world) -> List[BodyTarget]:
+    """Every `(person, life stage)` pair the viewer can actually ASK FOR.
+
+    Item U6's real fix. `select_everyone` gives a person ONE body at ONE age
+    -- their age now, or at death -- so scrubbing back to their childhood
+    draws adult proportions on a correctly-scaled small body.
+
+    DERIVED FROM THE RECORDED FRAMES, NOT FROM THE STAGE BOUNDARIES. The
+    viewer replays `frames.csv`, and every body it can ever request is a
+    `(name, life_stage)` pair that appears in some frame. Reading the ring
+    back makes the baked set exactly that, which closes three holes that
+    reasoning from the boundaries left open:
+
+      * **Founders.** They arrive aged 18 to 35 (`world.py`, `start_age`), so
+        their childhood is not in this run and a body for it can never be
+        shown. Deriving from frames drops those 34 of 167 bakes on the
+        measured village without a special case -- and without trusting
+        `PersonMeta.birth_tick`, which is stamped 0 for founders who are
+        already adults and is therefore not a birth date for them.
+      * **Zero-width stages.** `Zoe-41` dies at exactly age 2.0, and a scan
+        of the boundary table hands back a `child` span of length zero: a
+        2.5 s, 1.8 MB bake for a stage she occupied for no time.
+      * **Truncation.** The ring is capped at `snapshots.MAX_FRAMES` and its
+        oldest frames age out, so on a long run the early years are not
+        replayable at all. Bodies for them would be unreachable by
+        construction, and this never asks for one.
+
+    The bake age is the midpoint of the ages the person was actually
+    DISPLAYED at within the stage, so a founder first seen at 35 gets an
+    `adult` body baked for 35-to-40, not for 20-to-40.
+    """
+    seen: Dict[Tuple[str, str], List[float]] = defaultdict(list)
+    for frame in world.snapshots:
+        for row in frame["people"]:
+            stage = row.get("life_stage")
+            if not stage:
+                continue
+            seen[(row["name"], stage)].append(float(row["age"]))
+
+    if not seen:
+        # Nothing was captured -- a zero-tick world, or snapshots disabled.
+        # Fall back to the one-body-per-person behaviour rather than
+        # returning nothing and silently exporting a village of no one.
+        return [BodyTarget(n, None, float(world.people[n].age))
+                for n in sorted(world.people)]
+
+    out: List[BodyTarget] = []
+    for (name, stage), ages in sorted(seen.items()):
+        out.append(BodyTarget(name, stage,
+                              bake_age_for_span(stage, min(ages), max(ages))))
+    return out
 
 
 def select_family(world, count: int) -> List[str]:
@@ -258,10 +385,20 @@ def _channel_provenance(catalogue) -> dict:
     }
 
 
-def write_bodies(world, names: List[str], out_dir: str,
+def targets_from_names(world, names: List[str]) -> List[BodyTarget]:
+    """One body per person, at their current age. The pre-U6 behaviour."""
+    return [BodyTarget(n, None, float(world.people[n].age)) for n in names]
+
+
+def write_bodies(world, targets: List[BodyTarget], out_dir: str,
                  ethnicity: str = DEFAULT_ETHNICITY,
                  catalogue=None) -> dict:
-    """Write one `.mhm` per villager plus `bodies.json`. Returns the manifest.
+    """Write one `.mhm` per TARGET plus `bodies.json`. Returns the manifest.
+
+    A target is a person, optionally at one life stage. In staged mode one
+    person yields several bodies and the manifest keys them by `key`
+    (`Ada-16@child`), so the viewer can ask for the body a frame's own
+    `life_stage` column names instead of getting the person's last one.
 
     `catalogue` is an `mhm_assets.AssetCatalogue`, or None for bare bodies. It
     is threaded in rather than loaded here so that a caller with no asset pack
@@ -272,13 +409,17 @@ def write_bodies(world, names: List[str], out_dir: str,
     os.makedirs(out_dir, exist_ok=True)
 
     entries = []
-    for name in names:
+    for target in targets:
+        name = target.name
         npc = world.people[name]
-        stem = _safe_stem(name)
+        stem = _safe_stem(target.key)
         # phenotype_at_age, never phenotype(): the mature phenotype is
         # age-blind by construction, so using it here is precisely the "a
         # child is a small adult" defect (item U6) that this stage fixes.
-        pheno = npc.phenotype_at_age(npc.age)
+        # The age is the TARGET's, not the NPC's: in staged mode that is the
+        # middle of the stage, so a body for `Ada-16@child` is built from the
+        # phenotype she expressed at 5.5, not the one she has now at 57.
+        pheno = npc.phenotype_at_age(target.age)
 
         # The X-linked phenotypes are a SEPARATE dict on NPC and do not come
         # through `phenotype_at_age`, which returns TRAIT_TABLE traits only.
@@ -290,7 +431,7 @@ def write_bodies(world, names: List[str], out_dir: str,
         dressed = dict(pheno)
         dressed.update(npc.x_linked_phenotype())
 
-        text = phenotype_to_mhm(dressed, npc.sex, npc.age,
+        text = phenotype_to_mhm(dressed, npc.sex, target.age,
                                 name=stem, ethnicity=ethnicity,
                                 catalogue=catalogue, villager_name=name)
         path = os.path.join(out_dir, f"{stem}.mhm")
@@ -300,10 +441,14 @@ def write_bodies(world, names: List[str], out_dir: str,
         mother, father = _parents_of(world, name)
         entries.append({
             "name": name,
+            # What the viewer looks this body up by. Equal to `name` in
+            # one-body-per-person mode, so a legacy consumer is unaffected.
+            "key": target.key,
+            "life_stage": target.stage or "",
             "stem": stem,
             "mhm": f"{stem}.mhm",
             "sex": npc.sex,
-            "age": round(float(npc.age), 4),
+            "age": round(float(target.age), 4),
             # The stature the baked mesh must be scaled TO on the Unity side.
             # It is not in the `.mhm` because the height macro is a shape
             # target, not a scale (see phenotype_to_mhm's docstring).
@@ -316,17 +461,66 @@ def write_bodies(world, names: List[str], out_dir: str,
             # rather than only in the geometry: a reader looking at a bald
             # villager has to be able to check the claim against the pedigree.
             "pattern_baldness": bool(dressed.get("pattern_baldness", False)),
+            # WHAT COLOUR EACH PART IS, and where the colour came from.
+            # Carried per body rather than per person because the phenotype is
+            # read AT THE TARGET'S AGE: `skin_tone` has a nonzero v_gxe (UV
+            # exposure, tanning), so a villager's skin is not necessarily the
+            # same colour at 5 as at 50, and a per-person colour would quietly
+            # assert that it is.
+            "colors": appearance_colors(dressed, name),
+            # Which mesh inside the FBX is which channel. Read rather than
+            # matched on: hairstyles, suits and shoes are all just strings
+            # from the installed pack, so a viewer recognising `afro` or
+            # `Shoes` would hold a second copy of a rule that lives in
+            # `bodypart_channels`, and it would go stale silently because a
+            # part coloured as the wrong thing still renders.
+            "parts": (bodypart_channels(name, dressed, npc.sex, catalogue)
+                      if catalogue is not None else {"body": "skin"}),
         })
 
-    rel = _relations(world, set(names))
+    people = sorted({t.name for t in targets})
+    staged = any(t.stage for t in targets)
+    # Anyone in the world with no body at all. On the measured village these
+    # are three stillbirths from inbreeding depression, born and dead inside
+    # one tick: `frames.csv` holds the LIVING, so they appear in no frame and
+    # the viewer can never place them on the map. Recorded rather than left
+    # missing, because a consumer that finds no body falls back to the SHARED
+    # ADULT mesh, and drawing a stillborn infant as an adult is exactly the
+    # defect item U6 exists to remove. A viewer should show nothing, and say
+    # why, rather than show a body that was never alive to have one.
+    # DERIVED FROM THE FRAMES, not from "everyone the caller did not ask for".
+    # Those are different sets and only one of them is a claim this can make.
+    # `select_family` exports a related subset for the Stage 8 contact sheet,
+    # and subtracting it from the world would label thirty living villagers as
+    # stillbirths who appear in no frame -- a sentence that is false, specific
+    # and printed with a straight face. Only someone genuinely absent from
+    # every captured frame was never renderable.
+    framed = set()
+    for frame in world.snapshots:
+        for row in frame["people"]:
+            framed.add(row["name"])
+    unrendered = [
+        {"name": n,
+         "age": round(float(world.people[n].age), 4),
+         "death_cause": getattr(world.meta.get(n), "death_cause", "") or "",
+         "reason": "never alive at a captured tick"}
+        for n in sorted(set(world.people) - framed - set(people))
+    ]
+    rel = _relations(world, set(people))
     manifest = {
-        "bodies_schema": 1,
+        "bodies_schema": 2,
         "git_commit": git_commit(),
         "seed": int(world.seed),
         "tick": int(world.tick),
         "ethnicity_preset": ethnicity,
         "ethnicity_macros": ETHNICITY_PRESETS[ethnicity],
         "count": len(entries),
+        # `count` is bodies; `people` is individuals. They differ in staged
+        # mode and a reader comparing either against the village headcount
+        # needs to know which one they are holding.
+        "people": len(people),
+        "staged": staged,
+        "never_rendered": unrendered,
         # WHICH CHANNELS ARE A MEASUREMENT AND WHICH ARE DRESSING, recorded in
         # the file rather than left to a caption someone might not carry over.
         # A reader looking at these bodies has to be able to tell, without
@@ -381,6 +575,16 @@ def main() -> int:
                          "wants: scrubbing the timeline back otherwise shows "
                          "the shared body for anyone who died before the last "
                          "year. Read the caveat in `select_everyone`.")
+    ap.add_argument("--stages", action="store_true",
+                    help="bake a body per (person, LIFE STAGE) instead of one "
+                         "per person, so a villager is a child when the "
+                         "timeline is scrubbed to their childhood and not a "
+                         "small adult (item U6). Implies --everyone. Costs "
+                         "about 3x the bakes: 136 against 43 on the default "
+                         "village, roughly 5.5 minutes at the measured 2.5 s "
+                         "each. Only stages a frame actually recorded are "
+                         "baked, so a founder's missing childhood costs "
+                         "nothing.")
     ap.add_argument("--bare", action="store_true",
                     help="write bodies with no eyes, hair or clothes, the way "
                          "this script did before the CC0 asset pack existed. "
@@ -411,8 +615,14 @@ def main() -> int:
                                        note="bodies exported alongside")
         print(f"    bundle -> {bundle_path}")
 
-    names = (select_everyone(world) if args.everyone
-             else select_family(world, args.count))
+    if args.stages:
+        targets = select_everyone_staged(world)
+        print(f"    staged: {len(targets)} bodies for "
+              f"{len({t.name for t in targets})} people")
+    elif args.everyone:
+        targets = targets_from_names(world, select_everyone(world))
+    else:
+        targets = targets_from_names(world, select_family(world, args.count))
     catalogue = None
     if not args.bare:
         # Absent pack is a REPORTED fallback, never a silent one. An eyeless
@@ -426,7 +636,7 @@ def main() -> int:
         except MissingAssetPack as exc:
             print(f"  NO ASSET PACK, bodies will be bare: {exc}")
 
-    manifest = write_bodies(world, names, out_dir, ethnicity=args.ethnicity,
+    manifest = write_bodies(world, targets, out_dir, ethnicity=args.ethnicity,
                             catalogue=catalogue)
     rel = manifest["relationships"]
 

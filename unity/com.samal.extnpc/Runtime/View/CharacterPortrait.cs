@@ -62,10 +62,12 @@ namespace ExtNPC.View
         private Transform _pivot;
         private MeshFilter _filter;
         private MeshRenderer _renderer;
+        private MaterialPropertyBlock _block;
         private Light _key, _fill;
         private Material _skin;
 
         private string _name;
+        private string _lifeStage;
         private bool _female;
         private float _statureM = 1.7f;
         private Color _lineage = Color.grey;
@@ -176,6 +178,18 @@ namespace ExtNPC.View
         public void SetSubject(string villagerName, bool female, double heightCm,
                                Color lineage)
         {
+            SetSubject(villagerName, null, female, heightCm, lineage);
+        }
+
+        /// <summary>
+        /// Point the portrait at a villager AS THEY WERE at the displayed
+        /// tick. The inspector opens on whatever year the timeline is at, so
+        /// a portrait that ignored the stage would show a 60-year-old face
+        /// above a panel of childhood statistics.
+        /// </summary>
+        public void SetSubject(string villagerName, string lifeStage, bool female,
+                               double heightCm, Color lineage)
+        {
             // THIS VILLAGER'S OWN BODY, not the shared one for their sex.
             //
             // The portrait was built in session 22, before per-villager bodies
@@ -188,20 +202,74 @@ namespace ExtNPC.View
             // UnitBodyFor falls back to exactly the old shared mesh when the
             // villager has no baked body, so a bundle with no bodies installed
             // behaves as it did before rather than losing its portrait.
-            Mesh body = BodyLibrary.UnitBodyFor(villagerName, female);
+            Mesh body = BodyLibrary.UnitBodyFor(villagerName, lifeStage, female);
             if (body == null)
             {
                 _hasSubject = false;
                 return;
             }
 
-            bool changed = villagerName != _name || female != _female;
+            // The stage joins the change test. Without it the portrait keeps
+            // the mesh it first loaded while the timeline is scrubbed across
+            // a birthday, which looks exactly like staging not working.
+            bool changed = villagerName != _name || female != _female ||
+                           lifeStage != _lifeStage;
+            _lifeStage = lifeStage;
             _name = villagerName;
             _female = female;
             _lineage = lineage;
             _statureM = (float)(System.Math.Max(heightCm, 1.0) * 0.01);
             if (changed || _filter.sharedMesh != body) _filter.sharedMesh = body;
+            ApplyPartColors(body, villagerName, lifeStage);
             _hasSubject = true;
+        }
+
+        /// <summary>
+        /// Give the portrait one material slot per submesh and paint each.
+        ///
+        /// THE BUG THIS FIXES, because it is not obvious from the symptom. A
+        /// renderer draws only as many submeshes as it has materials. Since
+        /// bodies stopped being merged into one submesh so that skin, hair,
+        /// eyes and clothes could take different colours, a body arrives here
+        /// with nine submeshes; on the portrait's single-slot renderer eight
+        /// of them silently vanish and the panel shows a fragment of a person.
+        /// <see cref="VillagerView"/> got the same treatment at the same time
+        /// and this one was missed, which is why the village looked right and
+        /// the inspector did not.
+        ///
+        /// One material, N slots: colour arrives through
+        /// <c>SetPropertyBlock(block, index)</c>, so there is still exactly
+        /// one portrait material.
+        /// </summary>
+        private void ApplyPartColors(Mesh body, string villagerName,
+                                     string lifeStage)
+        {
+            if (_renderer == null || body == null) return;
+
+            int subs = Mathf.Max(1, body.subMeshCount);
+            if (_renderer.sharedMaterials.Length != subs)
+            {
+                var slots = new Material[subs];
+                for (int i = 0; i < subs; i++) slots[i] = _skin;
+                _renderer.sharedMaterials = slots;
+            }
+
+            if (_block == null) _block = new MaterialPropertyBlock();
+
+            Color[] parts = BodyLibrary.SubmeshColorsFor(villagerName, lifeStage);
+            for (int i = 0; i < subs; i++)
+            {
+                // No colours in this bundle: clear any block left from a
+                // previous subject so the material's own skin tone shows
+                // through, rather than leaving the last villager's hair
+                // colour on this one's face.
+                _renderer.GetPropertyBlock(_block, i);
+                Color c = (parts != null && parts.Length == subs)
+                    ? parts[i] : SkinAlbedo;
+                _block.SetColor(BaseColorId, c);
+                _block.SetColor(ColorId, c);
+                _renderer.SetPropertyBlock(_block, i);
+            }
         }
 
         public void ClearSubject() => _hasSubject = false;
@@ -228,14 +296,23 @@ namespace ExtNPC.View
             _pivot.localRotation = Quaternion.Euler(0f, 180f + pose.Yaw, 0f);
             _pivot.localPosition = new Vector3(0f, pose.Bob, 0f);
 
-            float eye = PortraitPose.EyeHeight(_statureM);
-            float distance = PortraitPose.CameraDistance(_statureM, FovDeg);
+            // Framed from the mesh's OWN top, not from a fixed fraction of
+            // stature: a hairstyle stands proud of the 1 m unit body by
+            // however much that asset happens to be, and the old constant
+            // cropped the crown off and put the key light level with it.
+            float unitTop = 1f;
+            if (_filter != null && _filter.sharedMesh != null)
+                unitTop = _filter.sharedMesh.bounds.max.y;
+
+            float focusHeight, span;
+            PortraitPose.FrameHead(_statureM, unitTop, out focusHeight, out span);
+            float distance = PortraitPose.DistanceForSpan(span, FovDeg);
 
             // The camera ORBITS the eye line rather than tilting in place. A
             // camera that pitches where it stands swings the face out of frame;
             // one that swings around the focus keeps the face centred and reads
             // as the head nodding, which is the intent.
-            var focus = new Vector3(0f, eye + pose.Bob, 0f);
+            var focus = new Vector3(0f, focusHeight + pose.Bob, 0f);
             Quaternion swing = Quaternion.Euler(pose.Pitch, 0f, 0f);
             Vector3 offset = swing * new Vector3(0f, 0f, -distance);
             _camera.transform.localPosition = focus + offset;

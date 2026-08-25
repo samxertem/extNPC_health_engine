@@ -128,9 +128,44 @@ namespace ExtNPC.View
         internal static Mesh Bake(GameObject model, float bodyStatureM,
                                   out float authoredStatureM)
         {
+            string[] ignored;
+            return Bake(model, bodyStatureM, out authoredStatureM, out ignored);
+        }
+
+        /// <summary>
+        /// Flatten, normalise, and say WHICH PART each submesh came from.
+        ///
+        /// The parts are kept as separate submeshes rather than merged, which
+        /// is the change that made colour possible at all. Merged, a villager
+        /// was one submesh with one material and therefore exactly one colour,
+        /// which is why every villager was beige no matter what the engine
+        /// said their skin, hair and eyes were.
+        ///
+        /// THE COST, so it is a decision and not a slip: N submeshes is N draw
+        /// calls a villager, about 9 where there was 1. Against the measured
+        /// budget -- 600 bodies at 92 fps as static meshes -- that is the thing
+        /// to re-measure if the village ever gets slow, and it buys the one
+        /// visible difference between two people that the genetics actually
+        /// drives. They still share ONE material: colour is per submesh
+        /// through <c>MaterialPropertyBlock</c>, so there is no material
+        /// instance per villager per part.
+        ///
+        /// `sourceNames` is parallel to the submeshes and holds each source
+        /// renderer's object name, which is what the manifest keys its
+        /// name-to-channel map on. Returned rather than resolved here: the
+        /// names are asset names from whatever pack is installed, and
+        /// recognising them in C# would be a second copy of a rule the engine
+        /// already owns and would go stale in silence.
+        /// </summary>
+        internal static Mesh Bake(GameObject model, float bodyStatureM,
+                                  out float authoredStatureM,
+                                  out string[] sourceNames)
+        {
             authoredStatureM = 0f;
+            sourceNames = new string[0];
             if (model == null) return null;
 
+            var names = new System.Collections.Generic.List<string>();
             var combines = new System.Collections.Generic.List<CombineInstance>();
             Matrix4x4 rootInverse = model.transform.worldToLocalMatrix;
 
@@ -138,6 +173,7 @@ namespace ExtNPC.View
             {
                 if (skinned.sharedMesh == null) continue;
                 if (!Readable(skinned.sharedMesh, model)) return null;
+                names.Add(skinned.name);
                 combines.Add(new CombineInstance
                 {
                     mesh = skinned.sharedMesh,
@@ -148,6 +184,7 @@ namespace ExtNPC.View
             {
                 if (filter.sharedMesh == null) continue;
                 if (!Readable(filter.sharedMesh, model)) return null;
+                names.Add(filter.name);
                 combines.Add(new CombineInstance
                 {
                     mesh = filter.sharedMesh,
@@ -166,7 +203,10 @@ namespace ExtNPC.View
             // 32-bit indices: an MPFB body is ~14.5k vertices before any
             // clothing, and a shared model plus assets can pass 65k.
             baked.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
-            baked.CombineMeshes(combines.ToArray(), true, true, false);
+            // mergeSubMeshes: FALSE. One submesh per source part, so each can
+            // take its own colour. Merging is what made every villager beige.
+            baked.CombineMeshes(combines.ToArray(), false, true, false);
+            sourceNames = names.ToArray();
 
             float combinedExtentM;
             Normalise(baked, bodyStatureM, out authoredStatureM,

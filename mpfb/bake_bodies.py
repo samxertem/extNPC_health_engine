@@ -94,7 +94,75 @@ def _clear_scene() -> None:
         bpy.data.objects.remove(obj, do_unlink=True)
 
 
-def bake_one(mhm_path: str, fbx_path: str, settings: dict) -> dict:
+def resolve_channels(child_names, parts: dict) -> dict:
+    """Blender object names to appearance channels, or raise.
+
+    WHY THIS RUNS HERE AND NOT IN C#. The viewer needs to know which mesh
+    inside the FBX is hair and which is shoes, so it can colour them
+    separately. It cannot work that out from the names: hairstyles, suits and
+    shoes are all just strings from whatever asset pack is installed, and a
+    renderer matching on `afro` or `Shoes` would hold a second copy of the
+    rule that `phenotype_to_mhm.bodypart_channels` already owns.
+
+    It cannot be a plain lookup either, because the name is transformed twice
+    on the way here and neither transformation is reversible by guessing:
+
+      * `AssetCatalogue.token` writes the LAST word of a spaced key, so
+        `Female elegantsuit01` is written `elegantsuit01`, while MPFB names
+        the object from the full key and Blender turns the space into an
+        underscore: `female_elegantsuit01_body`.
+      * Case is not preserved: the manifest says `Afro01`, the object is
+        `afro01_body`.
+
+    So the match is: strip `_body`, lowercase, and accept a token that equals
+    the name or is its final underscore-separated segment.
+
+    IT RAISES ON ANYTHING AMBIGUOUS OR UNMATCHED, and that is the point of
+    doing it in Python. A part coloured as the wrong thing still renders, and
+    a villager with brown hair on their shoes is not a crash -- it is a
+    picture somebody has to notice. Failing the bake is the only moment this
+    can be caught for free.
+    """
+    lookup = {}
+    for token, channel in (parts or {}).items():
+        lookup.setdefault(str(token).lower(), channel)
+
+    out = {}
+    for raw in child_names:
+        # MPFB names every part after the character it belongs to, so the
+        # object is `Ada-16_adult.afro01_body` and not `afro01_body`. Strip
+        # the character prefix first; the same rule runs on the C# side, where
+        # Unity adds the FBX root name back in the same shape.
+        dot = raw.rfind(".")
+        name = raw[dot + 1:] if dot >= 0 else raw
+        name = name[:-5] if name.lower().endswith("_body") else name
+        key = name.lower()
+        # The object name is the asset KEY with its spaces turned into
+        # underscores; the manifest holds the TOKEN, which `AssetCatalogue.
+        # token` picks as the LONGEST word of that key. Longest, not first or
+        # last: `Female elegantsuit01` gives `elegantsuit01` but `Teeth base`
+        # gives `Teeth`, so the token can be any word and neither a prefix nor
+        # a suffix rule covers both. Matching any whole segment does.
+        hits = {lookup[key]} if key in lookup else set()
+        if not hits:
+            for segment in key.split("_"):
+                if segment in lookup:
+                    hits.add(lookup[segment])
+        if len(hits) == 1:
+            out[name.lower()] = hits.pop()
+        elif not hits:
+            raise SystemExit(
+                f"[BAKE] cannot tell what '{raw}' is. Known parts: "
+                f"{sorted(lookup)}. Colouring it as a guess would put a "
+                f"hair colour on a shoe and log nothing.")
+        else:
+            raise SystemExit(
+                f"[BAKE] '{raw}' matches more than one part ({sorted(hits)}).")
+    return out
+
+
+def bake_one(mhm_path: str, fbx_path: str, settings: dict,
+             parts: dict = None) -> dict:
     """One `.mhm` to one FBX, on a scene cleared first. Returns measurements."""
     export_service = PROBE.dynamic_import("mpfb.services.exportservice", "ExportService")
     object_service = PROBE.dynamic_import("mpfb.services.objectservice", "ObjectService")
@@ -134,8 +202,13 @@ def bake_one(mhm_path: str, fbx_path: str, settings: dict) -> dict:
 
     bpy.ops.object.select_all(action="DESELECT")
     root.select_set(True)
+    exported = []
     for child in object_service.get_list_of_children(root):
         child.select_set(True)
+        if getattr(child, "type", None) == "MESH":
+            exported.append(child.name)
+    if getattr(mesh, "type", None) == "MESH" and mesh.name not in exported:
+        exported.append(mesh.name)
     bpy.context.view_layer.objects.active = root
     bpy.ops.export_scene.fbx(filepath=fbx_path, use_selection=True,
                              add_leaf_bones=False, bake_anim=False)
@@ -153,6 +226,9 @@ def bake_one(mhm_path: str, fbx_path: str, settings: dict) -> dict:
         "masked_away_m": round(authored - clothed, 6),
         "shape_keys_baked": dropped,
         "verts": len(mesh.data.vertices),
+        # Which mesh in the FBX is which appearance channel, resolved HERE
+        # where a mismatch can still fail the bake. See `resolve_channels`.
+        "submeshes": resolve_channels(exported, parts),
     }
 
 
@@ -200,6 +276,10 @@ def _record_statures(bodies_dir: str, manifest: dict, results: list) -> None:
     # deleted, so for a villager in a full suit it is the height of their head
     # and arms rather than of them.
     by_stem = {r["stem"]: r["authored_stature_m"] for r in results}
+    # Name-to-channel for each body, resolved during the bake. Written beside
+    # the stature for the same reason the stature is: only this stage holds
+    # both the manifest and the real Blender objects at once.
+    submeshes = {r["stem"]: r.get("submeshes", {}) for r in results}
     touched = 0
     for entry in manifest["bodies"]:
         stature = by_stem.get(entry["stem"])
@@ -208,6 +288,9 @@ def _record_statures(bodies_dir: str, manifest: dict, results: list) -> None:
             # stamping a stale number over bodies it never looked at.
             continue
         entry["body_stature_m"] = round(float(stature), 6)
+        mapping = submeshes.get(entry["stem"])
+        if mapping:
+            entry["submeshes"] = mapping
         touched += 1
 
     manifest_path = os.path.join(bodies_dir, "bodies.json")
@@ -251,7 +334,7 @@ def main() -> int:
         mhm = os.path.join(bodies_dir, entry["mhm"])
         fbx = os.path.join(out_dir, f"{entry['stem']}.fbx")
         t1 = time.perf_counter()
-        measured = bake_one(mhm, fbx, settings)
+        measured = bake_one(mhm, fbx, settings, entry.get("parts"))
         measured["name"] = entry["name"]
         measured["stem"] = entry["stem"]
         measured["seconds"] = round(time.perf_counter() - t1, 2)

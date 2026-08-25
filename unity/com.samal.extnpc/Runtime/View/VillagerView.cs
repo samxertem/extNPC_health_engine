@@ -106,7 +106,17 @@ namespace ExtNPC.View
             // returns a UNIT body -- 1 m tall, soles on the origin -- so the
             // scaling below is identical whichever answered, and the only case
             // that differs in scale or pivot is the primitive fallback.
-            Mesh body = BodyLibrary.UnitBodyFor(row.Name, row.IsFemale);
+            //
+            // Item U6: the body for the life stage THIS FRAME records, so
+            // scrubbing back to year 20 draws the child who was alive then
+            // and not the adult they became. The stage comes off the frame
+            // rather than being derived from age here, because `life_stage`
+            // is the engine's own label -- its boundaries are solved from the
+            // fitted growth curve and differ by sex -- and a second definition
+            // of them in C# would go stale silently, since a body baked for
+            // the wrong stage still renders.
+            Mesh body = BodyLibrary.UnitBodyFor(row.Name, row.LifeStage,
+                                                row.IsFemale);
             _feetPivot = body != null;
 
             if (_feetPivot)
@@ -166,14 +176,68 @@ namespace ExtNPC.View
             Color lineage = row.Color;
             Color bodyColour = _feetPivot ? LineageRing.NeutralBody : lineage;
 
-            _renderer.GetPropertyBlock(_block);
-            _block.SetColor(BaseColorId, bodyColour);
-            _block.SetColor(ColorId, bodyColour);
-            _renderer.SetPropertyBlock(_block);
+            // PER-PART COLOUR, item E2, when the bundle carries it: skin from
+            // this villager's `skin_tone` placed on the Del Bino skin locus,
+            // hair from `hair_pigment`, eyes from `eye_color`, and clothes
+            // from a hash of their name. Three measurements and one confessed
+            // invention; `bodies.json` records which is which per channel.
+            //
+            // Falls back to the single neutral tone when the bundle predates
+            // colour, which is every bundle baked before this. A villager
+            // painted white because their manifest said nothing would look
+            // like a bug in the bake.
+            Color[] parts = _feetPivot
+                ? BodyLibrary.SubmeshColorsFor(row.Name, row.LifeStage)
+                : null;
+
+            if (parts != null && _filter.sharedMesh != null &&
+                parts.Length == _filter.sharedMesh.subMeshCount)
+            {
+                EnsureMaterialSlots(parts.Length);
+                for (int i = 0; i < parts.Length; i++)
+                {
+                    _renderer.GetPropertyBlock(_block, i);
+                    _block.SetColor(BaseColorId, parts[i]);
+                    _block.SetColor(ColorId, parts[i]);
+                    _renderer.SetPropertyBlock(_block, i);
+                }
+            }
+            else
+            {
+                EnsureMaterialSlots(1);
+                _renderer.GetPropertyBlock(_block);
+                _block.SetColor(BaseColorId, bodyColour);
+                _block.SetColor(ColorId, bodyColour);
+                _renderer.SetPropertyBlock(_block);
+            }
 
             ApplyRing(lineage);
 
             gameObject.name = row.Name;
+        }
+
+        /// <summary>
+        /// Give the renderer one material slot per submesh, all pointing at
+        /// the SAME shared material.
+        ///
+        /// A renderer draws only as many submeshes as it has materials, so a
+        /// nine-submesh body on a one-slot renderer loses eight of its parts
+        /// and the villager renders as hair alone. That is the failure this
+        /// exists to prevent, and it is not a crash.
+        ///
+        /// ONE MATERIAL, N SLOTS, and that is what keeps this affordable.
+        /// Colour arrives through <c>SetPropertyBlock(block, index)</c>, which
+        /// takes a submesh index, so 600 villagers in nine colours each still
+        /// share a single material asset instead of instancing 5,400 of them.
+        /// </summary>
+        private void EnsureMaterialSlots(int count)
+        {
+            var current = _renderer.sharedMaterials;
+            if (current.Length == count) return;
+            var shared = current.Length > 0 ? current[0] : null;
+            var slots = new Material[count];
+            for (int i = 0; i < count; i++) slots[i] = shared;
+            _renderer.sharedMaterials = slots;
         }
 
         // ------------------------------------------------------------------

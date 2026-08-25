@@ -170,6 +170,60 @@ namespace ExtNPC.View
         public const float FramedFraction = 0.21f;
 
         /// <summary>
+        /// How far below the eye line the portrait cuts, as a fraction of
+        /// stature. Just under the collarbone, so the crop reads as a portrait
+        /// rather than as a floating head.
+        /// </summary>
+        public const float BelowEyeFraction = 0.105f;
+
+        /// <summary>Air left above the highest point of the head.</summary>
+        public const float HeadroomFraction = 0.012f;
+
+        /// <summary>
+        /// Frame the head from its ACTUAL top down to below the collarbone,
+        /// returning the focus height and the vertical span to fit.
+        ///
+        /// WHY THIS REPLACES A FIXED FRACTION OF STATURE. <see
+        /// cref="FramedFraction"/> was chosen in session 22, when every body
+        /// was bald, and it centres on the eye line. Hair does not fit in that
+        /// frame: <see cref="HumanMesh"/> normalises a body so the UNDRESSED
+        /// crown is at 1 m, deliberately, so hair and shoes stand proud of it.
+        /// A bob comes out at about 1.03, so the top of the villager's head
+        /// was being cropped off and the key light, which rides the focus, sat
+        /// level with the crown and blew it out. It looked like a rendering
+        /// fault and was a framing one, and it only became obvious once hair
+        /// stopped being the same colour as the face.
+        ///
+        /// `unitTop` is the mesh's own local bounds maximum, which is 1.0 for
+        /// a bald body and more for a dressed one. Read rather than assumed:
+        /// how far a hairstyle stands proud is a property of whichever asset
+        /// the villager drew, and a constant here would be right for one
+        /// hairstyle in ten.
+        /// </summary>
+        public static void FrameHead(float statureM, float unitTop,
+                                     out float focusHeightM, out float spanM)
+        {
+            float tallest = unitTop > 1f ? unitTop : 1f;
+            float top = tallest * statureM * (1f + HeadroomFraction);
+            float bottom = EyeHeight(statureM) - BelowEyeFraction * statureM;
+            if (top <= bottom) top = bottom + 0.01f;
+            spanM = top - bottom;
+            focusHeightM = 0.5f * (top + bottom);
+        }
+
+        /// <summary>
+        /// Metres from the focus to the camera, for a perspective camera of
+        /// `verticalFovDeg` that must fit `spanM` vertically.
+        /// </summary>
+        public static float DistanceForSpan(float spanM, float verticalFovDeg)
+        {
+            double halfFov = verticalFovDeg * 0.5 * System.Math.PI / 180.0;
+            double tan = System.Math.Tan(halfFov);
+            if (tan <= 1e-6) return spanM;
+            return (float)(spanM * 0.5 / tan);
+        }
+
+        /// <summary>
         /// Metres from the eye line to the camera, for a perspective camera of
         /// <paramref name="verticalFovDeg"/> looking at a body of
         /// <paramref name="statureM"/>.
