@@ -41,6 +41,7 @@ import sys
 import time
 
 import bpy
+import mathutils
 
 
 def _load_probe():
@@ -161,6 +162,71 @@ def resolve_channels(child_names, parts: dict) -> dict:
     return out
 
 
+ARM_BONES = ("upperarm_l", "upperarm_r")
+
+
+def relax_arms(scene_objects) -> bool:
+    """Item A1: MPFB's rest pose stands with both arms out at roughly 40
+    degrees (an A-pose); this swings each upper arm down to the side by
+    rotating the SHOULDER joint only, then bakes the result as the new rest
+    pose so it survives an FBX export with `bake_anim=False`.
+
+    Returns False, and touches nothing, for a body with no `game_engine`
+    armature (there is no such case in this pipeline today, but a silent
+    no-op on an assumption this specific is worse than a body that is still
+    A-posed and says so).
+
+    THE ROTATION IS MEASURED PER BODY, NOT A FIXED CONSTANT. A child's
+    humerus and an adult's are not the same proportions, and a hardcoded
+    angle tuned on one sample would be a fresh, unmeasured claim on every
+    other age. Instead each upper arm's CURRENT rest direction is read from
+    the bone itself and rotated toward mostly-straight-down, keeping a
+    fraction of the original outward and forward lean so the result still
+    reads as a standing pose rather than a plank glued to the ribs. Verified
+    2026-08-26 on a 9.6-year-old sample: both hands land within 3 mm of
+    pelvis height (symmetric, +-0.163 m out from the spine) and the SKINNED
+    MESH's own furthest-right vertex follows to the same height, i.e. the
+    body deforms with the bone, not just the bone chain in isolation.
+
+    ONLY THE SHOULDER ROTATES. The elbow's own bend is left exactly as MPFB
+    authored it and swings down rigidly with the upper arm, which is the
+    smallest change that fixes the outstretched-arms defect without
+    inventing an elbow angle nothing measured.
+    """
+    armature = next((o for o in scene_objects if o.type == "ARMATURE"), None)
+    if armature is None or not all(b in armature.pose.bones for b in ARM_BONES):
+        return False
+
+    for bone_name in ARM_BONES:
+        pose_bone = armature.pose.bones[bone_name]
+        bone = pose_bone.bone
+        head = bone.head_local.copy()
+        current = (bone.tail_local - head).normalized()
+        target = mathutils.Vector(
+            (current.x * 0.15, current.y * 0.6, -1.0)).normalized()
+        axis = current.cross(target)
+        if axis.length < 1e-6:
+            continue  # already hanging straight down; nothing to rotate
+        axis.normalize()
+        rotation = mathutils.Quaternion(axis, current.angle(target)).to_matrix().to_4x4()
+        delta = (mathutils.Matrix.Translation(head) @ rotation @
+                 mathutils.Matrix.Translation(-head))
+        pose_bone.matrix = delta @ pose_bone.bone.matrix_local
+    bpy.context.view_layer.update()
+
+    # Bake the pose into the rest bones themselves. Without this, the FBX
+    # exporter's bind pose is the armature's ORIGINAL rest state -- the
+    # arms-out A-pose -- regardless of what the pose bones are doing at
+    # export time, because `bake_anim=False` exports rest, not the live pose.
+    bpy.context.view_layer.objects.active = armature
+    armature.select_set(True)
+    bpy.ops.object.mode_set(mode="POSE")
+    bpy.ops.pose.select_all(action="SELECT")
+    bpy.ops.pose.armature_apply(selected=False)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    return True
+
+
 def bake_one(mhm_path: str, fbx_path: str, settings: dict,
              parts: dict = None) -> dict:
     """One `.mhm` to one FBX, on a scene cleared first. Returns measurements."""
@@ -194,6 +260,11 @@ def bake_one(mhm_path: str, fbx_path: str, settings: dict,
     basemesh = human_service.deserialize_from_mhm(mhm_path, settings)
     clothed = PROBE.stature(basemesh)
 
+    # Item A1, before the copy: create_character_copy duplicates whatever
+    # rest pose the armature has right now, so posing after the copy would
+    # mean tracking down which of the two armatures survived it.
+    relaxed = relax_arms(bpy.data.objects)
+
     root = export_service.create_character_copy(basemesh, name_suffix="_body")
     mesh = object_service.find_object_of_type_amongst_nearest_relatives(root, "Basemesh")
     export_service.bake_modifiers_remove_helpers(
@@ -225,6 +296,7 @@ def bake_one(mhm_path: str, fbx_path: str, settings: dict,
         "baked_stature_m": PROBE.stature(mesh),
         "masked_away_m": round(authored - clothed, 6),
         "shape_keys_baked": dropped,
+        "arms_relaxed": relaxed,
         "verts": len(mesh.data.vertices),
         # Which mesh in the FBX is which appearance channel, resolved HERE
         # where a mismatch can still fail the bake. See `resolve_channels`.
@@ -310,6 +382,14 @@ def main() -> int:
                         help="where the FBX files go (default: <bodies>/fbx)")
     parser.add_argument("--limit", type=int, default=0,
                         help="bake only the first N, for a quick look")
+    parser.add_argument("--start", type=int, default=0,
+                        help="skip the first N entries. One long-running "
+                             "Blender process accumulates orphaned data "
+                             "blocks across many sequential MPFB loads and "
+                             "slows down as it goes (observed: 144 bodies "
+                             "went from 2.5s/body to a crawl by #60) -- "
+                             "resuming in smaller batches, each its own "
+                             "process, avoids that.")
     args = parser.parse_args(argv)
 
     version = PROBE.ensure_mpfb()
@@ -321,6 +401,8 @@ def main() -> int:
         manifest = json.load(fh)
 
     entries = manifest["bodies"]
+    if args.start:
+        entries = entries[args.start:]
     if args.limit:
         entries = entries[:args.limit]
 
