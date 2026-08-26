@@ -6,11 +6,11 @@ namespace ExtNPC.View
     /// A minimal orbit camera, so the village can be looked at without wiring
     /// up an input system first.
     ///
-    /// Drag to orbit, scroll to zoom, right-drag or WASD to pan. Deliberately
-    /// uses the legacy Input class: it works in a default project with no
-    /// package added, which is the point of a package that should be usable
-    /// five minutes after cloning. Replace it with whatever the host project
-    /// already uses.
+    /// Drag to orbit, scroll to zoom, WASD to pan, Q/E to rise and fall, hold
+    /// Shift to move faster. Deliberately uses the legacy Input class: it
+    /// works in a default project with no package added, which is the point
+    /// of a package that should be usable five minutes after cloning.
+    /// Replace it with whatever the host project already uses.
     /// </summary>
     [AddComponentMenu("extNPC/Orbit Camera")]
     [RequireComponent(typeof(Camera))]
@@ -55,14 +55,21 @@ namespace ExtNPC.View
             }
 
             Vector2 move = InputCompat.MoveAxis;
-            if (move.sqrMagnitude > 0f)
+            float vertical = InputCompat.Vertical;
+            if (move.sqrMagnitude > 0f || !Mathf.Approximately(vertical, 0f))
             {
                 Vector3 forward = Vector3.ProjectOnPlane(
                     transform.forward, Vector3.up).normalized;
                 Vector3 right = Vector3.ProjectOnPlane(
                     transform.right, Vector3.up).normalized;
-                pivot += (forward * move.y + right * move.x) *
-                         (panSpeed * distance * Time.unscaledDeltaTime);
+                // Shift is a boost, not a mode: the default speed is tuned for
+                // walking a village at head height, and crossing the whole map
+                // at that pace is a real wait worth skipping for whoever is
+                // driving a live demo.
+                float boost = InputCompat.ShiftHeld ? 3f : 1f;
+                float step = panSpeed * distance * boost * Time.unscaledDeltaTime;
+                pivot += (forward * move.y + right * move.x) * step
+                         + Vector3.up * (vertical * step);
             }
 
             Apply();

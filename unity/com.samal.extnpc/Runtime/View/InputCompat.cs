@@ -87,6 +87,28 @@ namespace ExtNPC.View
                 return new Vector2(x, y);
             }
         }
+
+        /// <summary>Q/E as (down = -1, up = +1), for the pan plane's missing axis.</summary>
+        public static float Vertical
+        {
+            get
+            {
+                var k = Keyboard.current;
+                if (k == null) return 0f;
+                float v = 0f;
+                if (k.qKey.isPressed) v -= 1f;
+                if (k.eKey.isPressed) v += 1f;
+                return v;
+            }
+        }
+
+        public static bool ShiftHeld =>
+            Keyboard.current != null &&
+            (Keyboard.current.leftShiftKey.isPressed ||
+             Keyboard.current.rightShiftKey.isPressed);
+
+        public static bool HKeyPressedThisFrame =>
+            Keyboard.current != null && Keyboard.current.hKey.wasPressedThisFrame;
 #else
         public static bool Available => true;
 
@@ -108,6 +130,23 @@ namespace ExtNPC.View
         public static Vector2 MoveAxis =>
             new Vector2(Input.GetAxisRaw("Horizontal"),
                         Input.GetAxisRaw("Vertical"));
+
+        /// <summary>Q/E as (down = -1, up = +1), for the pan plane's missing axis.</summary>
+        public static float Vertical
+        {
+            get
+            {
+                float v = 0f;
+                if (Input.GetKey(KeyCode.Q)) v -= 1f;
+                if (Input.GetKey(KeyCode.E)) v += 1f;
+                return v;
+            }
+        }
+
+        public static bool ShiftHeld =>
+            Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+
+        public static bool HKeyPressedThisFrame => Input.GetKeyDown(KeyCode.H);
 #endif
     }
 }
