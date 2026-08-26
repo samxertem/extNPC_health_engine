@@ -247,10 +247,28 @@ namespace ExtNPC.View
             if (_renderer == null || body == null) return;
 
             int subs = Mathf.Max(1, body.subMeshCount);
-            if (_renderer.sharedMaterials.Length != subs)
+
+            // THE EYES GET THEIR OWN TEXTURED MATERIAL, exactly as in
+            // VillagerView, and this panel is where it matters most: the
+            // portrait is the one place a villager's face is shown large
+            // enough to read, so a flat-coloured eyeball is most obvious
+            // here. Resolved every call rather than cached, because the
+            // subject changes and so does their eye colour.
+            int eyeIndex = BodyLibrary.EyeSubmeshIndexFor(villagerName, lifeStage);
+            Material eyeMat = eyeIndex >= 0
+                ? EyeMaterials.For(BodyLibrary.EyeLabelFor(villagerName, lifeStage))
+                : null;
+            if (eyeMat == null) eyeIndex = -1;
+
+            var current = _renderer.sharedMaterials;
+            bool rebuild = current.Length != subs ||
+                           (eyeIndex >= 0 && current[eyeIndex] != eyeMat) ||
+                           (eyeIndex < 0 && System.Array.IndexOf(current, _skin) < 0);
+            if (rebuild)
             {
                 var slots = new Material[subs];
                 for (int i = 0; i < subs; i++) slots[i] = _skin;
+                if (eyeIndex >= 0 && eyeIndex < subs) slots[eyeIndex] = eyeMat;
                 _renderer.sharedMaterials = slots;
             }
 
@@ -264,8 +282,11 @@ namespace ExtNPC.View
                 // through, rather than leaving the last villager's hair
                 // colour on this one's face.
                 _renderer.GetPropertyBlock(_block, i);
-                Color c = (parts != null && parts.Length == subs)
-                    ? parts[i] : SkinAlbedo;
+                // White on the eye slot so its texture reads true; tinting it
+                // would repaint the sclera, which is the whole defect.
+                Color c = i == eyeIndex
+                    ? Color.white
+                    : ((parts != null && parts.Length == subs) ? parts[i] : SkinAlbedo);
                 _block.SetColor(BaseColorId, c);
                 _block.SetColor(ColorId, c);
                 _renderer.SetPropertyBlock(_block, i);

@@ -30,6 +30,14 @@ namespace ExtNPC.View
         private MeshRenderer _renderer;
         private CapsuleCollider _collider;
         private MaterialPropertyBlock _block;
+        private Material _bodyMaterial;
+        // Which submesh slot last got an eye material, and which material it
+        // was. Both are compared each Apply() so that a villager recycled
+        // from the pool onto a different body -- a different eye submesh
+        // index, or a different eye colour -- has its slots rebuilt instead
+        // of keeping the previous occupant's eyes.
+        private int _eyeSlot = -1;
+        private Material _eyeMaterial;
 
         // Where the body stands and how tall it is, kept so the two COSMETIC
         // adjustments below can move it without recomputing anything from the
@@ -68,6 +76,7 @@ namespace ExtNPC.View
                 UnityEngine.Rendering.ShadowCastingMode.Off;   // hundreds of these
             v._collider = go.AddComponent<CapsuleCollider>();
             v._block = new MaterialPropertyBlock();
+            v._bodyMaterial = shared;
             return v;
         }
 
@@ -193,18 +202,35 @@ namespace ExtNPC.View
             if (parts != null && _filter.sharedMesh != null &&
                 parts.Length == _filter.sharedMesh.subMeshCount)
             {
-                EnsureMaterialSlots(parts.Length);
+                // THE EYES ARE THE ONE EXCEPTION to flat-colour parts, and
+                // <see cref="EyeMaterials"/> carries the measurement that
+                // forced it: an eyeball is not one colour, so painting the
+                // submesh with `eye_color` paints the sclera the colour of
+                // the iris. That slot gets a textured material instead --
+                // and null when no texture is installed, which falls through
+                // to the flat tone rather than to a white eyeball.
+                int eyeIndex = BodyLibrary.EyeSubmeshIndexFor(row.Name, row.LifeStage);
+                Material eyeMat = eyeIndex >= 0
+                    ? EyeMaterials.For(BodyLibrary.EyeLabelFor(row.Name, row.LifeStage))
+                    : null;
+                if (eyeMat == null) eyeIndex = -1;
+
+                EnsureMaterialSlots(parts.Length, eyeIndex, eyeMat);
                 for (int i = 0; i < parts.Length; i++)
                 {
+                    // The eye slot keeps its texture's own colours: tinting
+                    // it would be the flat-colour bug arriving by the back
+                    // door, one property block later.
+                    Color c = i == eyeIndex ? Color.white : parts[i];
                     _renderer.GetPropertyBlock(_block, i);
-                    _block.SetColor(BaseColorId, parts[i]);
-                    _block.SetColor(ColorId, parts[i]);
+                    _block.SetColor(BaseColorId, c);
+                    _block.SetColor(ColorId, c);
                     _renderer.SetPropertyBlock(_block, i);
                 }
             }
             else
             {
-                EnsureMaterialSlots(1);
+                EnsureMaterialSlots(1, -1, null);
                 _renderer.GetPropertyBlock(_block);
                 _block.SetColor(BaseColorId, bodyColour);
                 _block.SetColor(ColorId, bodyColour);
@@ -217,27 +243,33 @@ namespace ExtNPC.View
         }
 
         /// <summary>
-        /// Give the renderer one material slot per submesh, all pointing at
-        /// the SAME shared material.
+        /// Give the renderer one material slot per submesh, every one
+        /// pointing at the SAME shared body material, EXCEPT the eyes slot
+        /// (if any), which gets the eye-shaded material instead.
         ///
         /// A renderer draws only as many submeshes as it has materials, so a
         /// nine-submesh body on a one-slot renderer loses eight of its parts
         /// and the villager renders as hair alone. That is the failure this
         /// exists to prevent, and it is not a crash.
         ///
-        /// ONE MATERIAL, N SLOTS, and that is what keeps this affordable.
-        /// Colour arrives through <c>SetPropertyBlock(block, index)</c>, which
-        /// takes a submesh index, so 600 villagers in nine colours each still
-        /// share a single material asset instead of instancing 5,400 of them.
+        /// ONE MATERIAL, N SLOTS (TWO, COUNTING THE EYE MATERIAL), and that is
+        /// what keeps this affordable. Colour arrives through
+        /// <c>SetPropertyBlock(block, index)</c>, which takes a submesh
+        /// index, so 600 villagers in nine colours each still share the same
+        /// two material assets instead of instancing 5,400 of them.
         /// </summary>
-        private void EnsureMaterialSlots(int count)
+        private void EnsureMaterialSlots(int count, int eyeIndex, Material eyeMaterial)
         {
             var current = _renderer.sharedMaterials;
-            if (current.Length == count) return;
-            var shared = current.Length > 0 ? current[0] : null;
+            if (current.Length == count && eyeIndex == _eyeSlot &&
+                _eyeMaterial == eyeMaterial) return;
             var slots = new Material[count];
-            for (int i = 0; i < count; i++) slots[i] = shared;
+            for (int i = 0; i < count; i++) slots[i] = _bodyMaterial;
+            if (eyeIndex >= 0 && eyeIndex < count && eyeMaterial != null)
+                slots[eyeIndex] = eyeMaterial;
             _renderer.sharedMaterials = slots;
+            _eyeSlot = eyeIndex;
+            _eyeMaterial = eyeMaterial;
         }
 
         // ------------------------------------------------------------------

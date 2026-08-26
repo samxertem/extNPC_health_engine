@@ -118,6 +118,19 @@ namespace ExtNPC.View
         private static readonly Dictionary<string, Color[]> _submeshColors =
             new Dictionary<string, Color[]>();
 
+        /// <summary>Which submesh index is the EYES channel, or -1. Cached
+        /// alongside `_submeshColors` for the same reason, and kept separate
+        /// from it because a submesh index is a rendering decision (which
+        /// material slot gets the eye shader), not a colour.</summary>
+        private static readonly Dictionary<string, int> _eyeIndex =
+            new Dictionary<string, int>();
+
+        /// <summary>Stem to the engine's categorical `eye_color` label, from
+        /// the manifest's `pigmentation`. Read straight through, never
+        /// derived: the label is a calibrated model output.</summary>
+        private static readonly Dictionary<string, string> _eyeLabel =
+            new Dictionary<string, string>();
+
         private static readonly Dictionary<string, string> _mature =
             new Dictionary<string, string>();
         private static readonly Dictionary<string, float> _matureAge =
@@ -191,6 +204,8 @@ namespace ExtNPC.View
             _colors.Clear();
             _channels.Clear();
             _submeshColors.Clear();
+            _eyeIndex.Clear();
+            _eyeLabel.Clear();
             Staged = false;
             ProvenanceWarning = null;
         }
@@ -260,6 +275,20 @@ namespace ExtNPC.View
                     foreach (var prop in subs.Properties())
                         map[prop.Name.ToLowerInvariant()] = (string)prop.Value;
                     if (map.Count > 0) _channels[stem] = map;
+                }
+
+                // The eye colour's LABEL, not its hex. Every other channel is
+                // a colour because every other part is drawn as a flat tone;
+                // the eyes are drawn from a real texture chosen by category
+                // (see EyeTextures), so what this needs is the engine's own
+                // categorical `eye_color` -- the HERC2 dominance outcome --
+                // rather than the swatch that stood in for it.
+                var pigmentation = entry["pigmentation"] as JObject;
+                if (pigmentation != null)
+                {
+                    string label = (string)pigmentation["eye_color"];
+                    if (!string.IsNullOrEmpty(label))
+                        _eyeLabel[stem] = label.ToLowerInvariant();
                 }
 
                 float age = (float?)entry["age"] ?? 0f;
@@ -454,8 +483,10 @@ namespace ExtNPC.View
         /// unacceptably in white, and a white tongue is a more visible error
         /// than a slightly-too-pink one.
         /// </summary>
-        private static Color[] ResolveColors(string stem, string[] sourceNames)
+        private static Color[] ResolveColors(string stem, string[] sourceNames,
+                                             out int eyeIndex)
         {
+            eyeIndex = -1;
             Dictionary<string, Color> byChannel;
             if (!_colors.TryGetValue(stem, out byChannel) || sourceNames == null)
                 return null;
@@ -483,6 +514,8 @@ namespace ExtNPC.View
                 if (byName == null || !byName.TryGetValue(local, out channel))
                     continue;
 
+                if (channel == "eyes") eyeIndex = i;
+
                 Color c;
                 // `suit` and `shoes` are separate channels in the engine but
                 // the manifest names the garment colour `clothes`, so a suit
@@ -492,6 +525,28 @@ namespace ExtNPC.View
                     out_[i] = c;
             }
             return out_;
+        }
+
+        /// <summary>Which submesh index is this villager's EYES channel, or
+        /// -1 when there isn't one (no colours, or a bundle predating item
+        /// E2). <see cref="VillagerView"/> uses this to give that one slot
+        /// the eye-shaded material instead of the flat body colour.</summary>
+        public static int EyeSubmeshIndexFor(string villagerName, string lifeStage)
+        {
+            string stem = StemFor(villagerName, lifeStage);
+            if (stem == null) return -1;
+            int idx;
+            return _eyeIndex.TryGetValue(stem, out idx) ? idx : -1;
+        }
+
+        /// <summary>This villager's `eye_color` label, or null when the
+        /// bundle does not carry one.</summary>
+        public static string EyeLabelFor(string villagerName, string lifeStage)
+        {
+            string stem = StemFor(villagerName, lifeStage);
+            if (stem == null) return null;
+            string label;
+            return _eyeLabel.TryGetValue(stem, out label) ? label : null;
         }
 
         /// <summary>
@@ -557,7 +612,9 @@ namespace ExtNPC.View
 
             baked.name = "extnpc_body_" + stem;
             _cache[stem] = baked;
-            _submeshColors[stem] = ResolveColors(stem, sourceNames);
+            int eyeIdx;
+            _submeshColors[stem] = ResolveColors(stem, sourceNames, out eyeIdx);
+            _eyeIndex[stem] = eyeIdx;
             return baked;
         }
     }
