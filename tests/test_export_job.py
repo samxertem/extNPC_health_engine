@@ -27,6 +27,7 @@ what lets the failure paths be tested at all.
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 import threading
@@ -182,18 +183,74 @@ class FakeBlender:
         self.terminated = True
 
 
-def _run_fake(monkeypatch, lines, code=0, expected=3):
+class FakeBatches:
+    """A `Popen` stand-in that reads `--start` and `--limit` off the command.
+
+    The plain `FakeBlender` returns the same canned lines whatever it is
+    asked for, which is fine for the parser and useless for the batch loop: an
+    offset bug, a batch that repeats bodies and a batch that skips them all
+    produce identical output against a fake that ignores its arguments. This
+    one generates the lines the real bake would print for the slice it was
+    handed, and records the slices so a test can check they tile the village.
+    """
+
+    def __init__(self, code=0, on_batch=None):
+        self.batches = []
+        self.job = None          # set by `_run_batched` before the job starts
+        self._code = code
+        self._on_batch = on_batch
+
+    def __call__(self, cmd, *a, **k):
+        start = int(cmd[cmd.index("--start") + 1])
+        limit = int(cmd[cmd.index("--limit") + 1])
+        self.batches.append((start, limit))
+        if self._on_batch is not None:
+            self._on_batch(self, start, limit)
+        lines = [f"[BAKE] blender 4.4.3, mpfb 2.0.17, {limit} bodies, subdiv 0"]
+        lines += [f"[BAKE] {i:3d}/{limit}  P-{start + i:<12d} "
+                  f"1.7700 m   8550 verts    2.4s"
+                  for i in range(1, limit + 1)]
+        lines.append(f"[BAKE] done in {limit * 2}s, 2.4s each")
+        return FakeBlender(lines, self._code)
+
+
+def _manifest_dir(tmp_path, n):
+    """A `bodies.json` with `n` entries, which is what the batch loop counts."""
+    bodies = [{"name": f"P-{i}", "stem": f"P-{i}_adult",
+               "mhm": f"P-{i}_adult.mhm"} for i in range(n)]
+    (tmp_path / "bodies.json").write_text(
+        json.dumps({"count": n, "people": n, "staged": False,
+                    "bodies": bodies}), encoding="utf-8")
+    return str(tmp_path)
+
+
+def _settle(job, ticks=400):
+    for _ in range(ticks):
+        if not job.status().running:
+            break
+        time.sleep(0.01)
+    return job
+
+
+def _run_fake(monkeypatch, lines, code=0, expected=3, bodies_dir="/bodies"):
     job = BakeJob()
     monkeypatch.setattr("dashboard.export_job._find_blender",
                         lambda: "C:/fake/blender.exe")
     monkeypatch.setattr(subprocess, "Popen",
                         lambda *a, **k: FakeBlender(lines, code))
-    job.start("/bodies", expected=expected)
-    for _ in range(200):
-        if not job.status().running:
-            break
-        time.sleep(0.01)
-    return job
+    job.start(bodies_dir, expected=expected)
+    return _settle(job)
+
+
+def _run_batched(monkeypatch, bodies_dir, total, batch, code=0, on_batch=None):
+    job = BakeJob(batch=batch)
+    popen = FakeBatches(code=code, on_batch=on_batch)
+    popen.job = job
+    monkeypatch.setattr("dashboard.export_job._find_blender",
+                        lambda: "C:/fake/blender.exe")
+    monkeypatch.setattr(subprocess, "Popen", popen)
+    job.start(bodies_dir, expected=total)
+    return _settle(job), popen
 
 
 BAKE_LINES = [
@@ -205,18 +262,95 @@ BAKE_LINES = [
 ]
 
 
-def test_progress_follows_the_bakes_own_count(monkeypatch):
-    """Read from Blender's stdout, not from the caller's expectation.
+def test_the_total_comes_from_the_manifest_not_the_caller(tmp_path, monkeypatch):
+    """The denominator is `bodies.json`, the list the bake itself indexes.
 
-    The two differ when `--limit` is in play or the manifest moved, and
-    trusting the caller's number shows a bar that stops at 80% on a complete
-    run. `expected` is 99 here and the bake says 3.
+    It used to be read off the bake's own progress line, which was right while
+    one process baked everything and is wrong now that the bake runs in
+    batches: a batch counts within the BATCH, so a bar fed that denominator
+    would read "80/80" three times over on a 240-body village. The caller's
+    `expected` is not trusted either, and the 99 here is deliberately wrong,
+    because it is the number that produced two different casts in the first
+    place.
     """
-    job = _run_fake(monkeypatch, BAKE_LINES, expected=99)
+    bodies_dir = _manifest_dir(tmp_path, 10)
+    job, _popen = _run_batched(monkeypatch, bodies_dir, total=99, batch=4)
     st = job.status()
     assert st.phase == "done"
-    assert (st.done, st.total) == (3, 3)
+    assert (st.done, st.total) == (10, 10)
     assert st.fraction == pytest.approx(1.0)
+
+
+def test_the_batches_tile_the_village_exactly_once(tmp_path, monkeypatch):
+    """Every body baked, none baked twice, and the last batch short.
+
+    A batch loop has three classic off-by-ones and they all render: bodies
+    skipped at a boundary leave villagers on the shared mesh, bodies baked
+    twice cost minutes, and a last batch that runs past the end makes Blender
+    slice an empty list and exit successfully having done nothing.
+    """
+    bodies_dir = _manifest_dir(tmp_path, 10)
+    job, popen = _run_batched(monkeypatch, bodies_dir, total=10, batch=4)
+    assert job.status().phase == "done"
+    assert popen.batches == [(0, 4), (4, 4), (8, 2)]
+    covered = [i for start, limit in popen.batches
+               for i in range(start, start + limit)]
+    assert covered == list(range(10))
+
+
+def test_the_bar_does_not_restart_at_each_batch(tmp_path, monkeypatch):
+    """The offset, checked where it would fail silently.
+
+    Without it the bar runs 1 to 4 and then 1 to 4 again, and the run looks
+    stuck at 40% for half an hour. Progress is sampled as each batch is
+    launched, before it has printed anything, so these are the totals carried
+    over from the batches before it.
+    """
+    seen = []
+
+    def on_batch(factory, start, limit):
+        seen.append(factory.job.status().done)
+
+    bodies_dir = _manifest_dir(tmp_path, 10)
+    job, _popen = _run_batched(monkeypatch, bodies_dir, total=10, batch=4,
+                               on_batch=on_batch)
+    assert seen == [0, 4, 8]
+    assert job.status().done == 10
+
+
+def test_cancel_stops_the_loop_and_not_just_one_batch(tmp_path, monkeypatch):
+    """The hazard the batch loop introduces, and the reason `cancel()` sets a
+    flag before it kills anything.
+
+    Terminating the current Blender ends one batch. Without the flag the loop
+    reads that as a batch finishing and starts the next one, so the work
+    carries on for another half hour behind a button that already said
+    cancelled and a status that already said failed.
+    """
+    def on_batch(factory, start, limit):
+        if len(factory.batches) == 1:
+            factory.job.cancel()
+
+    bodies_dir = _manifest_dir(tmp_path, 40)
+    job, popen = _run_batched(monkeypatch, bodies_dir, total=40, batch=4,
+                              on_batch=on_batch)
+    assert len(popen.batches) == 1, "the loop kept going after cancel"
+    st = job.status()
+    assert st.phase == "failed"
+    assert "cancelled" in st.error
+
+
+def test_a_batch_that_dies_stops_the_run_and_names_the_bodies(tmp_path,
+                                                              monkeypatch):
+    """A failure in batch two must not be reported as a finished bake, and the
+    error has to say WHICH bodies, because the recovery is a `--start`."""
+    bodies_dir = _manifest_dir(tmp_path, 10)
+    job, popen = _run_batched(monkeypatch, bodies_dir, total=10, batch=4,
+                              code=3)
+    st = job.status()
+    assert st.phase == "failed"
+    assert len(popen.batches) == 1, "it kept baking after a batch failed"
+    assert "1 to 4 of 10" in st.error
 
 
 def test_the_header_line_is_not_counted_as_a_bake(monkeypatch):

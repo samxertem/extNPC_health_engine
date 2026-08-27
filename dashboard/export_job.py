@@ -50,6 +50,7 @@ make, so it reports paths and says what to do with them.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
@@ -80,6 +81,42 @@ def world_lock() -> threading.RLock:
     is free to take it again.
     """
     return _WORLD_LOCK
+
+
+# ----------------------------------------------------------------------
+# how big a batch is
+# ----------------------------------------------------------------------
+
+# Bodies per Blender process. The bake is a loop of these rather than one
+# long process, for the two reasons set out in `BakeJob._run`.
+#
+# WHERE THE NUMBER COMES FROM. Per-body cost is
+#
+#     base + S / B + d * B / 2
+#
+# for a batch of B, where S is Blender startup plus MPFB init, paid once per
+# batch, and d is the per-body slowdown inside one process. Smallest at
+# B = sqrt(2 * S / d). Both inputs are now measured:
+#
+#   base = 2.534 s, d = 0.00598 s per body. Least squares over all 685 bodies
+#       of the dashboard-4 bake, from `fbx/bake_report.json`. The run went
+#       from 2.26 s a body over the first twenty to 6.27 s over the last
+#       twenty and never levelled off. An earlier reading of this curve called
+#       it a plateau at body 160; it was not, and the whole-run fit is what
+#       settled it.
+#   S = 9.85 s. MEASURED, by timing a `--limit 1` bake end to end (12.11 s
+#       wall) and subtracting the steady-state cost of the one body in it.
+#       An earlier revision of this comment guessed 25 s from the gap between
+#       process launch and first FBX, which was wrong by a factor of 2.5.
+#
+# sqrt(2 * 9.85 / 0.00598) is 57.
+#
+# AND THE CHOICE BARELY MATTERS, which is worth knowing before anyone tunes
+# it. Projected minutes for a 685-body village: 35.2 at B=20, 33.1 at 40,
+# 32.8 at 56, 33.1 at 80, 34.5 at 140. Every batch size from 40 to 100 lands
+# within 1.5% of the best. What matters is that B is finite: the same village
+# in ONE process measured 52.3 minutes.
+BATCH_BODIES = 56
 
 
 # ----------------------------------------------------------------------
@@ -140,11 +177,13 @@ class BakeJob:
 
     _BAKE_LINE = re.compile(r"^\[BAKE\]\s+(\d+)\s*/\s*(\d+)\b")
 
-    def __init__(self) -> None:
+    def __init__(self, batch: int = BATCH_BODIES) -> None:
         self._status = JobStatus()
         self._lock = threading.Lock()
         self._thread: Optional[threading.Thread] = None
         self._proc: Optional[subprocess.Popen] = None
+        self._cancelled = threading.Event()
+        self._batch = max(1, int(batch))
 
     # -- reading ------------------------------------------------------
 
@@ -172,12 +211,14 @@ class BakeJob:
                       message="no Blender found", finished=time.time())
             return self.status()
 
-        self._set(phase="baking", done=0, total=expected, error="",
+        total = _total_from_manifest(bodies_dir, expected)
+        self._cancelled.clear()
+        self._set(phase="baking", done=0, total=total, error="",
                   message="starting Blender", bodies_dir=bodies_dir,
                   started=time.time(), finished=0.0)
 
         self._thread = threading.Thread(
-            target=self._run, args=(exe, bodies_dir), daemon=True,
+            target=self._run, args=(exe, bodies_dir, total), daemon=True,
             name="extnpc-bake")
         self._thread.start()
         return self.status()
@@ -186,17 +227,85 @@ class BakeJob:
         """Stop the bake. The FBX files already written stay: they are whole
         files for whole villagers, and `bodies.json` names every body whether
         or not its FBX is installed, so a partial bake is a bundle with some
-        villagers on the shared mesh, which is a supported state."""
+        villagers on the shared mesh, which is a supported state.
+
+        THE FLAG IS SET BEFORE THE PROCESS IS KILLED, and the order is the
+        whole of it. The bake is a loop of batches now, so terminating the
+        current Blender without the flag would end one batch and let the loop
+        start the next: the button would report cancelled while the work
+        carried on for another half hour."""
+        self._cancelled.set()
         proc = self._proc
         if proc is not None and proc.poll() is None:
             proc.terminate()
         self._set(message="cancelled", phase="failed",
                   error="cancelled by the user", finished=time.time())
 
-    def _run(self, exe: str, bodies_dir: str) -> None:
+    def _run(self, exe: str, bodies_dir: str, total: int) -> None:
+        """Bake `total` bodies as a sequence of batches, one process each.
+
+        WHY NOT ONE PROCESS, which is what this was until it was measured. A
+        single Blender accumulates orphaned MPFB datablocks across sequential
+        `.mhm` loads and slows as it goes. Measured on the 685-body
+        dashboard-4 export: 2.21 s a body over bodies 1 to 20, 3.50 s over 61
+        to 80, and 4.60 s over 336 to 356. That is a rise of roughly 0.007 s
+        per body which had not levelled off by a third of the way in, and
+        integrated over 685 bodies it is about 53 minutes against about 25 at
+        the fresh rate.
+
+        THE SECOND REASON IS THE ONE THAT LOSES DATA, and it is not about
+        speed at all. `_record_statures` and the bake report are written ONCE,
+        after the last body of a process. A single run therefore carries every
+        villager's `body_stature_m` in memory for the whole bake and commits
+        it at the end, so a crash at body 600 leaves `bodies.json` with none
+        of them. Worse, the obvious recovery does not recover: `--start 600`
+        stamps only the bodies that run baked, because `_record_statures`
+        deliberately leaves entries it did not measure alone, so 0 to 599 stay
+        unstamped for good short of baking them again. Unity then falls back
+        to measuring the combined mesh, which includes hair, and every
+        villager loses height in proportion to their hairstyle while nothing
+        on screen looks wrong. Batching commits both files every `batch`
+        bodies, so a crash costs one batch.
+        """
         repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         script = os.path.join(repo, "mpfb", "bake_bodies.py")
-        cmd = [exe, "-b", "-P", script, "--", "--bodies", bodies_dir]
+        tail: List[str] = []
+
+        for start in range(0, total, self._batch):
+            if self._cancelled.is_set():
+                return
+            limit = min(self._batch, total - start)
+            cmd = [exe, "-b", "-P", script, "--", "--bodies", bodies_dir,
+                   "--start", str(start), "--limit", str(limit)]
+            code, tail = self._run_batch(cmd, start, total)
+            # Checked again after the batch: `cancel()` terminates the child,
+            # which surfaces here as a non-zero exit, and reporting that as a
+            # Blender failure would bury the real reason under a stack of
+            # Blender's shutdown chatter.
+            if self._cancelled.is_set():
+                return
+            if code != 0:
+                self._set(phase="failed", finished=time.time(),
+                          error=f"Blender exited {code} while baking bodies "
+                                f"{start + 1} to {start + limit} of {total}",
+                          message="\n".join(tail[-12:]))
+                return
+
+        st = self.status()
+        self._set(phase="done", finished=time.time(),
+                  message=f"baked {st.done} bodies")
+
+    def _run_batch(self, cmd: List[str], offset: int, total: int):
+        """One Blender process. Returns its exit code and the tail of its log.
+
+        The progress line a batch prints counts within the BATCH, so it is
+        offset here. Reporting the batch's own number would send the bar back
+        to zero every `batch` bodies. The single-process version warned
+        against trusting the caller's expectation for the denominator and it
+        was right to: `total` comes from `bodies.json` via
+        `_total_from_manifest`, which is the same list the bake indexes.
+        """
+        tail: List[str] = []
         try:
             # Line-buffered text, and stderr folded in: Blender writes its
             # own startup chatter to both and the progress lines are the only
@@ -208,9 +317,8 @@ class BakeJob:
         except Exception as exc:                          # noqa: BLE001
             self._set(phase="failed", error=str(exc),
                       message="could not start Blender", finished=time.time())
-            return
+            return 1, [str(exc)]
 
-        tail: List[str] = []
         assert self._proc.stdout is not None
         for line in self._proc.stdout:
             line = line.rstrip()
@@ -220,22 +328,10 @@ class BakeJob:
             del tail[:-40]
             m = self._BAKE_LINE.match(line)
             if m:
-                # The bake's OWN count, not the one the caller expected. They
-                # differ if `--limit` is in play or the manifest moved under
-                # us, and trusting the caller's number would show a progress
-                # bar that stops at 80% on a complete run.
-                self._set(done=int(m.group(1)), total=int(m.group(2)),
-                          message=line)
+                self._set(done=min(total, offset + int(m.group(1))),
+                          total=total, message=line)
 
-        code = self._proc.wait()
-        if code == 0:
-            st = self.status()
-            self._set(phase="done", finished=time.time(),
-                      message=f"baked {st.done} bodies")
-        else:
-            self._set(phase="failed", finished=time.time(),
-                      error=f"Blender exited {code}",
-                      message="\n".join(tail[-12:]))
+        return self._proc.wait(), tail
 
 
 JOB = BakeJob()
@@ -299,6 +395,26 @@ def export_now(world, out_dir: str, staged: bool = True) -> ExportResult:
         seconds=time.perf_counter() - t0,
         never_rendered=list(manifest.get("never_rendered", [])),
     )
+
+
+def _total_from_manifest(bodies_dir: str, expected: int) -> int:
+    """How many bodies there are, asked of the manifest rather than assumed.
+
+    The batch loop needs a real total, because it slices `--start` and
+    `--limit` out of it: a number that is too small silently leaves the tail
+    of the village unbaked and then reports success, which is the worst shape
+    a bug can take here. `bodies.json` is the file `bake_bodies.py` itself
+    indexes, so reading it means both sides are counting the same list.
+
+    `expected` survives only as the fallback for a manifest that cannot be
+    read, where baking what the caller asked for beats refusing to start.
+    """
+    try:
+        path = os.path.join(bodies_dir, "bodies.json")
+        with open(path, encoding="utf-8") as fh:
+            return len(json.load(fh)["bodies"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return int(expected)
 
 
 def _find_blender():

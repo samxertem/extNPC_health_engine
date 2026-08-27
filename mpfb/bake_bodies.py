@@ -304,6 +304,60 @@ def bake_one(mhm_path: str, fbx_path: str, settings: dict,
     }
 
 
+def _merge_report(path: str, fresh: dict, manifest: dict) -> dict:
+    """Fold this invocation's results into whatever report is already there.
+
+    WHY THIS IS NOT A PLAIN OVERWRITE, which is what it used to be. A large
+    bake runs in BATCHES, each one its own Blender process, because a single
+    process accumulates orphaned MPFB datablocks and slows down: measured on
+    the 685-body dashboard-4 export, 2.21 s a body over the first twenty and
+    4.60 s a body by the three-hundred-and-fiftieth. Overwriting would then
+    leave `bake_report.json` describing only the LAST batch, and this file is
+    the provenance record. The per-body seconds and megabytes quoted in the
+    report and the paper are read out of it, so a run that measured 685
+    bodies would document twenty and every derived figure would be a
+    statement about the tail of the run rather than about the run.
+
+    STALE ROWS ARE DROPPED RATHER THAN KEPT. The merged list is filtered to
+    the stems the CURRENT `bodies.json` names, so re-exporting a different
+    world into a directory that still holds an older report cannot leave a
+    body in the provenance that is not in the bundle. This is the same rule
+    `_record_statures` follows for the manifest, for the same reason.
+
+    `seconds_total` becomes the SUM of the batches' bake time and therefore
+    EXCLUDES Blender startup, which is per batch and real. It is named
+    `seconds_total` rather than `wall_seconds` for exactly that reason, and
+    `batches` is written beside it so the difference can be reconstructed.
+    """
+    try:
+        with open(path, encoding="utf-8") as fh:
+            prior = json.load(fh)
+    except (OSError, ValueError):
+        # No prior report, or one an interrupted run left half written. Either
+        # way this invocation's own results are the whole truth available, and
+        # a missing provenance file is not a reason to fail a good bake.
+        prior = {}
+
+    known = [e["stem"] for e in manifest["bodies"]]
+    rows = {}
+    for row in prior.get("bodies", []):
+        stem = row.get("stem")
+        if stem is not None:
+            rows[stem] = row
+    for row in fresh["bodies"]:
+        rows[row["stem"]] = row
+
+    merged = dict(fresh)
+    # Manifest order, not batch order: the file should read the same whether
+    # it was produced by one process or by thirty-five.
+    merged["bodies"] = [rows[stem] for stem in known if stem in rows]
+    merged["seconds_total"] = round(
+        float(prior.get("seconds_total") or 0.0) + float(fresh["seconds_total"]), 1)
+    merged["batches"] = int(prior.get("batches") or 0) + 1
+    merged["complete"] = len(merged["bodies"]) == len(known)
+    return merged
+
+
 def _record_statures(bodies_dir: str, manifest: dict, results: list) -> None:
     """Write each baked body's own height back into `bodies.json`.
 
@@ -426,14 +480,14 @@ def main() -> int:
               f"{measured['verts']:6d} verts  {measured['seconds']:5.1f}s")
 
     elapsed = time.perf_counter() - t0
-    report = {
+    report_path = os.path.join(out_dir, "bake_report.json")
+    report = _merge_report(report_path, {
         "blender": bpy.app.version_string,
         "mpfb": str(version),
         "subdiv_levels": settings["subdiv_levels"],
         "seconds_total": round(elapsed, 1),
         "bodies": results,
-    }
-    report_path = os.path.join(out_dir, "bake_report.json")
+    }, manifest)
     with open(report_path, "w", encoding="utf-8", newline="\n") as fh:
         json.dump(report, fh, indent=2)
         fh.write("\n")
