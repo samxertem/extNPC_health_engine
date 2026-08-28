@@ -409,6 +409,28 @@ PERIPHERAL_LOCUS_COUNT: Dict[str, int] = {
     # behaviour: essentially omnigenic -- nearly every locus, all tiny
     "openness": 400, "conscientiousness": 400, "extraversion": 400,
     "agreeableness": 400, "neuroticism": 400,
+
+    # --- APPENDED AFTER THE CATALOGUE WAS FROZEN ---------------------------
+    # Must stay last, and must stay in the same order as the matching block at
+    # the foot of `traits.TRAIT_TABLE`. This dict is walked in insertion order
+    # with ONE generator, so a trait inserted above re-rolls which peripheral
+    # loci every trait below it draws, and the symptom is every committed
+    # figure changing for no reason anybody can name.
+    #
+    # 200, the same order as height_cm's 300 and bmi's 250: SHR is polygenic
+    # and stature-like, but Chan 2015's point is that it is a NARROWER axis
+    # than height, with a smaller share of the genome behind it.
+    "sitting_height_ratio": 200,
+    # 180, just under adiposity's 200. Body composition is polygenic in the
+    # same way adiposity is, and deliberately not given MORE loci than the
+    # trait it is splitting apart: `lean_mass_fraction` is a refinement of
+    # what `bmi` and `adiposity` already describe, not a broader signal.
+    "lean_mass_fraction": 180,
+    # 220. Developmental stability is thought to be broadly polygenic rather
+    # than to sit on a few named genes, which is consistent with how badly it
+    # maps: no locus is a candidate here, so every contributing locus is a
+    # peripheral one and there is no core gene to anchor it.
+    "developmental_instability": 220,
 }
 
 

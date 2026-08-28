@@ -107,6 +107,7 @@ CAVEATS
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Tuple
@@ -117,6 +118,7 @@ from scipy.stats import norm
 if TYPE_CHECKING:                      # avoids an import cycle at runtime
     from .imprint import ImprintState
 
+from .asymmetry import FEATURES as _ASYM_FEATURES
 from .loci import ALT_FREQ, DOMINANCE_RATIO, LOCI, N_LOCI
 
 # Seed for the epistatic-pair draw. Part of the fixed reference "species",
@@ -163,6 +165,22 @@ class TraitSpec:
     clip: Optional[Tuple[float, float]] = None
     target_pgs_r2: Optional[float] = None   # literature value, documentation only
     note: str = ""
+    # Declared AFTER the environmental-deviate stream was frozen.
+    #
+    # WHAT THIS FLAG BUYS, measured rather than argued: appending
+    # `sitting_height_ratio` to the table and to `PERIPHERAL_LOCUS_COUNT` and
+    # changing nothing else moved 1420 of 1560 pre-existing phenotype values
+    # across 40 founders, every one of the 39 older traits affected. Not
+    # because the new trait interacts with them -- it does not -- but because
+    # `EnvironmentalDeviates.draw` draws every trait's residual and THEN every
+    # trait's GxE input from one stream, so one extra name in the first block
+    # shifts the whole second block by one draw.
+    #
+    # An appended trait therefore takes its two deviates from a generator
+    # derived with `inbreeding.derived_rng`, which costs the parent stream
+    # nothing. The flag is carried per trait rather than as a count of frozen
+    # traits so that it cannot be quietly desynchronised by an insertion.
+    appended: bool = False
 
     @property
     def v_add(self) -> float:
@@ -375,6 +393,93 @@ TRAIT_TABLE: Dict[str, TraitSpec] = {t.name: t for t in [
     TraitSpec("chronic_illness_predisposition", K, h2=0.40, v_gxe=0.10,
               labels=("high_risk", "low_risk"), prevalences=(0.20, 0.80),
               note="POPULATION-LEVEL RISK, NOT A DIAGNOSIS."),
+
+    # --- APPENDED AFTER THE CALIBRATION WAS FROZEN ---------------------------
+    #
+    # EVERYTHING BELOW THIS LINE MUST STAY BELOW IT, and the reason is
+    # mechanical rather than stylistic. `_build_map` threads ONE generator
+    # through `TRAIT_TABLE` in insertion order and `loci._build_catalogue`
+    # threads one through `PERIPHERAL_LOCUS_COUNT` the same way, so a trait
+    # inserted in the middle re-rolls the architecture of every trait after
+    # it. Appended, it costs the traits above exactly nothing, which
+    # `tests/test_appended_traits.py` asserts founder by founder rather than
+    # in a comment. `EnvironmentalDeviates.draw` needs its own arrangement for
+    # the same reason and makes it there.
+
+    TraitSpec("sitting_height_ratio", C, h2=0.80, mean=0.520, sd=0.021,
+              unit="sitting height / stature",
+              note="Item E5. Sitting height ratio: the scale-free split of "
+                   "stature into trunk and leg. SCALE-FREE IS THE WHOLE "
+                   "POINT -- a leg LENGTH would be most of height_cm over "
+                   "again, and driving a body-shape macro from it would apply "
+                   "stature twice. h2=0.80 is the usual family/twin figure for "
+                   "segmental anthropometry and is of the same order as "
+                   "height_cm's 0.80, which is expected: SHR is a ratio of two "
+                   "highly heritable lengths. STATUS OF THE DISTRIBUTION: "
+                   "mean 0.520 and sd 0.021 are representative adult values, "
+                   "NOT a fit to a named dataset, and V1 (ANSUR II, 6068 "
+                   "subjects, 93 measurements, public) is where they should be "
+                   "replaced by measured ones. Chan et al. 2015 AJHG 96:695 is "
+                   "the reference for SHR being a partly distinct genetic axis "
+                   "from stature rather than a by-product of it; VERIFY THAT "
+                   "CITATION AGAINST THE SOURCE before it goes in the paper.",
+              appended=True),
+
+    TraitSpec("lean_mass_fraction", C, h2=0.60, mean=0.750, sd=0.060,
+              clip=(0.50, 0.95), unit="fat-free mass / body mass",
+              note="Item E4. The half of body composition `bmi` cannot see: "
+                   "two villagers at BMI 24.5 can be a lean one and a fat "
+                   "one, and until now the engine could not tell them apart, "
+                   "so `adiposity` was carrying both meanings. "
+                   "WHY A FRACTION AND NOT A FAT-FREE MASS INDEX, which is "
+                   "the more standard quantity (VanItallie et al. 1990, "
+                   "FFMI + FMI = BMI exactly). Modelled as an INDEX it would "
+                   "be a second mass trait uncorrelated with `bmi`, and "
+                   "FMI = BMI - FFMI then goes NEGATIVE for 5.9% of "
+                   "villagers under this engine's own distributions -- "
+                   "computed, not feared. As a fraction of body mass both "
+                   "components are non-negative by construction and the "
+                   "identity is recovered exactly in `body_composition`. "
+                   "h2=0.60 is the usual twin-study order for percentage body "
+                   "fat and is deliberately LOWER than bmi's 0.75: "
+                   "composition responds to activity and diet more than mass "
+                   "does. STATUS OF THE DISTRIBUTION: mean 0.750 and sd 0.060 "
+                   "are representative mixed-sex adult values, NOT a fit to a "
+                   "named dataset. NO SEX DIMORPHISM, which is a real "
+                   "limitation and is deliberate rather than overlooked: "
+                   "fat-free fraction differs between the sexes by far more "
+                   "than the sd above, but this engine has no stature "
+                   "dimorphism either (item E1, measured at z=-0.93 over 1000 "
+                   "founders), and adding it to one trait and not the other "
+                   "would make the pair inconsistent in a way a reader could "
+                   "not audit. Both want doing together.",
+              appended=True),
+
+    TraitSpec("developmental_instability", C, h2=0.10, v_dom=0.02, v_epi=0.01,
+              v_gxe=0.08, mean=0.0, sd=1.0, unit="z (higher = less buffered)",
+              note="Item E6, and the trait that is NOT the phenotype it is "
+                   "about. Fluctuating asymmetry is developmental NOISE and "
+                   "cannot be inherited; what can is the capacity to buffer "
+                   "it, which is what this trait is. `asymmetry.py` draws the "
+                   "asymmetry fresh per individual and scales it by this. "
+                   "h2=0.10 is deliberately low and the literature is "
+                   "genuinely contested: Moller & Thornhill 1997 meta-analyse "
+                   "developmental stability at about 0.19, and Whitlock & "
+                   "Fowler 1997 and Leamy & Klingenberg 2005 dispute the "
+                   "estimate and the method, with most direct estimates near "
+                   "zero. 0.10 sits at the low end on purpose. THE REALISED "
+                   "HERITABILITY OF ASYMMETRY ITSELF WILL COME OUT FAR BELOW "
+                   "THIS, because any one measurement is mostly the fresh "
+                   "draw, and that is a prediction the engine reproduces "
+                   "rather than a number it declares: see "
+                   "`test_asymmetry.py`. HIGH v_gxe (0.08) because "
+                   "developmental stability is by definition the trait most "
+                   "exposed to environment; the stress coupling itself runs "
+                   "through `canalize.canalization_factor`, which is exactly "
+                   "1.0 in a neutral environment so this layer is inert by "
+                   "default. VERIFY THE CITATIONS AGAINST THE SOURCES before "
+                   "the paper.",
+              appended=True),
 ]}
 
 for _t in TRAIT_TABLE.values():
@@ -383,6 +488,15 @@ for _t in TRAIT_TABLE.values():
 TRAIT_NAMES: List[str] = list(TRAIT_TABLE)
 CONTINUOUS_TRAITS: List[str] = [n for n, t in TRAIT_TABLE.items() if t.kind is C]
 CATEGORICAL_TRAITS: List[str] = [n for n, t in TRAIT_TABLE.items() if t.kind is K]
+
+# The two halves of TRAIT_NAMES that `EnvironmentalDeviates.draw` treats
+# differently. FROZEN keeps the exact draw order the engine has had since the
+# deviate stream was fixed; APPENDED is everything declared afterwards, which
+# must not be allowed to shift it. See `TraitSpec.appended`.
+FROZEN_TRAIT_NAMES: List[str] = [n for n, t in TRAIT_TABLE.items()
+                                 if not t.appended]
+APPENDED_TRAIT_NAMES: List[str] = [n for n, t in TRAIT_TABLE.items()
+                                   if t.appended]
 OCEAN_TRAITS: List[str] = ["openness", "conscientiousness", "extraversion",
                            "agreeableness", "neuroticism"]
 
@@ -746,6 +860,72 @@ class Environment:
 NEUTRAL_ENVIRONMENT = Environment("neutral")
 
 
+def _derived_stream(rng: np.random.Generator, key: bytes
+                    ) -> np.random.Generator:
+    """One generator keyed on `key` and on the parent's STATE, costing nothing.
+
+    The costing-nothing claim is the whole point and it has two halves, both
+    argued at `_appended_streams`: no draws are taken, and no spawn counter is
+    advanced. Keying on a label rather than an index is what lets a
+    non-trait consumer -- the asymmetry vector -- take a stream that can never
+    collide with a trait's, and that cannot move when a trait is appended.
+    """
+    fingerprint = repr(rng.bit_generator.state).encode("utf-8")
+    digest = hashlib.blake2b(fingerprint, digest_size=16,
+                             person=b"extnpc-ap").digest()
+    entropy = list(np.frombuffer(digest + hashlib.blake2b(
+        key, digest_size=8).digest(), dtype="<u4"))
+    return np.random.default_rng(np.random.SeedSequence(entropy))
+
+
+def _appended_streams(rng: np.random.Generator, n: int
+                      ) -> List[np.random.Generator]:
+    """`n` independent generators derived from `rng`, costing it NOTHING.
+
+    "Nothing" here has to mean more than it usually does, and getting that
+    wrong is what this docstring is mostly about.
+
+    WHY NOT `Generator.spawn`, which is the technique session 11 established
+    and `inbreeding.derived_rng` still uses. Spawning leaves the parent's
+    bit-generator state untouched, so every DRAW the caller makes afterwards is
+    byte-identical. That is genuinely free with respect to draws, and it is why
+    the frozen traits were safe. But a spawn advances a CHILD COUNTER on the
+    shared seed sequence, and that counter is a second resource with its own
+    consumers: `random_founder` also derives a generator for the deleterious
+    load. Spawning here therefore handed the load layer a different child, the
+    load changed viability, viability changed who died, and the exported world
+    changed.
+
+    That was not theory. Both halves of `test_export_golden.py` went red on
+    `people.csv` and `history.csv` while the frozen-phenotype fixture still
+    reported 0 of 1560 values moved, because a phenotype fixture cannot see a
+    mortality change. Two tripwires, and only the second one could catch it.
+
+    SO THE STREAM IS DERIVED FROM THE PARENT'S STATE INSTEAD. Reading
+    `bit_generator.state` consumes no draws and touches no counter, so this
+    function is invisible to the parent in both currencies. The state differs
+    for every individual -- the frozen draws above have already advanced it --
+    so each villager gets their own stream without anything being consumed to
+    say so.
+
+    BLAKE2B AND NOT `hash()`, and this is not a preference. Python's `hash()`
+    is salted per process for strings, so a state-derived seed built on it
+    would give a DIFFERENT villager on every interpreter restart, and the only
+    symptom would be a figure that cannot be regenerated to match the one in
+    the paper. `cosmetic.py` was written around exactly this trap and names it
+    at length. The old fallback below this line had that bug; it is gone.
+
+    POSITIONAL, so trait i is immune to any trait appended after it: child i is
+    keyed on (state, i) and on nothing else, which is what keeps
+    `sitting_height_ratio` from moving when `lean_mass_fraction` arrives.
+    """
+    # `repr` of the state dict is stable for a given bit generator and its
+    # values are plain ints, so this is a faithful fingerprint of where the
+    # parent stands without disturbing it.
+    return [_derived_stream(rng, b"trait:" + i.to_bytes(4, "little"))
+            for i in range(n)]
+
+
 @dataclass
 class EnvironmentalDeviates:
     """
@@ -759,14 +939,80 @@ class EnvironmentalDeviates:
     """
     residual: Dict[str, float]      # standard-normal residual per trait
     gxe_input: Dict[str, float]     # standard-normal GxE input per trait
+    # Item E6. One standard normal per bilateral feature, fixed for life.
+    #
+    # UNIT NORMALS, NOT FINISHED ASYMMETRIES, and the reason is a circularity
+    # rather than a preference. The asymmetry has to be fixed at birth or a
+    # villager's face changes between two reads of the same person, which is
+    # the v0.2 quirk this whole dataclass exists to kill. But its WIDTH
+    # depends on `developmental_instability`, a phenotype, which depends on
+    # the deviates being drawn right here. So birth fixes the shape and
+    # `asymmetry.scale_asymmetry` applies the width at read time, exactly as
+    # every residual above is a unit normal scaled by a calibrated variance
+    # later.
+    asymmetry: Dict[str, float] = field(default_factory=dict)
 
     @staticmethod
     def draw(rng: np.random.Generator, env: Environment = NEUTRAL_ENVIRONMENT
              ) -> "EnvironmentalDeviates":
-        return EnvironmentalDeviates(
-            residual={t: float(rng.normal(env.shift(t), 1.0)) for t in TRAIT_NAMES},
-            gxe_input={t: float(rng.normal(env.gxe_mean(t), 1.0)) for t in TRAIT_NAMES},
-        )
+        """Two standard-normal deviates per trait, drawn once at birth.
+
+        THE ORDER OF THESE DRAWS IS AN INTERFACE, not an implementation
+        detail, and that is why the loop is written in two halves.
+
+        Every residual is drawn first and every GxE input second, so ONE extra
+        name in the first block shifts the whole second block by one draw and
+        changes every trait's GxE input for every individual ever generated.
+        Measured, not feared: appending `sitting_height_ratio` and changing
+        nothing else moved 1420 of 1560 phenotype values across 40 founders,
+        with all 39 pre-existing traits affected.
+
+        So a trait declared after the stream was frozen takes its pair from a
+        DERIVED generator, built by `_appended_streams` from the parent's
+        bit-generator STATE. Reading that state takes no draws, so the frozen
+        half above is byte-identical to what it would have been if the new
+        traits did not exist, and no figure churns.
+
+        NOT `Generator.spawn`, which was the obvious choice and was tried
+        first. Spawning is free with respect to draws but advances a child
+        counter that `random_founder` is also a consumer of, which handed the
+        deleterious-load layer a different child and changed who died.
+        `_appended_streams` carries that measurement in full; the summary
+        here is that the two currencies are draws and child counters, and only
+        state-derivation is free in both.
+
+        ONE DERIVED STREAM PER APPENDED TRAIT, not one for all of them, and
+        this cost a second measurement to get right. Sharing a single stream
+        reproduces the original bug one level down: that stream would draw
+        every appended residual and then every appended GxE input, so adding
+        `lean_mass_fraction` moved all 40 of `sitting_height_ratio`'s values.
+        The frozen block was safe and the new block was not.
+
+        The streams are keyed POSITIONALLY, on (parent state, i) and on
+        nothing that comes after i, so giving trait i stream i makes every
+        appended trait stable against every trait appended later, for ever.
+        """
+        residual = {t: float(rng.normal(env.shift(t), 1.0))
+                    for t in FROZEN_TRAIT_NAMES}
+        gxe_input = {t: float(rng.normal(env.gxe_mean(t), 1.0))
+                     for t in FROZEN_TRAIT_NAMES}
+
+        if APPENDED_TRAIT_NAMES:
+            children = _appended_streams(rng, len(APPENDED_TRAIT_NAMES))
+            for trait, child in zip(APPENDED_TRAIT_NAMES, children):
+                residual[trait] = float(child.normal(env.shift(trait), 1.0))
+                gxe_input[trait] = float(child.normal(env.gxe_mean(trait), 1.0))
+
+        # A LABELLED stream, not the next positional one. Keyed on b"asym" it
+        # can never collide with a trait's stream and cannot move when a trait
+        # is appended, so E6 and the appended traits are independent of each
+        # other's existence.
+        asym_stream = _derived_stream(rng, b"asym")
+        asymmetry = {feature: float(asym_stream.normal())
+                     for feature in _ASYM_FEATURES}
+
+        return EnvironmentalDeviates(residual=residual, gxe_input=gxe_input,
+                                     asymmetry=asymmetry)
 
 
 # ======================================================================
