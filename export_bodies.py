@@ -47,6 +47,7 @@ from typing import Dict, List, NamedTuple, Optional, Set, Tuple
 
 from health_engine.phenotype_to_mhm import (
     CITED_BODYPARTS,
+    CONVENTION_BODYPARTS,
     COSMETIC_BODYPARTS,
     EYE_MESH_QUALITY,
     DEFAULT_ETHNICITY,
@@ -375,13 +376,24 @@ def _channel_provenance(catalogue) -> dict:
         "cosmetic": {channel: "blake2b of the villager's name, salted per "
                               "channel; carries no biology"
                      for channel in COSMETIC_BODYPARTS},
+        "conditioned": {
+            channel: (f"drawn from a distribution conditioned on {variable}, "
+                      f"which IS modelled; the weights are a declared "
+                      f"convention and are not. See "
+                      f"health_engine/hair_convention.py.")
+            for channel, variable in CONVENTION_BODYPARTS.items()},
         "constant": {
             "eyes": f"{EYE_MESH_QUALITY}; a mesh resolution, not eye colour. "
                     f"Eye colour is a material and travels in `pigmentation`.",
         },
         "note": ("`cited` channels are driven by a modelled trait and may be "
                  "read as phenotype. `cosmetic` channels are invented, "
-                 "reproducibly, from the name alone and must not be."),
+                 "reproducibly, from the name alone and must not be. "
+                 "`conditioned` channels are the third case and the one most "
+                 "easily misread: the variable they depend on is modelled, so "
+                 "the dependence in the picture is real, while the SHAPE of "
+                 "that dependence was chosen by the author and supports no "
+                 "claim about human beings."),
     }
 
 
@@ -431,9 +443,15 @@ def write_bodies(world, targets: List[BodyTarget], out_dir: str,
         dressed = dict(pheno)
         dressed.update(npc.x_linked_phenotype())
 
+        # Item E6. The asymmetry vector lives on the NPC's birth deviates
+        # rather than in the phenotype dict, because it is 31 numbers and the
+        # phenotype is a flat table that goes to CSV. It is scaled by the
+        # villager's own `developmental_instability` inside
+        # `phenotype_to_mhm`, which is why only the raw unit normals travel.
         text = phenotype_to_mhm(dressed, npc.sex, target.age,
                                 name=stem, ethnicity=ethnicity,
-                                catalogue=catalogue, villager_name=name)
+                                catalogue=catalogue, villager_name=name,
+                                asymmetry=npc.deviates.asymmetry)
         path = os.path.join(out_dir, f"{stem}.mhm")
         with open(path, "w", encoding="utf-8", newline="\n") as fh:
             fh.write(text)

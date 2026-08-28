@@ -221,11 +221,14 @@ def test_eyebrows_survive_baldness():
 
 
 def test_hair_style_is_not_a_function_of_any_trait():
-    """Style is cosmetic, and this is the assertion that keeps it that way.
+    """Style is conditioned on SEX and on nothing else in the phenotype.
 
-    Two villagers with the same NAME and wildly different phenotypes must get
-    the same hairstyle. If a trait ever leaks into the style choice this fails,
-    and the caption saying "style is cosmetic" stops being true.
+    This used to read "style is cosmetic" and it no longer is: the pool a
+    villager draws from now depends on sex. What must stay true is the rest of
+    it. Two villagers with the same name and the same sex, holding wildly
+    different phenotypes, get the same hairstyle, so no TRAIT has leaked into
+    the choice. Sex is passed separately and is deliberately held equal here;
+    `test_hair_convention.py` is where the sex dependence is asserted.
     """
     a = lines_for(name="Same-Name",
                   pheno={"bmi": 17.0, "pattern_baldness": False})
@@ -238,7 +241,22 @@ def test_hair_style_is_not_a_function_of_any_trait():
 
 def test_the_cited_channel_is_declared():
     assert CITED_BODYPARTS["hair_presence"] == "pattern_baldness"
-    assert "hair" in COSMETIC_BODYPARTS
+
+
+def test_hair_style_is_declared_as_conditioned_and_not_as_cosmetic():
+    """Hair moved category the day its style stopped being name-only.
+
+    It is now drawn from a sex-conditioned distribution, so calling it
+    cosmetic in a caption understates it: a cosmetic channel carries no
+    information and this one carries a genetically determined variable. Calling
+    it cited would overstate it in the other direction, because the weights are
+    invented. It has to be in the third list and in neither of the other two.
+    """
+    from health_engine.phenotype_to_mhm import CONVENTION_BODYPARTS
+
+    assert CONVENTION_BODYPARTS["hair"] == "sex"
+    assert "hair" not in COSMETIC_BODYPARTS
+    assert "hair" not in CITED_BODYPARTS
 
 
 def test_a_missing_baldness_key_means_not_bald():

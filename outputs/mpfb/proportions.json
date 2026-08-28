@@ -1,0 +1,128 @@
+{
+  "mpfb": "(2, 0, 17)",
+  "blender": "4.4.3",
+  "bases": {
+    "neutral": {
+      "stature_delta_mm": 7.794203091179952,
+      "trunk_fraction_delta": -0.021072198644089712,
+      "waist_depth_delta_mm": -0.41637569665908813,
+      "shoulder_span_delta_mm": 62.49362230300903,
+      "rows": [
+        {
+          "proportions": 0.0,
+          "stature_m": 1.6560979740461335,
+          "crotch_fraction": 0.43863808275125205,
+          "trunk_fraction": 0.561361917248748,
+          "span_x_at_waist_m": 0.9626143574714661,
+          "waist_depth_m": 0.3410435616970062,
+          "span_x_at_shoulder_m": 0.43945854902267456,
+          "verts": 13380
+        },
+        {
+          "proportions": 0.25,
+          "stature_m": 1.657764988951385,
+          "crotch_fraction": 0.4440678036411654,
+          "trunk_fraction": 0.5559321963588346,
+          "span_x_at_waist_m": 0.9771762490272522,
+          "waist_depth_m": 0.3397561013698578,
+          "span_x_at_shoulder_m": 0.45819520950317383,
+          "verts": 13380
+        },
+        {
+          "proportions": 0.5,
+          "stature_m": 1.6594313269888517,
+          "crotch_fraction": 0.44948445130583226,
+          "trunk_fraction": 0.5505155486941677,
+          "span_x_at_waist_m": 0.9917322397232056,
+          "waist_depth_m": 0.338638037443161,
+          "span_x_at_shoulder_m": 0.47730910778045654,
+          "verts": 13380
+        },
+        {
+          "proportions": 0.75,
+          "stature_m": 1.6616617520630825,
+          "crotch_fraction": 0.45460422934415595,
+          "trunk_fraction": 0.5453957706558441,
+          "span_x_at_waist_m": 1.0072225332260132,
+          "waist_depth_m": 0.3416476212441921,
+          "span_x_at_shoulder_m": 0.4966230094432831,
+          "verts": 13380
+        },
+        {
+          "proportions": 1.0,
+          "stature_m": 1.6638921771373134,
+          "crotch_fraction": 0.45971028139534176,
+          "trunk_fraction": 0.5402897186046582,
+          "span_x_at_waist_m": 1.0170999765396118,
+          "waist_depth_m": 0.34062718600034714,
+          "span_x_at_shoulder_m": 0.5019521713256836,
+          "verts": 13380
+        }
+      ]
+    },
+    "male_caucasian": {
+      "stature_delta_mm": 0.0,
+      "trunk_fraction_delta": -0.018334743903129613,
+      "waist_depth_delta_mm": 12.949008494615555,
+      "shoulder_span_delta_mm": 122.9022741317749,
+      "rows": [
+        {
+          "proportions": 0.0,
+          "stature_m": 1.7472905991598964,
+          "crotch_fraction": 0.4538778018416487,
+          "trunk_fraction": 0.5461221981583513,
+          "span_x_at_waist_m": 1.0389900207519531,
+          "waist_depth_m": 0.39293262735009193,
+          "span_x_at_shoulder_m": 0.46987706422805786,
+          "verts": 13380
+        },
+        {
+          "proportions": 0.25,
+          "stature_m": 1.7472905991598964,
+          "crotch_fraction": 0.4593515455394071,
+          "trunk_fraction": 0.540648454460593,
+          "span_x_at_waist_m": 1.0608372688293457,
+          "waist_depth_m": 0.39409783855080605,
+          "span_x_at_shoulder_m": 0.49890968203544617,
+          "verts": 13380
+        },
+        {
+          "proportions": 0.5,
+          "stature_m": 1.7472905991598964,
+          "crotch_fraction": 0.46482307191744077,
+          "trunk_fraction": 0.5351769280825592,
+          "span_x_at_waist_m": 1.0826756954193115,
+          "waist_depth_m": 0.39526254311203957,
+          "span_x_at_shoulder_m": 0.5279304385185242,
+          "verts": 13380
+        },
+        {
+          "proportions": 0.75,
+          "stature_m": 1.7472905991598964,
+          "crotch_fraction": 0.46851780883110955,
+          "trunk_fraction": 0.5314821911688905,
+          "span_x_at_waist_m": 1.1116230487823486,
+          "waist_depth_m": 0.40534479171037674,
+          "span_x_at_shoulder_m": 0.5603548884391785,
+          "verts": 13380
+        },
+        {
+          "proportions": 1.0,
+          "stature_m": 1.7472905991598964,
+          "crotch_fraction": 0.47221254574477833,
+          "trunk_fraction": 0.5277874542552217,
+          "span_x_at_waist_m": 1.1378344297409058,
+          "waist_depth_m": 0.4058816358447075,
+          "span_x_at_shoulder_m": 0.5927793383598328,
+          "verts": 13380
+        }
+      ]
+    }
+  },
+  "stature_delta_mm": 7.794203091179952,
+  "trunk_fraction_delta": -0.021072198644089712,
+  "waist_delta_mm": -0.41637569665908813,
+  "shoulder_delta_mm": 62.49362230300903,
+  "expressible_sd": 1.0034380306709387,
+  "shoulder_coupling": 0.14220595421795873
+}

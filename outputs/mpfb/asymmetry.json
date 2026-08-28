@@ -1,0 +1,37 @@
+{
+  "mpfb": "(2, 0, 17)",
+  "blender": "4.4.3",
+  "feature": "asym-eye-1",
+  "rows": {
+    "symmetric": {
+      "verts": 13380,
+      "stature_m": 1.6594313161872378,
+      "head_centroid_x_m": -1.4084654089079622e-13,
+      "body_centroid_x_m": -1.2326864989640425e-11
+    },
+    "left_full": {
+      "verts": 13380,
+      "stature_m": 1.6594313161872378,
+      "head_centroid_x_m": 0.0008574433996169689,
+      "body_centroid_x_m": 0.00027421525729672935
+    },
+    "right_full": {
+      "verts": 13380,
+      "stature_m": 1.6594313161872378,
+      "head_centroid_x_m": -0.000857443399898662,
+      "body_centroid_x_m": -0.00027421528195045936
+    },
+    "left_half": {
+      "verts": 13380,
+      "stature_m": 1.6594313161872378,
+      "head_centroid_x_m": 0.0004287217051384915,
+      "body_centroid_x_m": 0.00013710762421202048
+    }
+  },
+  "left_shift_m": 0.0008574433997578154,
+  "right_shift_m": -0.0008574433997578154,
+  "half_shift_m": 0.00042872170527933804,
+  "resolves_through_mhm": true,
+  "left_and_right_are_mirrored": true,
+  "scales_with_weight": true
+}

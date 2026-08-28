@@ -35,10 +35,29 @@ place nobody would think to look for it.
     at all (`mpfb/blender_probe.py:probe_dead_band`), so it is the only value
     that adds no shape opinion whatsoever.
 
-  * `BodyProportions`. Pinned at 0.5 because the engine has no body-proportion
-    trait. Sitting height and leg-to-torso ratio are item E5 on the
-    implementation line, h2 about 0.8, and MPFB has the macro waiting. Until
-    that trait exists, any value here is invented at render time.
+  * `BodyProportions`. Still pinned at 0.5, and the reason CHANGED once it was
+    measured. It used to be pinned because the engine had no body-proportion
+    trait. It now has one -- `sitting_height_ratio`, item E5, h2=0.80 -- and
+    the macro stays pinned anyway, because `mpfb/probe_proportions.py` swept
+    it 0 to 1 on fresh humans and found it is not that trait's axis:
+
+      - its ENTIRE range moves the mesh's trunk fraction by 0.0211, which is
+        1.00 sd of sitting height ratio. A trait lives in its tails, and a
+        macro that cannot reach +/- 1 sd cannot carry one.
+      - over the same sweep it changes shoulder span by 14.2% at the neutral
+        base and 26% at a male caucasian one. That is a large visible reshape
+        that NO modelled trait authorises, and driving it from SHR would put
+        it on screen anyway.
+      - at the neutral base it also moves stature by 7.79 mm. Worth noting
+        against `blender_probe.probe_coupling`, which recorded proportions
+        moving stature by exactly 0.00 mm: that finding is CONFIRMED at the
+        male caucasian base it was measured at, and is base-dependent rather
+        than general.
+
+    So the refusal is now a measurement rather than an absence, which is the
+    stronger position. The trait is real and travels in the phenotype, the
+    inspector and the paper; what is missing is an MPFB axis honest enough to
+    render it, and MakeHuman's own leg-length targets are where to look next.
 
   * The three ethnicity macros. Pinned to a fixed preset for the reason set
     out at length in MPFB_UNITY_INVESTIGATION.md section 3.3: the engine
@@ -59,7 +78,7 @@ library's version into the hash.
 
 from __future__ import annotations
 
-from typing import Dict, Mapping, Sequence, Tuple
+from typing import Dict, Mapping, Optional, Sequence, Tuple
 
 __all__ = [
     "ETHNICITY_PRESETS",
@@ -72,6 +91,7 @@ __all__ = [
     "macros_to_mhm",
     "phenotype_to_mhm",
     "COSMETIC_BODYPARTS",
+    "CONVENTION_BODYPARTS",
     "CITED_BODYPARTS",
     "EYE_MESH_QUALITY",
     "bodypart_lines",
@@ -188,27 +208,56 @@ def bmi_to_weight_macro(bmi: float, mean: float = 24.5, sd: float = 4.0) -> floa
     return _clamp01(0.5 + 0.5 * z / _MACRO_SPREAD_SD)
 
 
-def muscle_macro(phenotype: Mapping[str, object]) -> float:
-    """The muscle macro. Currently pinned neutral, and that is a decision.
+def muscle_macro(phenotype: Mapping[str, object],
+                 mean: float = 0.750, sd: float = 0.060) -> float:
+    """MakeHuman's muscle macro, driven by `lean_mass_fraction` (item E4).
 
-    THE PROBLEM. MPFB separates weight from muscle, and the engine does not:
-    `bmi` and `adiposity` stand in for both fat and mass, which is item E4 on
-    the implementation line. There is no `lean_mass` trait to drive this with,
-    so under invariant 5 the correct value is the neutral one, and every baked
-    villager therefore has identical musculature.
+    THIS WAS PINNED NEUTRAL UNTIL THE TRAIT EXISTED, and the old reasoning is
+    worth keeping because it is what kept a wrong body off the screen for
+    three sessions: `bmi` and `adiposity` stood in for both fat and lean mass,
+    there was no trait that meant musculature, and driving the macro from
+    `aerobic_capacity` instead would have been a trait standing in for a trait
+    it is not -- invisible in a screenshot and indefensible in a viva.
 
-    THE ALTERNATIVE, and why it is not taken here. `aerobic_capacity` exists,
-    h2=0.50, mean 42 sd 8 in VO2max units, and is correlated with lean mass in
-    real people. Driving the macro from it would give visible physique
-    variation today. It would also be a trait standing in for a trait it is
-    not, which is precisely the kind of substitution that is invisible in a
-    screenshot and indefensible in a viva. If it is done, it must be cited in
-    the caption wherever a body appears.
+    `lean_mass_fraction` is now that trait, h2=0.60, and the mapping is the
+    z-score route `bmi_to_weight_macro` uses, for the same reason: a villager
+    one sd above the population mean lands the same distance up the slider
+    whatever the catalogue does to the absolute numbers. Defaults are the
+    trait's calibrated mean and sd, passed in rather than imported so this
+    module stays pure arithmetic with no engine import.
 
-    See the module docstring for the same argument about Height and
-    BodyProportions.
+    THE DIRECTION IS MEASURED, NOT ASSUMED, and it is the reason this docstring
+    is long. `mpfb/probe_muscle.py` swept the macro 0 to 1 on fresh humans and
+    found the enclosed mesh volume FALLS monotonically, by 13.4% at the neutral
+    base and 15.1% at a male caucasian one, with stature unmoved at 0.000 mm at
+    both. So a higher macro does not mean a bigger body; it means a leaner,
+    more compact one at the same weight macro.
+
+    That is the right direction for this trait rather than a problem with it,
+    and the physics says why: lean tissue is denser than fat, roughly 1.06
+    against 0.9 g/cm3, so replacing fat with muscle at constant MASS reduces
+    VOLUME. A villager with a high fat-free fraction should be exactly that --
+    tighter, not larger. Had the macro been wired from the naive reading that
+    "more muscle means more body", every villager would have been rendered as
+    the inverse of their own genome, and nothing on screen would have looked
+    wrong.
+
+    NOT BEING DRIVEN, and deliberately: `physiology.py` and `aerobic_capacity`
+    do not consume this trait. They should -- lean mass is the tissue that
+    consumes oxygen, and the final line says so -- but `aerobic_capacity` is a
+    CALIBRATED trait, and feeding a new input into it changes its realised
+    values, which churns every figure containing it and invalidates the frozen
+    fixture. That is a recalibration with a decision attached, not a wiring
+    job, and it is left for whoever accepts the churn.
     """
-    return NEUTRAL_MACROS["Muscle"]
+    lean = phenotype.get("lean_mass_fraction")
+    if lean is None:
+        # A phenotype with no E4 layer must still bake. Neutral is the honest
+        # answer for an absent trait, and it is what every body baked before
+        # this function had a trait to read.
+        return NEUTRAL_MACROS["Muscle"]
+    z = (float(lean) - mean) / sd
+    return _clamp01(0.5 + 0.5 * z / _MACRO_SPREAD_SD)
 
 
 def phenotype_to_macros(phenotype: Mapping[str, object],
@@ -269,8 +318,22 @@ def pigmentation(phenotype: Mapping[str, object]) -> Dict[str, object]:
 # a real visual difference between two people that the engine does not model,
 # so it is invented on purpose, reproducibly, and labelled wherever it shows.
 # `cosmetic.cosmetic_choice` is the only route to them.
-COSMETIC_BODYPARTS: Tuple[str, ...] = ("hair", "eyebrows", "eyelashes",
+COSMETIC_BODYPARTS: Tuple[str, ...] = ("eyebrows", "eyelashes",
                                        "teeth", "clothes")
+
+# Channels conditioned on a MODELLED variable by a convention that is not
+# modelled, mapped to the variable. The third category, and `hair` left
+# COSMETIC_BODYPARTS above to arrive here the day hairstyle stopped being a
+# function of the name alone.
+#
+# The distinction is not pedantry. A cosmetic channel carries no information
+# and a reader can be told to ignore it. A conditioned channel carries REAL
+# information -- these villagers are drawn from different distributions
+# because of a genetically determined variable -- while the shape of that
+# dependence is invented. A caption that files it under either of the other
+# two headings is wrong in a different direction each time, so it gets its
+# own heading. `hair_convention.py` holds the table itself.
+CONVENTION_BODYPARTS: Dict[str, str] = {"hair": "sex"}
 
 # Families driven by a modelled trait, mapped to the trait that drives them.
 # Currently one entry, and it is a presence rather than a choice: whether a
@@ -334,16 +397,23 @@ def bodypart_choices(villager_name: str,
     on `afro` or `Shoes` would hold a second, silent copy of a rule that
     lives here.
     """
-    from .cosmetic import cosmetic_choice
+    from .cosmetic import conventional_choice, cosmetic_choice
+    from .hair_convention import hair_weights
 
     out = []
     out.append(("eyes", "eyes", eye_quality))
 
     bald = bool(phenotype.get("pattern_baldness", False))
     if not bald:
+        # Conditioned on sex, which IS modelled, by a table which is NOT. The
+        # weights live in `hair_convention.py` rather than here, both because
+        # this module may hold no asset literals and because the distinction
+        # deserves a file that argues for it. See `cosmetic.CONVENTION_CHANNELS`.
+        styles = catalogue.keys("hair")
         out.append(("hair", "hair",
-                    cosmetic_choice(villager_name, catalogue.keys("hair"),
-                                    channel="hair")))
+                    conventional_choice(villager_name, styles,
+                                        hair_weights(styles, sex),
+                                        channel="hair")))
 
     for family in ("eyebrows", "eyelashes", "teeth"):
         out.append((family, family,
@@ -433,7 +503,8 @@ def macros_to_mhm(macros: Mapping[str, float],
                   name: str = "extnpc",
                   skeleton: str = "game_engine.mhskel",
                   subdivide: bool = False,
-                  bodyparts: Sequence[str] = ()) -> str:
+                  bodyparts: Sequence[str] = (),
+                  asymmetry: Sequence[Tuple[str, float]] = ()) -> str:
     """A macro vector to `.mhm` text. Deterministic, LF line endings.
 
     The skeleton default is not arbitrary: `game_engine` is the rig the probe
@@ -458,6 +529,18 @@ def macros_to_mhm(macros: Mapping[str, float],
     # MakeHuman itself writes them. Emitted in the order given rather than
     # sorted here: `bodypart_lines` already fixes the order, and sorting a
     # second time would put the tie-break in two places.
+    # Item E6. Asymmetry targets are ordinary modifier lines in a group named
+    # after their directory, which is how MPFB's own loader resolves them:
+    # `translate_mhm_target_line_to_target_fragment` strips the prefix at the
+    # slash and `target_full_path` finds the file. Measured end to end by
+    # `mpfb/probe_asymmetry.py` rather than inferred from that reading.
+    #
+    # AFTER the macros, because they are corrections to the shape the macros
+    # produce, and in the order `asymmetry.target_weights` fixed, so the file
+    # stays byte-reproducible.
+    for target, weight in asymmetry:
+        lines.append(
+            f"modifier asym/{target} {_VALUE_FORMAT.format(float(weight))}")
     lines.extend(bodyparts)
     lines.append(f"skeleton {skeleton}")
     lines.append(f"subdivide {subdivide}")
@@ -471,7 +554,9 @@ def phenotype_to_mhm(phenotype: Mapping[str, object],
                      ethnicity: str = DEFAULT_ETHNICITY,
                      skeleton: str = "game_engine.mhskel",
                      catalogue=None,
-                     villager_name: str = "") -> str:
+                     villager_name: str = "",
+                     asymmetry: Optional[Mapping[str, float]] = None,
+                     stress_factor: float = 1.0) -> str:
     """One villager's phenotype to one `.mhm` file's text. The Stage 7 entry point.
 
     Pass `catalogue` (from `mhm_assets.load_catalogue()`) to dress the body in
@@ -490,4 +575,16 @@ def phenotype_to_mhm(phenotype: Mapping[str, object],
     parts: Tuple[str, ...] = ()
     if catalogue is not None:
         parts = bodypart_lines(villager_name or name, phenotype, sex, catalogue)
-    return macros_to_mhm(macros, name=name, skeleton=skeleton, bodyparts=parts)
+
+    asym_lines: Tuple[Tuple[str, float], ...] = ()
+    if asymmetry:
+        # Imported here rather than at module top so this module keeps its
+        # promise of being pure arithmetic with no engine import on the path
+        # the golden fixture walks.
+        from .asymmetry import scale_asymmetry, target_weights
+        instability = phenotype.get("developmental_instability", 0.0)
+        asym_lines = target_weights(
+            scale_asymmetry(asymmetry, float(instability), stress_factor))
+
+    return macros_to_mhm(macros, name=name, skeleton=skeleton, bodyparts=parts,
+                         asymmetry=asym_lines)

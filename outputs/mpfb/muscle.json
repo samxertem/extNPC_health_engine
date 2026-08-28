@@ -1,0 +1,96 @@
+{
+  "mpfb": "(2, 0, 17)",
+  "blender": "4.4.3",
+  "bases": {
+    "neutral": {
+      "stature_delta_mm": 0.0,
+      "volume_delta_pct": -13.367516219366626,
+      "volume_monotonic_rising": false,
+      "volume_monotonic_falling": true,
+      "chest_delta_mm": -14.855533838272095,
+      "thigh_delta_mm": -12.549817562103271,
+      "rows": [
+        {
+          "muscle": 0.0,
+          "stature_m": 1.6594313269888517,
+          "volume_m3": 0.06091297675360775,
+          "chest_depth_m": 0.24281826615333557,
+          "thigh_depth_m": 0.13649751618504524
+        },
+        {
+          "muscle": 0.25,
+          "stature_m": 1.6594313269888517,
+          "volume_m3": 0.05783137209494747,
+          "chest_depth_m": 0.23291435092687607,
+          "thigh_depth_m": 0.13649751618504524
+        },
+        {
+          "muscle": 0.5,
+          "stature_m": 1.6594313269888517,
+          "volume_m3": 0.054905066638735,
+          "chest_depth_m": 0.22700056433677673,
+          "thigh_depth_m": 0.13649751618504524
+        },
+        {
+          "muscle": 0.75,
+          "stature_m": 1.6594313269888517,
+          "volume_m3": 0.05380729847590679,
+          "chest_depth_m": 0.22648586332798004,
+          "thigh_depth_m": 0.13188963383436203
+        },
+        {
+          "muscle": 1.0,
+          "stature_m": 1.6594313269888517,
+          "volume_m3": 0.052770424706370216,
+          "chest_depth_m": 0.22796273231506348,
+          "thigh_depth_m": 0.12394769862294197
+        }
+      ]
+    },
+    "male_caucasian": {
+      "stature_delta_mm": 0.0,
+      "volume_delta_pct": -15.124814665461928,
+      "volume_monotonic_rising": false,
+      "volume_monotonic_falling": true,
+      "chest_delta_mm": -32.325759530067444,
+      "thigh_delta_mm": -11.187609285116196,
+      "rows": [
+        {
+          "muscle": 0.0,
+          "stature_m": 1.7472905991598964,
+          "volume_m3": 0.07280915935979818,
+          "chest_depth_m": 0.2685244381427765,
+          "thigh_depth_m": 0.14690342918038368
+        },
+        {
+          "muscle": 0.25,
+          "stature_m": 1.7472905991598964,
+          "volume_m3": 0.06885121850409928,
+          "chest_depth_m": 0.2477542906999588,
+          "thigh_depth_m": 0.14690342918038368
+        },
+        {
+          "muscle": 0.5,
+          "stature_m": 1.7472905991598964,
+          "volume_m3": 0.06516175326973203,
+          "chest_depth_m": 0.2370455116033554,
+          "thigh_depth_m": 0.14690342918038368
+        },
+        {
+          "muscle": 0.75,
+          "stature_m": 1.7472905991598964,
+          "volume_m3": 0.06338414516547364,
+          "chest_depth_m": 0.23180345445871353,
+          "thigh_depth_m": 0.1405932791531086
+        },
+        {
+          "muscle": 1.0,
+          "stature_m": 1.7472905991598964,
+          "volume_m3": 0.06179690894714787,
+          "chest_depth_m": 0.23619867861270905,
+          "thigh_depth_m": 0.1357158198952675
+        }
+      ]
+    }
+  }
+}
