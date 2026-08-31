@@ -2,188 +2,418 @@
 
 <p align="center">
   <em>A reproduction, inheritance and medical-issues engine for the</em>
-  <strong>extNPC</strong> <em>NPC framework (Uludagli et al.),<br>
-  rebuilt on real quantitative genetics.</em>
+  <strong>extNPC</strong> <em>NPC framework (Uludağlı &amp; Oğuz 2023),<br>
+  built on real quantitative and population genetics.</em>
 </p>
 
 <p align="center">
-  <img alt="version"  src="https://img.shields.io/badge/version-0.6.0-1a1a19">
-  <img alt="tests"    src="https://img.shields.io/badge/tests-735%20passing-0ca30c">
-  <img alt="roadmap"  src="https://img.shields.io/badge/roadmap-32%2F32%20closed-0ca30c">
+  <img alt="version"  src="https://img.shields.io/badge/version-0.5.0-1a1a19">
+  <img alt="tests"    src="https://img.shields.io/badge/python%20tests-1210%20passing%2C%201%20skipped-0ca30c">
+  <img alt="unity"    src="https://img.shields.io/badge/unity%20tests-122%20passing-0ca30c">
+  <img alt="harness"  src="https://img.shields.io/badge/validation-20%2F20%20gated%20verdicts-0ca30c">
   <img alt="python"   src="https://img.shields.io/badge/python-3.14.5-3987e5">
-  <img alt="unity"    src="https://img.shields.io/badge/unity-6000.0%2B-4ea3ff">
+  <img alt="engine"   src="https://img.shields.io/badge/unity-6000.0%2B-4ea3ff">
 </p>
 
----
+<p align="center">
+  <img src="docs/showcase/dashboard-overview.png" width="100%"
+       alt="The analysis dashboard at year 100 of a simulated century">
+</p>
 
-The goal is not a game system that *feels* genetic. It is a simulator whose
-emergent output can be checked against the closed-form laws of population
-genetics — and which says so honestly when it cannot.
+Most game and simulation NPCs inherit through one of two rules: a single-gene
+Mendelian switch per visible trait, or an arithmetic blend of the parents'
+trait values. Both are cheap and legible. Neither can produce pleiotropy
+(one gene, several traits), linkage (nearby genes travelling together), or a
+heritability you can actually set, because blending transmits the *phenotype*
+rather than the genetic material that produces it.
 
-That second half is the part most of this repository is about. Every claim
-below is attached to a test that could fail, every known weakness is written
-down rather than left to be discovered, and where the model disagrees with the
-literature it says so in the same breath as the number.
+This engine replaces the rule instead of tuning it. Individuals carry a diploid
+genome of **505 loci across 22 autosomes and a sex pair**; meiosis draws
+crossovers as a Poisson process along real centimorgan maps; phenotype is
+composed as *P = A + D + I + G×E + E* with variance components solved per trait
+against a **declared heritability**, across **42 traits**.
 
-### Three layers
+**The commitment that shapes the whole project: nothing it claims is computed.**
+Sixteen population-genetics laws are *measured from emergent output* and
+compared against closed-form or published expectations by an automated harness
+that returns 20 gated verdicts. Every one of them could fail.
+
+### Three layers, three surfaces
 
 | | | |
 |---|---|---|
-| 🧬 **Engine** | `health_engine/` | one individual: genome, meiosis, phenotype, epigenetics, physiology |
-| 🌍 **Population** | `simulation/` | many individuals over time: birth, pairing, death, demes, migration |
-| 📊 **Surfaces** | `dashboard/` · `unity/` | a Dash analysis deck, and a Unity world viewer that reads exported bundles |
+| 🧬 **Engine** | `health_engine/` · 14.2k lines | one individual: genome, meiosis, phenotype, epigenetics, physiology |
+| 🌍 **Simulation** | `simulation/` · 3.8k lines | many individuals over time: birth, pairing, death, demes, migration |
+| 📊 **Dashboard** | `dashboard/` · 5.2k lines | 28 analysis panels behind a 12-metric deck, plus a character sheet |
+| 🎮 **Viewer** | `unity/` · 10.8k lines C# | a Unity package that renders an exported world as rigged bodies |
 
 ---
 
-## What makes this different from a trait-blending system
+## The result that explains the project
 
-> **Historical note — this section describes the *old* v0.2 prototype and why it
-> was replaced. Everything it criticises was removed in July 2026 (Stage 0,
-> session 1). It is here to show what the current engine does differently, not
-> to describe the current engine.**
+<p align="center">
+  <img src="docs/showcase/two-sisters.png" width="100%"
+       alt="Two sisters' inbreeding panels side by side: same pedigree F, different realised F">
+</p>
 
-<details>
-<summary><strong>The v0.2 prototype (removed) — click to expand</strong></summary>
+**Lena (left) and Ada (right) have the same two parents.** Their pedigree
+inbreeding coefficient is therefore the same number, 0.0625, and so are the two
+costs derived from it: −0.75 cm of stature and −0.086 L of lung capacity.
 
-v0.2 modelled inheritance with Simulated Binary Crossover, single-gene Mendelian
-dominance, and a self-adaptive mutation sigma. Each is a defensible engineering
-choice; none is how a genome works. The consequences were structural, not
-cosmetic: one locus meant one trait, so no gene could affect two things; loci
-assorted independently, so there was no linkage and no genome; and interpolating
-a child's phenotype between its parents' meant heritability could not be a
-parameter and selection response was simply wrong.
+Their *realised* inbreeding is not the same number: **−0.0188 against +0.1014**.
+One sister received a genome less homozygous than a random outbred draw; the
+other received one substantially more homozygous than her pedigree predicted.
 
-</details>
+And the subtler half: Lena is the **less** homozygous sister and the **less**
+viable one, 0.683 against 0.739, although she exposes three load alleles where
+Ada exposes seven. Viability follows *which* alleles a genome happened to
+expose and what their selection coefficients are, not how many.
 
-**The current engine — what replaced all of the above:**
-
-| | |
-|---|---|
-| **Genome** | 22 autosomes with real centimorgan maps; meiosis draws crossovers as a Poisson process, so linked genes co-inherit |
-| **Loci** | ~500 biallelic loci — ~50 named GWAS genes plus a peripheral background — feeding a sparse gene × trait weight matrix, so EDAR touches hair, teeth, ears, chin and sweat glands at once |
-| **Phenotype** | P = additive + dominance + epistasis + G×E + environment, with variance components solved per trait to hit a target heritability |
-| **Discrete traits** | Liability-threshold traits (Falconer 1965), not single-gene switches; expression is deterministic given the genome |
-| **Epigenetics** | Lifetime-dynamic methylation with an epigenetic clock, and a germline firewall that resets ~95% of marks between generations |
-| **Regulation** | A sparse gene→gene trans layer over 8 real TF hubs, so knocking out RUNX2 shifts traits it has no direct weight on |
-| **Sex** | X/Y determination, hemizygosity, random X-inactivation (Lyon 1961), sex-limited expression |
-| **Mitochondria** | Strict maternal transmission, heteroplasmy, an OXPHOS threshold, and the N_e=30 bottleneck |
-| **Imprinting** | Parent-of-origin silencing at IGF2, so reciprocal heterozygotes — same genotype, opposite parent — differ by exactly 2·s·a |
-| **Canalization** | Development is buffered; stress past a threshold releases cryptic genetic variation, raising variance as k² without moving the mean |
-| **Body → mind** | A physiological state vector — hormones, interoception, allostatic load, circadian phase — emitting an action distribution for an LLM |
+Nothing here was implemented. A model that transmits phenotypes cannot produce
+it, because it has no meiosis for the variance to arise in.
 
 ---
 
-## Install
+## See it
+
+<table>
+<tr>
+<td width="50%">
+
+**World map.** Four settlements on their terrain, every villager in place,
+tinted by dominant founder ancestry. Migration routes thicken with use and
+decay when unused. Settlement membership, size and the routes between them are
+emergent, not authored.
+
+</td>
+<td width="50%"><img src="docs/showcase/dashboard-worldmap.png" alt="World map, bloodline layer"></td>
+</tr>
+<tr>
+<td><img src="docs/showcase/dashboard-worldmap-stress.png" alt="World map, stress-load layer"></td>
+<td>
+
+**Three interchangeable layers** over the same map: bloodline, ancestry
+dominance, and mean allostatic load per territory. Stress is a physiological
+quantity carried by individuals, aggregated here by where they live.
+
+</td>
+</tr>
+<tr>
+<td>
+
+**Genetics** is the laboratory tab: trait evolution over time, the allele
+frequency spectrum, heterozygosity distributions, the imprinting gap, the
+X-linked sex ratio, mitochondrial haplogroups, de novo mutation counts and the
+epigenetic-age cloud.
+
+</td>
+<td><img src="docs/showcase/dashboard-genetics.png" alt="Genetics tab"></td>
+</tr>
+<tr>
+<td><img src="docs/showcase/dashboard-community.png" alt="Community tab"></td>
+<td>
+
+**Community** carries the population-structure argument: *F*<sub>ST</sub> against its
+island-model expectation, deme composition, the kinship distribution, and the
+two costs of inbreeding plotted *separately* against the same *F*, because they
+are two mechanisms and not two views of one.
+
+</td>
+</tr>
+<tr>
+<td>
+
+**Any villager opens** from the map or from a dot in the genetic cloud, into a
+five-tab character sheet: identity, genome, a dated medical history,
+personality and physiological state, and a family tree with consanguineous
+unions marked.
+
+</td>
+<td><img src="docs/showcase/dashboard-individual.png" alt="Individual character sheet"></td>
+</tr>
+<tr>
+<td><img src="docs/showcase/dashboard-family-tree.png" alt="Family tree with consanguineous unions marked"></td>
+<td>
+
+**The family tree** is drawn from the pedigree the simulation actually built.
+By year 100 of a closed four-deme village, 54.5% of the living have parents who
+are second cousins or closer, and nothing in the parameter set asked for it.
+
+</td>
+</tr>
+<tr>
+<td>
+
+**Controls** exposes every run parameter, grouped into three labelled bands, plus
+eight scenario presets (isolated islands, melting pot, founder crash,
+Malthusian squeeze, harsh and unequal…) and three one-off shocks: plague,
+famine, bottleneck.
+
+</td>
+<td><img src="docs/showcase/dashboard-controls.png" alt="Controls tab"></td>
+</tr>
+<tr>
+<td><img src="docs/showcase/dashboard-guide.png" alt="Guide tab"></td>
+<td>
+
+**A Guide tab that teaches.** It states what each panel measures, what would
+count as a surprising value, and which parts of the model are deliberately
+weak. A simulation that shows you an *F*<sub>ST</sub> of 0.003 without saying
+what a large one would have been is not being read, it is being believed.
+
+</td>
+</tr>
+</table>
+
+### The Unity viewer
+
+<p align="center">
+  <img src="docs/showcase/unity-villager.png" width="100%"
+       alt="The Unity viewer: villagers in a settlement, with provenance HUD and inspector">
+</p>
+
+The same exported world, rendered. Note the HUD: **seed, year, catalogue mode
+and source revision travel into the runtime**, so a screenshot is traceable to
+the code that produced it. The viewer also reconciles its on-screen headcount
+against the exported history table for every replayed year (*"headcount agrees
+with history.csv, 578 years checked"*).
+
+<p align="center">
+  <img src="docs/showcase/unity-life-stages.png" width="100%"
+       alt="One individual rendered at seven life stages, from infant to age 84">
+</p>
+
+**One genome, seven bodies.** The same individual at seven points in one
+century: 49.3 cm at age 0, then 90.9 at 3, 136.6 at 11, 170.2 at 23, 170.4 at
+40, 167.8 at 65, 164.2 at 84. The mature genetic endpoint is 171 cm throughout
+and never changes. What moves is the developmental factor applied to it: a
+Preece-Baines growth trajectory followed by modelled senescent loss. Faces are
+baked from that individual's own genome.
+
+---
+
+## Nothing it claims is computed
+
+This is the part that matters scientifically. No code path evaluates
+Hardy-Weinberg or the breeder's equation in order to *produce* output. Those
+appear only in the harness, reading output back.
+
+| Law | Checked against | Source |
+|---|---|---|
+| Hardy-Weinberg proportions | genotype frequencies under random mating | Hardy 1908; Weinberg 1908 |
+| Haldane's map function | recombination fraction vs map distance, 40 locus pairs | Haldane 1919 |
+| Midparent-offspring regression | slope ≈ *h*² per trait | Falconer & Mackay 1996 |
+| Breeder's equation | selection response ≈ *h*² × *S* | Lush 1937 |
+| Daetwyler's law | PGS accuracy vs training *N* and marker count | Daetwyler et al. 2008 |
+| Allele-frequency drift | variance vs 2*N*<sub>e</sub> expectation | Wright 1931 |
+| X-linked epidemiology | colour blindness at *q* in males, *q*² in females | Lyon 1961 |
+| mtDNA bottleneck | offspring heteroplasmy variance = *h*(1−*h*)/*N*<sub>e</sub> | Wallace 1999 |
+| Reciprocal-heterozygote gap | imprinted parent-of-origin effect = 2·*s*·*a* | DeChiara et al. 1991 |
+| Cryptic-variation release | Var(*z*) = *k*²·V<sub>gen</sub> + V<sub>env</sub> past threshold | Waddington 1942 |
+| Wright's *F*<sub>ST</sub> | between-deme differentiation vs migration | Wright 1931; Weir & Cockerham 1984 |
+| Lethal equivalents | ln *S*(*F*) = ln *S*₀ − *B*·*F*, *B* recovered by regression | Morton, Crow & Muller 1956 |
+| Directional dominance | *M*<sub>F</sub> − *M*₀ = −*F*·Σ2*pq d*; −1.2 cm per 10% *F* | Joshi et al. 2015 |
+| Malécot kinship | pedigree coefficients to machine precision | Malécot 1948; Wright 1922 |
+| CNV dosage response | shift = (copies/2 − 1)·ΣE[val]; deletion/duplication mirror | Jacquemont et al. 2011 |
+| Growth curve | fraction of adult stature vs age, rms 0.0014 | Preece & Baines 1978; Tanner 1962 |
+
+**20 gated verdicts, 20 passes.** Three further sections (Haldane's map
+function, polygenic-score accuracy, and the demonstration that *h*² is a
+property of a population *in an environment*) are reported **without** a pass
+criterion, because a threshold on them would encode an arbitrary tolerance
+rather than a law, and that distinction is stated rather than blurred.
+
+### It tracks its own parameters, not just has them
+
+One run shows the engine can simulate a village. It does not show that its
+behaviour is a *function* of the parameters it exposes. Two shipped scenarios
+differ essentially in one number:
+
+| Scenario | *m*/yr | *m*<sub>gen</sub> | measured *F*<sub>ST</sub> | island-model prediction |
+|---|---:|---:|---:|---:|
+| isolated islands | 0.005 | 0.145 | **0.0848** | 0.1022 |
+| baseline run | 0.050 | 0.799 | **0.0028** | 0.0069 |
+| melting pot | 0.150 | 0.994 | **0.0019** | 0.0139 |
+
+Three seeds per arm, 100 years. Every isolated-islands seed (0.051, 0.080,
+0.124) exceeds every melting-pot seed (−0.000, 0.001, 0.005), with **no
+overlap**, and the arm means differ by a factor of 44 from a 30-fold difference in the
+parameter.
+
+> **A units trap worth knowing about.** Wright's *m* is **per generation**;
+> `DemographyParams.migration_rate` is an **annual** per-individual
+> probability. Substituting one for the other understates 4*N*<sub>e</sub>*m*
+> by ~29× here and makes a correct model look badly wrong. The conversion is
+> *m*<sub>gen</sub> = 1 − (1 − *m*)<sup>*T*</sup>, and *T* is not a parameter
+> of this model. It falls out of the mortality schedule, the fertility window
+> and the matching, so it is **measured**: 31.3 years.
+
+### The invariant that holds it together
+
+Every layer added after the foundation either draws from its **own** RNG or
+draws strictly **after** all autosomal draws. In a stochastic simulator the RNG
+stream is effectively a global variable: inserting one `rng.uniform()` upstream
+shifts every downstream draw and silently decalibrates the model. Append-only
+draws plus private generators is the discipline that prevents it.
+
+**Two strengths of that claim, and the difference matters.** The tail-draw
+layers, sex chromosomes and mitochondria, consume from the *caller's*
+generator, so their invariant is **per-individual, not per-sequence**: founder
+#0 is byte-identical, founder #1 onward is not. The recessive-load and
+copy-number layers carry no such caveat: they draw from a **spawned
+sub-generator**, because `numpy.random.Generator.spawn` advances the parent's
+*seed sequence* while leaving its bit-generator state alone. All 175
+pre-existing tests passed unchanged when those two layers landed, with no
+expected value touched.
+
+A thesis methods section should say "per individual", and this one does.
+
+### Two surfaces, one set of numbers
+
+The dashboard and the Unity viewer read the same exported bundle, and they are
+held to identical output **mechanically rather than by discipline**: the Python
+inspector is run over a fixed world and its formatted strings are written out
+as a generated C# fixture, which the Unity EditMode suite then has to
+reproduce, under two locales.
+
+That pair has already caught what neither a code review nor a working scene
+would have. Python rounds half-to-even while .NET rounds half-away-from-zero,
+so an eighth of ancestry rendered `13%` in Unity against `12%` in the
+dashboard.
+
+---
+
+## Quick start
 
 ```bash
 python -m pip install -r requirements.txt
-```
 
-Python **3.14.5** is what the suite is verified against. Dependencies are pinned
-exactly rather than with `>=`, because the project's central claim is that a
-seeded run is reproducible and numpy has changed RNG behaviour across minor
-versions before.
-
-## Run
-
-```bash
-python health_engine_prototype.py          # full engine demo, several minutes:
-                                           #   validation harness + outputs/*.png
-python health_engine_prototype.py --fast   # smoke run (widened tolerances;
-                                           #   a rare noise-floor FAIL is expected)
-python -m pytest tests/ -q                 # 735 tests, ~10 min — the rigorous gate
-python run_dashboard.py                    # live population sim at localhost:8050
+python run_dashboard.py                    # the live population sim at :8050
+python health_engine_prototype.py          # engine demo + validation harness + figures
+python health_engine_prototype.py --fast   # smoke run (widened tolerances)
+python -m pytest tests/ -q                 # 1,211 tests, ~8 min: the rigorous gate
 python export_for_unity.py                 # write a world bundle for the viewer
 ```
 
+Python **3.14.5** is what the suite is verified against. Dependencies are
+pinned exactly rather than with `>=`, because the project's central claim is
+that a seeded run is reproducible and numpy has changed RNG behaviour across
+minor versions before.
+
 The demo drives the **engine** on a hand-built nine-person pedigree. The
-**population layer** (yearly turnover, demes, migration, lineages) and its
-seven-tab dashboard are separate — that's `run_dashboard.py`.
+**simulation layer** (yearly turnover, demes, migration, lineages) and its
+dashboard are separate: that is `run_dashboard.py`.
+
+<details>
+<summary><strong>Empirical allele frequencies (experimental)</strong></summary>
 
 ```bash
-EXTNPC_CATALOGUE=empirical python run_dashboard.py   # EXPERIMENTAL — see below
+EXTNPC_CATALOGUE=empirical python run_dashboard.py
 ```
 
-`EXTNPC_CATALOGUE=empirical` swaps 21 core genes' hand-set allele
-frequencies for measured 1000 Genomes phase 3 EUR values (vendored with
-provenance in `health_engine/data/`). The default is byte-identical to
-every committed figure and pinned by test. The two modes are different
-model versions: world saves record which one they were made under and
-refuse to load across the boundary.
+Swaps 21 core genes' hand-set allele frequencies for measured 1000 Genomes
+phase 3 EUR values, vendored with provenance in `health_engine/data/`. The
+default is byte-identical to every committed figure and pinned by test. The two
+modes are different model versions: world saves record which one they were made
+under and refuse to load across the boundary.
 
-> **Empirical mode is experimental and must not be used for results.**
-> Full suite under the flag: 6 failed / 574 passed / 3 skipped, against
-> 582 passed / 1 skipped on the default. Real EUR frequencies change the
-> *shape* of the genotypic distribution — `eye_color`'s kurtosis flips
-> sign, −0.771 → +0.978 — and redistribute variance sharply for traits
-> whose variance is concentrated in a few loci: SLC24A5 keeps its −1.80
-> weight and loses 98.7% of its variance contribution, because at
-> q = 0.997 there is nearly nothing left to vary. Tests asserting the
-> synthetic architecture's shape then fail correctly. See the KNOWN
-> FAILURES block in `health_engine/loci.py`.
+> **Experimental, and the failures are the finding.** Full suite under the
+> flag: 6 failed / 574 passed. Real EUR frequencies change the *shape* of the
+> genotypic distribution, flipping `eye_color`'s kurtosis from −0.771 to
+> +0.978, and redistribute variance sharply for traits whose variance sits in a few
+> loci: SLC24A5 keeps its −1.80 weight and loses 98.7% of its variance
+> contribution, because at *q* = 0.997 there is nearly nothing left to vary.
+> Tests asserting the synthetic architecture's shape then fail *correctly*.
+> Widening a tolerance would hide exactly the result. See the KNOWN FAILURES
+> block in `health_engine/loci.py`.
 
 ```bash
 python -m health_engine.catalogue_compare   # synthetic vs EUR, side by side
 ```
 
-Runs the engine under both catalogues and prints a markdown table of what
-moves and why — built for the thesis comparison. Costs two subprocess
-imports; touches no figure and consumes no RNG.
+</details>
+
+<details>
+<summary><strong>Running the Unity viewer</strong></summary>
+
+```bash
+python export_for_unity.py --years 90 --founders 16 --demes 3 --migration 0.08
+```
+
+That writes a plain-file bundle: `manifest.json`, `people.csv`, `history.csv`,
+`pedigree.csv`, `frames.csv`, `demes.csv`, `flows.csv`, `events.csv` and
+`diseases.csv`. Add `unity/com.samal.extnpc` to a Unity 6 project, point
+`ExtNpcWorldLoader` at the folder, and press play.
+
+**It is a viewer, and the distinction is enforced rather than promised:** it
+performs no biology, draws no random numbers, and derives no phenotype. If a
+number reaches the screen, there is a CSV cell it was read from.
+`tests/test_unity_contract.py` reads the C# source as text and asserts every
+column it requests exists in a real export.
+
+**Why files and not a live socket.** Measured on this machine: engine import
+12.4 s, tick cost ~1.7 ms per living person per year, so a 600-person village
+runs near a second per simulated year. That is a batch job, not something to
+animate against. Exporting once and viewing many times removes the engine from
+the interactive loop entirely, which is what makes the viewer smooth: the
+architecture, not the renderer.
+
+</details>
 
 > On Windows, two dev servers can both bind `:8050` and a stale process will
 > silently serve old code. Kill every `:8050` listener before relaunching.
 
 ---
 
-## The Unity world viewer
+## What it models
 
-`unity/com.samal.extnpc` is a UPM package that renders an exported world.
-**It is a viewer, and the distinction is enforced rather than promised:** it
-performs no biology, draws no random numbers, and derives no phenotype. If a
-number reaches the screen, there is a CSV cell it was read from.
+| | |
+|---|---|
+| **Genome** | 22 autosomes with real centimorgan maps; meiosis draws crossovers as a Poisson process, so linked genes co-inherit |
+| **Loci** | 505 biallelic loci, 55 named GWAS genes plus a 450-locus peripheral background, feeding a sparse gene × trait weight matrix, so EDAR touches hair, teeth, ears, chin and sweat glands at once |
+| **Phenotype** | *P* = additive + dominance + epistasis + G×E + environment, with variance components solved per trait to hit a target heritability, across 42 traits |
+| **Discrete traits** | Liability-threshold traits (Falconer 1965), not single-gene switches; expression is deterministic given the genome |
+| **Epigenetics** | Lifetime-dynamic methylation with an epigenetic clock, and a germline firewall that resets ~95% of marks between generations |
+| **Regulation** | A sparse gene→gene trans layer over 8 real TF hubs, so knocking out RUNX2 shifts traits it has no direct weight on |
+| **Sex** | X/Y determination, hemizygosity, random X-inactivation (Lyon 1961), sex-limited expression |
+| **Mitochondria** | Strict maternal transmission, heteroplasmy, an OXPHOS threshold, and the *N*<sub>e</sub> = 30 bottleneck |
+| **Imprinting** | Parent-of-origin silencing at IGF2, so reciprocal heterozygotes with the same genotype and the opposite parent differ by exactly 2·*s*·*a* |
+| **Inbreeding** | One *F*, two independent consequences: survival via a 2000-locus recessive load at *B* = 1.4 lethal equivalents, and stature via directional dominance calibrated to Joshi et al. 2015 |
+| **Disease** | Nine real autosomal recessive disorders labelled onto load loci; incidence follows *P* = *q*² + *Fpq* exactly |
+| **Development** | A Preece-Baines growth trajectory applied to the *output* of the genotype→phenotype path, so the calibrated path never sees an age |
+| **Structural variation** | Deletions and duplications scaling a locus's genotypic deviation, at mutation-selection balance |
+| **Physiology** | A state vector on a sub-daily clock: glucose, sleep pressure, a four-stage HPA cascade, monoamine tones and allostatic load, with ten heritable gains |
 
-```bash
-python export_for_unity.py --years 90 --founders 16 --demes 3 --migration 0.08
-```
+### The body-to-mind layer, and why the engine exists
 
-That writes a plain-file bundle — `manifest.json`, `people.csv`, `history.csv`,
-`pedigree.csv`, `frames.csv`, `demes.csv`, `flows.csv`, `events.csv`,
-`diseases.csv`. Add the package to a Unity 6 project, point
-`ExtNpcWorldLoader` at the folder, and press play.
+`physiology.py` produces the state the host framework was built to consume, and
+exposes two read-outs for it: an interoceptive salience list, and a probability
+distribution over eight action classes.
 
-**Why files and not a live socket.** Measured on this machine: engine import
-12.4 s, tick cost ~1.7 ms per living person per year — a 600-person village
-runs near a second per simulated year. That is a batch job, not something to
-animate against. Exporting once and viewing many times removes the engine from
-the interactive loop entirely, which is what makes the viewer smooth: the
-architecture, not the renderer.
+The second is measurable, so it is measured. Holding the body and the hour
+fixed and changing **only** the internal state, a hungry high-cortisol state and
+a sated calm one produce action distributions **1.69 nats apart** in
+Kullback-Leibler divergence. `forage` carries 0.631 of the mass in the first
+and 0.042 in the second, while `explore` runs the other way, 0.078 against
+0.501. The same state renders to a sentence, so a language model can be handed
+`[body] ravenous; highly stressed; thirsty` rather than a vector.
 
-**The division of labour is fixed.** The dashboard keeps every chart,
-distribution, validation figure and thesis plot. Unity does agents in space and
-time — things a chart cannot show. Neither reimplements the other, and both
-read the same bundle, so they cannot disagree about a villager.
-
-That last claim is tested rather than intended. `tests/test_unity_contract.py`
-reads the C# source as text and asserts every column it requests exists in a
-real export; `tests/test_unity_parity_fixture.py` runs the dashboard's *own*
-formatters over a grid and generates the strings a C# test then has to
-reproduce, under two locales. The pair has already caught what neither a code
-review nor a working scene would have — that Python rounds half-to-even while
-.NET rounds half-away-from-zero, so an eighth of ancestry rendered `13%` in
-Unity against `12%` in the dashboard.
-
-Full contract, invariants and staged plan: `reads/UNITY_PLAN.md`.
-Character-generation research (MPFB2, licensing, the 5–10% facial-variance
-ceiling): `reads/MPFB_UNITY_INVESTIGATION.md`.
+**Nothing consumes those read-outs yet, and that is the honest position of the
+whole project.** Whether an agent conditioned on a genuinely inherited body
+behaves differently from one conditioned on an arbitrary one is open, and it
+is the question the architecture was chosen to make askable. The
+predecessor blending implementation is retained in the repository, so the
+control arm is a different *inheritance rule over an identical world* rather
+than a different system.
 
 ---
 
 ## Layout
 
 ```
-health_engine/        the engine — everything below is per-individual genetics
+health_engine/        the engine: everything below is per-individual genetics
   genetic_map.py        22 autosomes, physical (Mb) and genetic (cM) maps
-  loci.py               ~50 named GWAS genes + ~450 peripheral SNPs
+  loci.py               55 named GWAS genes + 450 peripheral SNPs
   genome.py             diploid genome, meiosis with crossover, mutation
   traits.py             genotype -> phenotype: A + D + I + GxE + E
   npc.py                the individual: genome + persistent deviates + life
@@ -193,123 +423,66 @@ health_engine/        the engine — everything below is per-individual genetics
   mito.py               maternal inheritance, heteroplasmy, bottleneck
   imprint.py            genomic imprinting: parent-of-origin silencing
   canalize.py           developmental buffering, cryptic variation release
+  inbreeding.py         Malecot F, the load spectrum, directional dominance
+  cnv.py                copy-number variation and dosage response
+  development.py        Preece-Baines growth, senescent decline
+  asymmetry.py          fluctuating asymmetry: what development failed to control
   physiology.py         physiological state vector, hormones, action bias
+  diseases.py           nine autosomal recessive disorders on the load loci
   medical.py            acquired, non-heritable conditions
-  mating.py             life-partner selection (greedy baseline)
-  legacy.py             v0.2 operators (SBX, n-point crossover), kept for comparison
+  legacy.py             v0.2 operators (SBX, n-point crossover), kept as a control
   validation.py         the harness: HWE, Haldane, h^2, breeder's, PGS, ...
   viz.py                figures
 
-simulation/           the population layer — many individuals over time
+simulation/           the simulation layer: many individuals over time
   world.py              yearly turnover: birth, pairing, ageing, death
-  demography.py         Gompertz mortality, fertility, Gale-Shapley matching
+  demography.py         Gompertz-Makeham mortality, fertility, Gale-Shapley matching
   community.py          Wright island model: demes, migration, F_ST
-  pedigree.py           pedigree graph + kinship
+  pedigree.py           pedigree graph + Malecot kinship
   lineage.py            founder-ancestry lineage colours
-  events.py             shocks: plague, famine, bottleneck
-  chronicle.py          narrates notable events from the metrics stream
-  metrics.py, embedding.py
-
+  events.py             eight scenario presets; plague, famine, bottleneck
+  chronicle.py          narrates notable events; the metric glossary + citations
   export.py             the world bundle: CSV tables + a provenance manifest
-  snapshots.py          per-tick ring buffer — the viewer's longitudinal feed
+  worldsave.py          full world save and restore
+  snapshots.py          per-tick ring buffer, the timeline scrubber's feed
 
-dashboard/            live Plotly/Dash command deck (7 tabs) + canvas RTS map
-  inspector.py          the character drawer; the parity source for Unity
+dashboard/            Dash/Plotly analysis deck: 7 views, 28 panels, 12 metrics
+  panels.py             the charts and the metric deck
+  inspector.py          the character sheet; the parity source for Unity
+  genetics_panels.py    the laboratory tab
+  export_job.py         simulate, export, and optionally bake bodies
+  session_sync.py       selection and year, shared with the Unity viewer
 
 unity/com.samal.extnpc  UPM package: reads a bundle, renders the village
   Runtime/Data/         RFC-4180 CSV reader, locale-proof parsing, manifest
-  Runtime/View/         villagers, deme rings, orbit camera, the inspector
-  Tests/                34 NUnit tests, incl. a generated dashboard-parity fixture
+  Runtime/View/         villagers, deme rings, orbit camera, timeline, inspector
+  Tests/                122 EditMode tests, incl. a generated parity fixture
 
-tests/                735 tests
-reads/                CLAUDE_PROJECT_ROADMAP.md (the spec), REPORT.md (the log),
-                      UNITY_PLAN.md, MPFB_UNITY_INVESTIGATION.md
+mpfb/                 the genome -> parametric mesh -> rigged body bake path
+tests/                the Python suite
 outputs/              validation figures, regenerated by the demo
+docs/showcase/        the screenshots in this README
 ```
-
----
-
-## The validation harness
-
-This is the part that matters scientifically. Nothing in the engine computes
-these laws; they are measured from emergent output and compared to theory.
-
-| Law | Checks | Source |
-|---|---|---|
-| Hardy–Weinberg proportions | genotype frequencies under random mating | Hardy 1908; Weinberg 1908 |
-| Haldane's map function | recombination fraction vs map distance, 40 locus pairs | Haldane 1919 |
-| Midparent–offspring regression | slope ≈ h² per trait | Falconer & Mackay 1996 |
-| Breeder's equation | selection response ≈ h² × S | Lush 1937 |
-| Daetwyler's law | PGS accuracy vs training N and marker count | Daetwyler et al. 2008 |
-| Allele-frequency drift | variance vs 2N_e expectation | Wright 1931 |
-| X-linked epidemiology | colour blindness at q in males, q² in females (8% / 0.8%) | Lyon 1961 |
-| mtDNA bottleneck | offspring heteroplasmy variance = h(1−h)/N_e | Wallace 1999 |
-| Reciprocal-heterozygote gap | imprinted-locus parent-of-origin effect = 2·s·a | DeChiara et al. 1991 |
-| Cryptic-variation release | Var(z) = k²·V_gen + V_env past the buffering threshold | Waddington 1942 |
-| Wright's F_ST | between-deme differentiation vs migration | Wright 1931; Weir & Cockerham 1984 |
-| Lethal equivalents | ln S(F) = ln S₀ − B·F, B recovered by regression | Morton, Crow & Muller 1956 |
-| Directional dominance | M_F − M₀ = −F·Σⱼ2pⱼqⱼdⱼ; −1.2 cm of stature per 10% F | Falconer & Mackay 1996; Joshi et al. 2015 |
-| Malécot kinship | pedigree coefficients to machine precision | Malécot 1948; Wright 1922 |
-| CNV dosage response | shift = (copies/2 − 1)·Σⱼ E[valⱼ]; deletion/duplication mirror | Jacquemont et al. 2011 |
-| Developmental identity | age schedule is *exactly* 1.0 at the calibration age | — |
-| Growth curve | fraction of adult stature vs age, rms 0.0014 | Preece & Baines 1978; Tanner 1962 |
-
-### The invariant that holds it together
-
-Every layer added after the Stage-0 foundation either draws from its **own**
-RNG or draws strictly **after** all autosomal draws. A default world is
-therefore identical to the one the original heritabilities were calibrated
-against. This is why 113 pre-existing tests survived the large session-8
-additions unchanged, and it is the first thing to preserve when adding
-anything new.
-
-In a stochastic simulator the RNG stream is effectively a global variable:
-inserting one `rng.uniform()` upstream shifts every downstream draw and silently
-decalibrates the model. Append-only draws plus private generators per feature is
-the discipline that prevents it.
-
-**Two strengths of that claim, and the difference matters.** The tail-draw
-layers — sex chromosomes (#2) and mitochondria (#3) — consume from the
-*caller's* generator. Founder #0 is then byte-identical, but the extra draws
-advance the shared stream, so founder #1 onward is not. Their invariant is
-therefore **per-individual, not per-sequence**: any loop drawing N founders
-from a single generator drifted when those layers landed, which is why seven
-committed figures changed on regeneration in session 9. Statistically
-harmless — the founders are still drawn from the same distribution — but the
-claim has to be stated at the strength it actually holds, and a thesis
-methods section should say "per individual".
-
-The layers added in session 11 — the recessive load (#31) and copy number
-(#12) — do not carry that caveat. They draw from a **spawned sub-generator**
-(`inbreeding.derived_rng`): `numpy.random.Generator.spawn` advances the
-parent's *seed sequence* while leaving its bit-generator state alone, so the
-caller's stream is byte-identical and the invariant holds **per sequence**.
-All 175 pre-existing tests passed unchanged when those two layers were added,
-with no expected value touched. The same one-line change would retrofit onto
-#2 and #3; it has not been applied there, because doing so would rewrite
-every figure and expectation seeded through them to fix a drift that is
-harmless.
 
 ---
 
 ## Known limitations
 
-Kept deliberately visible, per the project's scientific-honesty standard.
+Kept deliberately visible, per the project's scientific-honesty standard. This
+list is a feature, not an apology.
 
-- ~~**F_ST is biased upward at current deme sizes.**~~ **Fixed in session 11.**
-  `simulation/community.fst` now implements the Weir & Cockerham (1984)
-  estimator it had been citing while actually computing Nei's G_ST. Against a
-  null of four demes drawn independently from one shared allele-frequency
-  vector (true F_ST = 0), the old estimator returned ≈0.038 at 10 individuals
-  per deme and ≈0.019 at 20; the new one returns 0.000 ± 0.002 at every size
-  tested, and recovers a Balding–Nichols target of 0.05 to within 0.001. The
-  correction matters: under the fixed estimator the melting-pot preset falls
-  from ≈0.025–0.058 to **0.010** (negative on some seeds, as an unbiased
-  estimator should be when there is nothing to find) while isolated islands
-  hold at **0.095**, so the contrast between presets is *larger* than it
-  looked, not smaller. F_ST is no longer clipped at zero — clipping would
-  reintroduce the bias. The old estimator is retained as `fst_gst` so the
-  comparison is checked by a test rather than remembered.
+- **Believability is asserted, not measured.** No human participant has
+  evaluated the output and no believability instrument has been administered.
+  Every result here is *internal* validity: the engine is shown to obey the
+  laws it claims to obey.
+- **Sexual dimorphism in stature is −0.57 cm** against a real human value near
+  13 cm, and lean mass fraction carries the same uncalibrated gap deliberately,
+  because fixing one and not the other would leave a reader with a pair they
+  cannot audit.
+- **Pubertal timing has the right sign and the wrong magnitude**, 1.3 years
+  between the sexes against Tanner's roughly 2.0, most likely because the fit
+  targets median cross-sectional stature and smears the spurt across
+  individuals of differing tempo.
 - **PGS do not transfer across ancestries.** Allele frequencies here are
   neutral placeholders, not ancestry-specific; nothing in this model licenses
   cross-population comparison.
@@ -318,107 +491,58 @@ Kept deliberately visible, per the project's scientific-honesty standard.
   2019). Genetic variation here sets only modest polygenic priors on hormone
   and receptor-sensitivity parameters.
 - **The omnigenic core/peripheral split is an engineering device**, not settled
-  biology — Wray et al. 2018 argue it understates real complexity.
+  biology; Wray et al. 2018 argue it understates real complexity.
 - **Resource stratification is a stylized family-wealth proxy** by lineage
   headcount. It is not an economic model and emphatically not a gene-for-status
   claim.
 - **Migration is isolation-by-distance on a static settlement layout**, not a
   stepping-stone lattice; settlements never move or get founded.
-- **Only one locus is imprinted.** Humans have ~100–200; the catalogue contains
+- **Only one locus is imprinted.** Humans have ~100-200; the catalogue contains
   exactly one genuinely imprinted gene (IGF2), and adding more would change
-  `N_LOCI` and invalidate every calibrated heritability. Imprinting here is also
-  whole-body, where real imprinting is tissue- and stage-specific.
+  `N_LOCI` and invalidate every calibrated heritability. Imprinting here is
+  also whole-body, where real imprinting is tissue- and stage-specific.
 - **The canalization capacity is not calibrated against human data**, because
-  no such data exists — the HSP90 capacitor experiments are qualitative and in
-  flies and plants. What is tested is Waddington's *qualitative* claim
-  (buffered below threshold, released above) plus internal k² consistency. Do
-  not read the magnitude as an empirical estimate. Canalization here also
-  cannot evolve: buffering capacity is a per-trait constant, not a heritable
-  modifier, which is precisely what Waddington's selection experiments were
-  about.
-- **Directional dominance covers two traits, not all of them.** Inbreeding now
-  costs both viability (1.4 lethal equivalents per gamete) *and* stature:
-  `height_cm` and `lung_capacity` are calibrated to Joshi et al. 2015 (−1.2 cm
-  and −137 ml per 10% F) with `V_D` as an output of the calibration rather than
-  an input. Four traits Joshi tested and found nothing in — BMI, adiposity,
-  blood pressure, lipids — are deliberately left flat, so the model reproduces
-  the paper's nulls as well as its positives. But every *other* trait is
-  **uncalibrated in this respect, not calibrated to zero**: what
-  `inbreeding.directional_dominance()` returns for them is the small residual
-  of `loci.py`'s random-sign dominance ratios. `lung_capacity` carries a second
-  caveat — Joshi measured FEV1, a timed volume, while this trait is a generic
-  spirometric capacity, and reproducing the slope costs `V_D = 0.11` because
-  only 82 loci carry it. Sign and mechanism are real; the magnitude is
-  indicative.
-- **The load spectrum does not evolve.** A world that inbreeds heavily for
-  many generations should *purge* some of its recessive load (Crnokrak &
-  Barrett 2002). Transmitted genotypes drift, but `SPECTRUM.q` — and hence the
-  predicted B — stays at its founding value throughout.
-- **CNVs model dosage, not loss of function.** The copy-number multiplier
-  (#12) scales a locus's genotypic *deviation*, not its absolute gene product,
-  so the magnitude of a dosage effect and the mirror symmetry between a
-  deletion and its reciprocal duplication are exact, while the *direction* of
-  a loss-of-function phenotype is not modelled. The worked example is in
-  `cnv.py`: 15q11–q13 deletion patients are hypopigmented, and the engine
-  gets that sign wrong for exactly this reason. There is also no hemizygous
-  unmasking of the allele opposite a deletion.
+  no such data exists. What is tested is Waddington's *qualitative* claim
+  (buffered below threshold, released above) plus internal *k*² consistency.
+  Canalization here also cannot evolve.
+- **Directional dominance covers two traits, not all of them.** `height_cm` and
+  `lung_capacity` are calibrated to Joshi et al. 2015, and four traits Joshi
+  found nothing in are deliberately left flat, so the model reproduces the
+  paper's nulls as well as its positives. Every *other* trait is
+  **uncalibrated in this respect, not calibrated to zero**.
+- **The load spectrum's parameters do not evolve.** Realised *B* is measured
+  from the living each year and does move, falling 31% over the reported
+  century from 1.419 to 0.979, but `SPECTRUM.q`, the founding frequency
+  vector, stays where it started.
+- **CNVs model dosage, not loss of function.** The magnitude of a dosage effect
+  and the mirror symmetry between a deletion and its duplication are exact,
+  while the *direction* of a loss-of-function phenotype is not modelled: 15q11
+  deletion patients are hypopigmented and the engine gets that sign wrong, for
+  exactly this reason.
 - **Development varies in endpoint, not in tempo.** Every NPC travels the same
-  normalised growth curve (#13) toward its own genetic adult stature, so the
-  model cannot produce early and late maturers — and therefore cannot show the
-  variance spike during puberty that makes adolescent height so dispersed. The
-  developmental schedule is also applied to the *output* of `phenotype()`
-  rather than inside it; that is what makes the calibration structurally safe,
-  but it means age never feeds back into the genotype→phenotype map.
-- **The physiological state vector has never been connected to a live LLM.** It
-  emits `to_prompt()` and `action_distribution()`, validated by KL divergence
-  between states, but nothing consumes them yet.
+  normalised growth curve toward its own genetic adult stature, so the model
+  cannot produce early and late maturers, and cannot show the variance spike
+  that makes adolescent height so dispersed.
+- **Neither the suite nor the harness runs in CI.** Both are run by hand, so a
+  regression is caught when someone thinks to look rather than at the commit
+  that introduces it. For a project whose central claim is reproducibility,
+  that is the most conspicuous piece of missing infrastructure.
+- **Mating is monogamous and heterosexual by construction**, which is a
+  modelling choice with demographic consequences and not a claim about human
+  societies.
 
----
+### Ethics
 
-## Roadmap status
-
-Tracked against `reads/CLAUDE_PROJECT_ROADMAP.md` (32 items, 3 thrusts).
-Per-session detail is in `reads/REPORT.md`.
-
-| Stage | Items | Status |
-|---|---|---|
-| **0** — foundation | 1, 7, 9, 10, 29, 32 | complete |
-| **1** — headline requests | 15–20, 21–27, 8 | complete |
-| **2** — structural realism | 2, 3, 4, 5, 6, 11, 12, 13, 14 | complete |
-| **3** — algorithms + validation | 29, 30, 31, 32 | complete |
-
-**The roadmap is closed.** Session 11 landed the last three items: #31
-inbreeding depression (`inbreeding.py`), #12 structural variants
-(`cnv.py`) and #13 developmental trajectory (`development.py`).
-
-### The display thrust — off the roadmap, additive only
-
-A Unity front-end was added in sessions 17–18 under a hard constraint: **no
-file in `health_engine/` may be modified, and `simulation/` may only gain
-things.** That is not a promise but a test — `tests/test_export_golden.py`
-freezes a seeded world's full history and an md5 over `people.csv`'s columns,
-and it was verified by *breaking* it: one stray `self.rng.random()` in
-`World.step()` diverged the population by tick 2 and failed both guards.
-
-| | |
-|---|---|
-| Stage 0–1 | golden tripwire · `export_world_dir()` · frames/demes/flows tables |
-| Stage 2–3 | UPM package, bundle loader · villagers on the map |
-| Stage 4 | the inspector, at parity with the dashboard drawer |
-| Stage 5 | time scrubbing — **the one stage left in Phase A** |
-
-The md5-over-frozen-columns trick is what makes it work: a stage may *add* a
-column and stay green, while renaming, reordering or changing any pre-existing
-one fails and names it.
-
-What remains is not roadmap work. It is the scientific debt listed under
-[Known limitations](#known-limitations) — session 15 closed the largest item,
-directional dominance, so inbreeding now shortens people as well as killing
-them — and the one genuinely open question: **`PhysiologicalState` has never
-driven a live LLM.** `to_prompt()` and `action_distribution()` are validated by KL
-divergence between states, but nothing consumes them. That is the gap between
-"a genetics simulator" and "a genetics simulator that demonstrably changes how
-an agent behaves."
+An engine that models consanguinity and its consequences touches material with
+a real-world history of misuse. Three commitments follow. The model is of
+**populations**, and its individual-level outputs are fictional characters, not
+predictions about people. The disease panel is calibrated to published carrier
+frequencies for one named reference population and is **unsuitable for
+epidemiological use**, with the cystic fibrosis misfit documented in the code
+and the export manifest. And the engine must not be used to infer anything
+about real individuals or groups: it maps genotypes to phenotypes under
+assumptions it declares, which is the opposite of the inference direction that
+DNA phenotyping would require.
 
 ---
 
@@ -429,34 +553,40 @@ Regenerated by `python health_engine_prototype.py` into `outputs/`.
 | File | Shows |
 |---|---|
 | `recombination_haldane.png` | Simulated recombination fraction vs Haldane's map function |
-| `heritability_validation.png` | Midparent–offspring regression vs theoretical h² |
+| `heritability_validation.png` | Midparent-offspring regression vs theoretical *h*² |
 | `pleiotropy_matrix.png` | Core gene × trait weight matrix, EDAR outlined |
 | `pedigree_relatedness.png` | Realised genomic relatedness (GCTA) across the pedigree |
 | `family_ocean_radars.png` | OCEAN profiles, founders dashed vs offspring solid |
 | `epigenetics.png` | Smoking→AHRR trajectory, epigenetic clock, germline firewall |
 | `physiology.png` | Action distributions by state, HPA axis over a day, EDAR→behaviour |
 | `grn_network.png` | RUNX2 knockout syndrome and its downstream program |
-| `sex_linked.png` | Colour-blindness q vs q², G6PD mosaicism, sex-limited alopecia |
+| `sex_linked.png` | Colour-blindness *q* vs *q*², G6PD mosaicism, sex-limited alopecia |
 | `mito_inheritance.png` | OXPHOS threshold, mtDNA bottleneck vs closed form |
-| `imprinting.png` | Reciprocal heterozygotes, the 2·s·a law, and the population effect |
-| `canalization.png` | Variance flat while the buffer holds, then released; same mean, wider spread |
-| `inbreeding_depression.png` | ln S vs pedigree F recovering B; realised vs expected F; hidden load exposed |
-| `cnv_dosage.png` | Linear mirror-symmetric dosage response; emergent mutation–selection balance |
-| `development.png` | Individual growth to a genetic endpoint; Preece–Baines vs Tanner; the identity at age 20 |
+| `imprinting.png` | Reciprocal heterozygotes, the 2·*s*·*a* law, the population effect |
+| `canalization.png` | Variance flat while the buffer holds, then released |
+| `inbreeding_depression.png` | ln *S* vs pedigree *F* recovering *B*; hidden load exposed |
+| `cnv_dosage.png` | Linear mirror-symmetric dosage response; mutation-selection balance |
+| `development.png` | Growth to a genetic endpoint; Preece-Baines vs Tanner |
 
 The `dashboard_*.png` files are captures of the live dashboard, not engine
-output, and are not regenerated by the demo.
+output, and are not regenerated by the demo. `docs/showcase/` is built from
+full-resolution captures by `python docs/make_showcase.py`.
 
 ---
 
 ## Assets
 
-Terrain art is Kenney's "Tiny Town" (CC0) — see
+Terrain art is Kenney's "Tiny Town" (CC0); see
 `dashboard/assets/sprites/tiny_town_LICENSE.txt`. The villager sprite sheet is
-authored here and regenerable via
-`dashboard/assets/sprites/make_villager.py` (requires Pillow); it is also CC0.
+authored here and regenerable via `dashboard/assets/sprites/make_villager.py`
+(requires Pillow); it is also CC0. Body meshes are baked through MPFB2 /
+MakeHuman; see `mpfb/` for the licensing notes.
 
 ## Citation
 
-This engine is the foundation of an in-progress thesis. If you use it, please
-cite the extNPC framework paper (Uludagli et al.) alongside this repository.
+This engine is the foundation of an in-progress thesis, and a conference paper
+describing it is in preparation. If you use it, please cite the extNPC
+framework paper alongside this repository:
+
+> Uludağlı, M.Ç. and Oğuz, K. Non-player character decision-making in computer
+> games. *Artificial Intelligence Review*, 56(12):14159-14191, 2023.
