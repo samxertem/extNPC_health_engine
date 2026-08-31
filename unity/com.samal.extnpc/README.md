@@ -14,7 +14,8 @@
 and derives no phenotype. If a number reaches the screen there is a CSV cell it
 came from. Anything the engine did not export is not available here, and the
 correct fix for that is to export it from the engine — never to compute it in
-C#. See `reads/UNITY_PLAN.md` Part 0 for the full contract.
+C#. The contract is enforced by `tests/test_unity_contract.py` and
+`tests/test_unity_parity_fixture.py` in the Python repository root.
 
 Those are not aspirations. A test in the engine repo fails if `HSVToRGB`
 appears anywhere in this package, if any runtime file touches `Random`, if a

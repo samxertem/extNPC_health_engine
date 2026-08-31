@@ -2,7 +2,7 @@
 The golden-fixture tripwire: proof that a change did not move the science.
 ==========================================================================
 
-Stage 0 of `reads/UNITY_PLAN.md`. The Unity front-end is a *viewer*: it may
+The Unity front-end is a *viewer*: it may
 add export columns, but it must never perturb a calibrated number. That is an
 easy promise to make and, without this file, an impossible one to check --
 "the suite still passes" says nothing when no test in the suite would notice a
@@ -47,7 +47,7 @@ protection -- so the reason is mandatory and is committed into the fixture:
         python -m pytest tests/test_export_golden.py -q
 
 A bare `1` is refused. See `_regeneration_is_authorised`, and record the same
-reason in `reads/REPORT.md`.
+reason in the commit message.
 """
 
 from __future__ import annotations
@@ -171,7 +171,7 @@ def _regeneration_is_authorised() -> bool:
         EXTNPC_UPDATE_GOLDEN="session 18: added the X layer, V_D recalibrated" \
             python -m pytest tests/test_export_golden.py -q
 
-    Then record the same reason in reads/REPORT.md.
+    Then record the same reason in the commit message.
     """
     reason = _regeneration_reason()
     if not reason or reason in {"1", "true", "yes", "y", "on"}:
@@ -235,7 +235,7 @@ def test_history_is_unchanged(world, golden):
             assert a[key] == b[key], (
                 f"tick {i}, column {key!r} moved: {a[key]!r} -> {b[key]!r}\n"
                 f"Something perturbed the calibrated computation. This is the "
-                f"tripwire in reads/UNITY_PLAN.md Part 0 doing its job.")
+                f"export tripwire doing its job.")
 
 
 def test_no_frozen_people_column_has_disappeared(world, golden):

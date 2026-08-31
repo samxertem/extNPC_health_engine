@@ -5,7 +5,7 @@ Export a world for the Unity viewer.
     python export_for_unity.py --years 120 --demes 4 --migration 0.08
     python export_for_unity.py --out "D:/Unity/MyGame/Assets/StreamingAssets/extnpc/demo"
 
-Writes the bundle described in `reads/UNITY_PLAN.md` Part 3 as plain files:
+Writes the bundle the Unity viewer reads, as plain files:
 manifest.json, people.csv, history.csv, pedigree.csv, frames.csv, demes.csv,
 flows.csv, events.csv, README.txt.
 

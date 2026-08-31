@@ -43,7 +43,7 @@ v0.3 replaces all of that with the standard quantitative-genetics model:
     Haldane's map function, the midparent-offspring regression, the
     breeder's equation and Daetwyler's PGS law (#32).
 
-WHAT LANDED AFTER v0.3  (sessions 2-8; see reads/REPORT.md)
+WHAT LANDED AFTER v0.3
 -----------------------------------------------------------
 Stage 1 is complete: lifetime-dynamic epigenetics with a germline
 firewall (#15-#20, `epigenome.py`), the physiological state vector with

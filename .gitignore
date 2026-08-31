@@ -69,6 +69,18 @@ dash_err.log
 # looks like.
 reads/
 
+# The paper's working artefacts follow reads/, for the same reason: they are
+# captures and intermediate renders made for a document that is not published
+# from this repository. `article_screenings/` is the figure set captured for
+# the paper; `outputs/paper/` is its build scratch, including page rasters of
+# the PDF itself.
+#
+# The public showcase is NOT here. `docs/showcase/` holds a curated, resized
+# subset, is tracked, and is what README.md links to. Rebuild it with
+# `python docs/make_showcase.py` while the captures above are still on disk.
+article_screenings/
+outputs/paper/
+
 # ---------------------------------------------------------------------
 # LaTeX build artifacts (reads/article.tex)
 # ---------------------------------------------------------------------

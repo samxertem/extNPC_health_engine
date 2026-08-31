@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Measure MPFB2 end to end, Blender to Unity, without opening either GUI.
 
-WHY THIS EXISTS. Phase B (`reads/UNITY_PLAN.md` Stage 6) needs the engine's
+WHY THIS EXISTS. The body-bake path needs the engine's
 `height_cm` to become a real stature on a real mesh in Unity, and its
 acceptance criterion is "a 1.75 m character measures 1.75 m in Unity". Every
 number that criterion depends on belongs to a third-party Blender add-on, so
@@ -43,7 +43,7 @@ than keep warning about a trap that no longer exists.
 WHAT THIS DOES NOT CHECK. Nothing here opens a window. Whether the character
 looks like a person, whether the skin material survived, and whether a family
 of them looks like a family are still human questions; the last of those
-is Stage 2's deliverable in `reads/MPFB_UNITY_INVESTIGATION.md`, deliberately
+is the deliverable of the MPFB investigation, deliberately
 gated behind this one.
 """
 

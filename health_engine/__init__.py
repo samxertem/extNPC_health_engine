@@ -35,7 +35,7 @@ Stage 2 (sex chromosomes #2, mitochondria #3, imprinting #4,
 canalization #14b, structural variants #12, developmental trajectory #13)
 and Stage 3 (stable matching #30, inbreeding depression #31) are all done.
 What remains is scientific debt and the LLM harness, not roadmap items --
-see reads/REPORT.md.
+see the README.
 """
 
 from .epigenome import (DEFAULT_GERMLINE_POLICY, Epigenome, GermlineResetPolicy,
