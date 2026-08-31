@@ -1,0 +1,179 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 430" width="1200" height="430" role="img" aria-labelledby="t d">
+<title id="t">Blending against meiosis</title>
+<desc id="d">Left: under blending every child lands on the midparent value. Right: under meiosis each child is an independent recombined mosaic of the parental haplotypes.</desc>
+<rect x="1" y="1" width="1198" height="428" fill="#0B0E14" rx="14" stroke="#1F2733" stroke-width="1"/>
+<rect x="30" y="30" width="540" height="370" fill="#0E141C" rx="12" stroke="#1F2733" stroke-width="1"/>
+<text x="56" y="66" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#F2C14E" font-weight="700" text-anchor="start" letter-spacing="2">BLENDING</text>
+<text x="56" y="94" font-family="ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace" font-size="15" fill="#E6EDF3" font-weight="600" text-anchor="start">child = (mother + father) / 2 + noise</text>
+<text x="56" y="132" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="11" fill="#6E7B8B" font-weight="600" text-anchor="start">mother</text>
+<rect x="130" y="120" width="300" height="16" fill="#0E141C" rx="8" stroke="#1F2733" stroke-width="1"/>
+<circle cx='190' cy='128' r='7' fill='#7C9EFF'/>
+<text x="56" y="164" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="11" fill="#6E7B8B" font-weight="600" text-anchor="start">father</text>
+<rect x="130" y="152" width="300" height="16" fill="#0E141C" rx="8" stroke="#1F2733" stroke-width="1"/>
+<circle cx='372' cy='160' r='7' fill='#FF9E64'/>
+<line x1="130" y1="186" x2="430" y2="186" stroke="#1F2733" stroke-width="1" stroke-linecap="round" stroke-dasharray="3 4"/>
+<line x1="281" y1="112" x2="281" y2="300" stroke="#6E7B8B" stroke-width="1" stroke-linecap="round" stroke-dasharray="4 5"/>
+<text x="281" y="106" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="10" fill="#6E7B8B" font-weight="600" text-anchor="middle">midparent</text>
+<text x="56" y="214" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="11" fill="#6E7B8B" font-weight="600" text-anchor="start">child 1</text>
+<rect x="130" y="206" width="300" height="16" fill="#0E141C" rx="8" stroke="#1F2733" stroke-width="1"/>
+<circle cx='272' cy='214' r='7' fill='#F2C14E'/>
+<text x="56" y="244" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="11" fill="#6E7B8B" font-weight="600" text-anchor="start">child 2</text>
+<rect x="130" y="236" width="300" height="16" fill="#0E141C" rx="8" stroke="#1F2733" stroke-width="1"/>
+<circle cx='286' cy='244' r='7' fill='#F2C14E'/>
+<text x="56" y="274" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="11" fill="#6E7B8B" font-weight="600" text-anchor="start">child 3</text>
+<rect x="130" y="266" width="300" height="16" fill="#0E141C" rx="8" stroke="#1F2733" stroke-width="1"/>
+<circle cx='279' cy='274' r='7' fill='#F2C14E'/>
+<text x="56" y="336" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="13" fill="#AEBAC8" font-weight="400" text-anchor="start">Every child lands on the midpoint. There is no</text>
+<text x="56" y="356" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="13" fill="#AEBAC8" font-weight="400" text-anchor="start">genotype to vary, so siblings correlate at 0.54</text>
+<text x="56" y="376" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="13" fill="#AEBAC8" font-weight="400" text-anchor="start">where theory says 0.21, and heritability cannot</text>
+<text x="56" y="396" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="13" fill="#F2C14E" font-weight="600" text-anchor="start">be a parameter of the model at all.</text>
+<rect x="630" y="30" width="540" height="370" fill="#0E141C" rx="12" stroke="#1F2733" stroke-width="1"/>
+<text x="656" y="66" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#4EC9E0" font-weight="700" text-anchor="start" letter-spacing="2">MEIOSIS</text>
+<text x="656" y="94" font-family="ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace" font-size="15" fill="#E6EDF3" font-weight="600" text-anchor="start">crossovers drawn along a centimorgan map</text>
+<text x="656" y="132" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="11" fill="#6E7B8B" font-weight="600" text-anchor="start">mother</text>
+<rect x="730" y="120" width="400" height="16" fill="#0E141C" rx="4"/>
+<rect x="730.0" y="120" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="746.67" y="120" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="763.33" y="120" width="17.07" height="16" fill="#7C9EFF" rx="0"/>
+<rect x="780.0" y="120" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="796.67" y="120" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="813.33" y="120" width="17.07" height="16" fill="#7C9EFF" rx="0"/>
+<rect x="830.0" y="120" width="17.07" height="16" fill="#7C9EFF" rx="0"/>
+<rect x="846.67" y="120" width="17.07" height="16" fill="#7C9EFF" rx="0"/>
+<rect x="863.33" y="120" width="17.07" height="16" fill="#7C9EFF" rx="0"/>
+<rect x="880.0" y="120" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="896.67" y="120" width="17.07" height="16" fill="#7C9EFF" rx="0"/>
+<rect x="913.33" y="120" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="930.0" y="120" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="946.67" y="120" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="963.33" y="120" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="980.0" y="120" width="17.07" height="16" fill="#7C9EFF" rx="0"/>
+<rect x="996.67" y="120" width="17.07" height="16" fill="#7C9EFF" rx="0"/>
+<rect x="1013.33" y="120" width="17.07" height="16" fill="#7C9EFF" rx="0"/>
+<rect x="1030.0" y="120" width="17.07" height="16" fill="#7C9EFF" rx="0"/>
+<rect x="1046.67" y="120" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="1063.33" y="120" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="1080.0" y="120" width="17.07" height="16" fill="#7C9EFF" rx="0"/>
+<rect x="1096.67" y="120" width="17.07" height="16" fill="#7C9EFF" rx="0"/>
+<rect x="1113.33" y="120" width="17.07" height="16" fill="#7C9EFF" rx="0"/>
+<rect x="730" y="120" width="400" height="16" fill="none" rx="4" stroke="#1F2733" stroke-width="1"/>
+<text x="656" y="164" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="11" fill="#6E7B8B" font-weight="600" text-anchor="start">father</text>
+<rect x="730" y="152" width="400" height="16" fill="#0E141C" rx="4"/>
+<rect x="730.0" y="152" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="746.67" y="152" width="17.07" height="16" fill="#C4703F" rx="0"/>
+<rect x="763.33" y="152" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="780.0" y="152" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="796.67" y="152" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="813.33" y="152" width="17.07" height="16" fill="#C4703F" rx="0"/>
+<rect x="830.0" y="152" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="846.67" y="152" width="17.07" height="16" fill="#C4703F" rx="0"/>
+<rect x="863.33" y="152" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="880.0" y="152" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="896.67" y="152" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="913.33" y="152" width="17.07" height="16" fill="#C4703F" rx="0"/>
+<rect x="930.0" y="152" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="946.67" y="152" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="963.33" y="152" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="980.0" y="152" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="996.67" y="152" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="1013.33" y="152" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="1030.0" y="152" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="1046.67" y="152" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="1063.33" y="152" width="17.07" height="16" fill="#C4703F" rx="0"/>
+<rect x="1080.0" y="152" width="17.07" height="16" fill="#C4703F" rx="0"/>
+<rect x="1096.67" y="152" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="1113.33" y="152" width="17.07" height="16" fill="#C4703F" rx="0"/>
+<rect x="730" y="152" width="400" height="16" fill="none" rx="4" stroke="#1F2733" stroke-width="1"/>
+<text x="656" y="214" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="11" fill="#6E7B8B" font-weight="600" text-anchor="start">child 1</text>
+<rect x="730" y="206" width="400" height="16" fill="#0E141C" rx="4"/>
+<rect x="730.0" y="206" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="746.67" y="206" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="763.33" y="206" width="17.07" height="16" fill="#7C9EFF" rx="0"/>
+<rect x="780.0" y="206" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="796.67" y="206" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="813.33" y="206" width="17.07" height="16" fill="#7C9EFF" rx="0"/>
+<rect x="830.0" y="206" width="17.07" height="16" fill="#7C9EFF" rx="0"/>
+<rect x="846.67" y="206" width="17.07" height="16" fill="#7C9EFF" rx="0"/>
+<rect x="863.33" y="206" width="17.07" height="16" fill="#7C9EFF" rx="0"/>
+<rect x="880.0" y="206" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="896.67" y="206" width="17.07" height="16" fill="#7C9EFF" rx="0"/>
+<rect x="913.33" y="206" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="930.0" y="206" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="946.67" y="206" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="963.33" y="206" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="980.0" y="206" width="17.07" height="16" fill="#7C9EFF" rx="0"/>
+<rect x="996.67" y="206" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="1013.33" y="206" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="1030.0" y="206" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="1046.67" y="206" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="1063.33" y="206" width="17.07" height="16" fill="#C4703F" rx="0"/>
+<rect x="1080.0" y="206" width="17.07" height="16" fill="#C4703F" rx="0"/>
+<rect x="1096.67" y="206" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="1113.33" y="206" width="17.07" height="16" fill="#C4703F" rx="0"/>
+<rect x="730" y="206" width="400" height="16" fill="none" rx="4" stroke="#1F2733" stroke-width="1"/>
+<line x1="996.7" y1="202" x2="996.7" y2="226" stroke="#E6EDF3" stroke-width="1.2" stroke-linecap="round"/>
+<text x="656" y="244" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="11" fill="#6E7B8B" font-weight="600" text-anchor="start">child 2</text>
+<rect x="730" y="236" width="400" height="16" fill="#0E141C" rx="4"/>
+<rect x="730.0" y="236" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="746.67" y="236" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="763.33" y="236" width="17.07" height="16" fill="#7C9EFF" rx="0"/>
+<rect x="780.0" y="236" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="796.67" y="236" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="813.33" y="236" width="17.07" height="16" fill="#7C9EFF" rx="0"/>
+<rect x="830.0" y="236" width="17.07" height="16" fill="#7C9EFF" rx="0"/>
+<rect x="846.67" y="236" width="17.07" height="16" fill="#7C9EFF" rx="0"/>
+<rect x="863.33" y="236" width="17.07" height="16" fill="#7C9EFF" rx="0"/>
+<rect x="880.0" y="236" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="896.67" y="236" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="913.33" y="236" width="17.07" height="16" fill="#C4703F" rx="0"/>
+<rect x="930.0" y="236" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="946.67" y="236" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="963.33" y="236" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="980.0" y="236" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="996.67" y="236" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="1013.33" y="236" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="1030.0" y="236" width="17.07" height="16" fill="#7C9EFF" rx="0"/>
+<rect x="1046.67" y="236" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="1063.33" y="236" width="17.07" height="16" fill="#C4703F" rx="0"/>
+<rect x="1080.0" y="236" width="17.07" height="16" fill="#C4703F" rx="0"/>
+<rect x="1096.67" y="236" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="1113.33" y="236" width="17.07" height="16" fill="#C4703F" rx="0"/>
+<rect x="730" y="236" width="400" height="16" fill="none" rx="4" stroke="#1F2733" stroke-width="1"/>
+<line x1="896.7" y1="232" x2="896.7" y2="256" stroke="#E6EDF3" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="1030.0" y1="232" x2="1030.0" y2="256" stroke="#E6EDF3" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="1046.7" y1="232" x2="1046.7" y2="256" stroke="#E6EDF3" stroke-width="1.2" stroke-linecap="round"/>
+<text x="656" y="274" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="11" fill="#6E7B8B" font-weight="600" text-anchor="start">child 3</text>
+<rect x="730" y="266" width="400" height="16" fill="#0E141C" rx="4"/>
+<rect x="730.0" y="266" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="746.67" y="266" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="763.33" y="266" width="17.07" height="16" fill="#7C9EFF" rx="0"/>
+<rect x="780.0" y="266" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="796.67" y="266" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="813.33" y="266" width="17.07" height="16" fill="#7C9EFF" rx="0"/>
+<rect x="830.0" y="266" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="846.67" y="266" width="17.07" height="16" fill="#C4703F" rx="0"/>
+<rect x="863.33" y="266" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="880.0" y="266" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="896.67" y="266" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="913.33" y="266" width="17.07" height="16" fill="#C4703F" rx="0"/>
+<rect x="930.0" y="266" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="946.67" y="266" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="963.33" y="266" width="17.07" height="16" fill="#5B76C4" rx="0"/>
+<rect x="980.0" y="266" width="17.07" height="16" fill="#7C9EFF" rx="0"/>
+<rect x="996.67" y="266" width="17.07" height="16" fill="#7C9EFF" rx="0"/>
+<rect x="1013.33" y="266" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="1030.0" y="266" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="1046.67" y="266" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="1063.33" y="266" width="17.07" height="16" fill="#C4703F" rx="0"/>
+<rect x="1080.0" y="266" width="17.07" height="16" fill="#C4703F" rx="0"/>
+<rect x="1096.67" y="266" width="17.07" height="16" fill="#FF9E64" rx="0"/>
+<rect x="1113.33" y="266" width="17.07" height="16" fill="#C4703F" rx="0"/>
+<rect x="730" y="266" width="400" height="16" fill="none" rx="4" stroke="#1F2733" stroke-width="1"/>
+<line x1="830.0" y1="262" x2="830.0" y2="286" stroke="#E6EDF3" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="930.0" y1="262" x2="930.0" y2="286" stroke="#E6EDF3" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="1013.3" y1="262" x2="1013.3" y2="286" stroke="#E6EDF3" stroke-width="1.2" stroke-linecap="round"/>
+<text x="656" y="336" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="13" fill="#AEBAC8" font-weight="400" text-anchor="start">Each child is an independent mosaic. Linked genes</text>
+<text x="656" y="356" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="13" fill="#AEBAC8" font-weight="400" text-anchor="start">travel together, one gene reaches several traits,</text>
+<text x="656" y="376" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="13" fill="#AEBAC8" font-weight="400" text-anchor="start">and the declared heritability comes back out of</text>
+<text x="656" y="396" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="13" fill="#4EC9E0" font-weight="600" text-anchor="start">the measurement: 0.835 against a declared 0.80.</text>
+</svg>

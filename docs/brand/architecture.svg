@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 585" width="1200" height="585" role="img" aria-labelledby="t d">
+<title id="t">SAMARA architecture</title>
+<desc id="d">Engine feeds Simulation, which exports a CSV bundle read by both the Dashboard and the Unity Viewer, the two held to identical output by a generated parity fixture. A validation harness reads the output back and never writes into it.</desc>
+<rect x="1" y="1" width="1198" height="583" fill="#0B0E14" rx="14" stroke="#1F2733" stroke-width="1"/>
+<text x="40" y="42" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="11" fill="#6E7B8B" font-weight="700" text-anchor="start" letter-spacing="2">ONE SIMULATION, FOUR LAYERS, ONE BUNDLE BETWEEN THEM</text>
+<rect x="40" y="70" width="240" height="159" fill="#0E141C" rx="12" stroke="#4EC9E0" stroke-width="1.4"/>
+<rect x="40" y="70" width="240" height="3.5" fill="#4EC9E0" rx="2"/>
+<text x="56" y="100" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="9.5" fill="#4EC9E0" font-weight="700" text-anchor="start" letter-spacing="1.6">PYTHON  ·  14.2k LINES</text>
+<text x="56" y="124" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="18" fill="#E6EDF3" font-weight="700" text-anchor="start">Engine</text>
+<text x="56" y="150" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12.5" fill="#AEBAC8" font-weight="400" text-anchor="start">505 loci, 22 autosomes + XY</text>
+<text x="56" y="169" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12.5" fill="#AEBAC8" font-weight="400" text-anchor="start">meiosis as a Poisson process</text>
+<text x="56" y="188" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12.5" fill="#AEBAC8" font-weight="400" text-anchor="start">P = A + D + I + G×E + E</text>
+<text x="56" y="207" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12.5" fill="#AEBAC8" font-weight="400" text-anchor="start">42 traits, declared h²</text>
+<rect x="330" y="70" width="240" height="159" fill="#0E141C" rx="12" stroke="#7C9EFF" stroke-width="1.4"/>
+<rect x="330" y="70" width="240" height="3.5" fill="#7C9EFF" rx="2"/>
+<text x="346" y="100" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="9.5" fill="#7C9EFF" font-weight="700" text-anchor="start" letter-spacing="1.6">PYTHON  ·  3.8k LINES</text>
+<text x="346" y="124" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="18" fill="#E6EDF3" font-weight="700" text-anchor="start">Simulation</text>
+<text x="346" y="150" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12.5" fill="#AEBAC8" font-weight="400" text-anchor="start">yearly turnover, Gompertz</text>
+<text x="346" y="169" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12.5" fill="#AEBAC8" font-weight="400" text-anchor="start">Gale-Shapley pairing</text>
+<text x="346" y="188" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12.5" fill="#AEBAC8" font-weight="400" text-anchor="start">island demes + migration</text>
+<text x="346" y="207" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12.5" fill="#AEBAC8" font-weight="400" text-anchor="start">8 scenarios, 3 shocks</text>
+<rect x="620" y="86" width="180" height="140" fill="#0E141C" rx="12" stroke="#F2C14E" stroke-width="1.4"/>
+<rect x="620" y="86" width="180" height="3.5" fill="#F2C14E" rx="2"/>
+<text x="636" y="116" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="9.5" fill="#F2C14E" font-weight="700" text-anchor="start" letter-spacing="1.6">CSV + MANIFEST</text>
+<text x="636" y="140" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="18" fill="#E6EDF3" font-weight="700" text-anchor="start">Bundle</text>
+<text x="636" y="166" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12.5" fill="#AEBAC8" font-weight="400" text-anchor="start">people · history · pedigree</text>
+<text x="636" y="185" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12.5" fill="#AEBAC8" font-weight="400" text-anchor="start">frames · demes · flows</text>
+<text x="636" y="204" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12.5" fill="#AEBAC8" font-weight="400" text-anchor="start">seed, params, revision</text>
+<rect x="850" y="60" width="310" height="159" fill="#0E141C" rx="12" stroke="#7EE787" stroke-width="1.4"/>
+<rect x="850" y="60" width="310" height="3.5" fill="#7EE787" rx="2"/>
+<text x="866" y="90" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="9.5" fill="#7EE787" font-weight="700" text-anchor="start" letter-spacing="1.6">DASH / PLOTLY  ·  5.2k LINES</text>
+<text x="866" y="114" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="18" fill="#E6EDF3" font-weight="700" text-anchor="start">Dashboard</text>
+<text x="866" y="140" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12.5" fill="#AEBAC8" font-weight="400" text-anchor="start">28 panels, 12-metric deck</text>
+<text x="866" y="159" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12.5" fill="#AEBAC8" font-weight="400" text-anchor="start">7 views, 5-tab character sheet</text>
+<text x="866" y="178" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12.5" fill="#AEBAC8" font-weight="400" text-anchor="start">timeline replay of any year</text>
+<text x="866" y="197" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12.5" fill="#AEBAC8" font-weight="400" text-anchor="start">two-individual comparison</text>
+<rect x="850" y="236" width="310" height="159" fill="#0E141C" rx="12" stroke="#FF9E64" stroke-width="1.4"/>
+<rect x="850" y="236" width="310" height="3.5" fill="#FF9E64" rx="2"/>
+<text x="866" y="266" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="9.5" fill="#FF9E64" font-weight="700" text-anchor="start" letter-spacing="1.6">UNITY C#  ·  10.8k LINES</text>
+<text x="866" y="290" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="18" fill="#E6EDF3" font-weight="700" text-anchor="start">Viewer</text>
+<text x="866" y="316" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12.5" fill="#AEBAC8" font-weight="400" text-anchor="start">one rigged body per life stage</text>
+<text x="866" y="335" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12.5" fill="#AEBAC8" font-weight="400" text-anchor="start">provenance HUD in every frame</text>
+<text x="866" y="354" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12.5" fill="#AEBAC8" font-weight="400" text-anchor="start">headcount reconciled per year</text>
+<text x="866" y="373" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12.5" fill="#AEBAC8" font-weight="400" text-anchor="start">122 EditMode tests</text>
+<line x1="284" y1="149.5" x2="315.0" y2="149.5" stroke="#6E7B8B" stroke-width="2" stroke-linecap="round"/>
+<polygon points="324.0,149.5 313.6,153.0 313.6,146.0" fill="#6E7B8B"/>
+<line x1="574" y1="149.5" x2="605.1" y2="154.6" stroke="#6E7B8B" stroke-width="2" stroke-linecap="round"/>
+<polygon points="614.0,156.0 603.1,157.8 604.3,150.9" fill="#6E7B8B"/>
+<line x1="804" y1="148.0" x2="835.8" y2="133.7" stroke="#6E7B8B" stroke-width="2" stroke-linecap="round"/>
+<polygon points="844.0,130.0 835.9,137.5 833.1,131.1" fill="#6E7B8B"/>
+<line x1="804" y1="164.0" x2="841.4" y2="287.4" stroke="#6E7B8B" stroke-width="2" stroke-linecap="round"/>
+<polygon points="844.0,296.0 837.6,287.0 844.3,285.0" fill="#6E7B8B"/>
+<line x1="890" y1="219" x2="890" y2="236" stroke="#7EE787" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="4 4"/>
+<text x="902" y="231.5" font-family="ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace" font-size="10.5" fill="#6E7B8B" font-weight="600" text-anchor="start">parity fixture · identical strings</text>
+<rect x="40" y="400" width="700" height="160" fill="#0E141C" rx="12" stroke="#F2C14E" stroke-width="1.4"/>
+<rect x="40" y="400" width="700" height="3.5" fill="#F2C14E" rx="2"/>
+<text x="56" y="430" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="9.5" fill="#F2C14E" font-weight="700" text-anchor="start" letter-spacing="1.6">MEASURED, NOT COMPUTED</text>
+<text x="56" y="454" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="18" fill="#E6EDF3" font-weight="700" text-anchor="start">Validation harness</text>
+<text x="56" y="480" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12.5" fill="#AEBAC8" font-weight="400" text-anchor="start">Hardy-Weinberg · Haldane · midparent-offspring · breeder's equation</text>
+<text x="56" y="499" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12.5" fill="#AEBAC8" font-weight="400" text-anchor="start">Daetwyler · drift · imprinting gap · Malécot kinship · lethal equivalents</text>
+<text x="56" y="518" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12.5" fill="#AEBAC8" font-weight="400" text-anchor="start">directional dominance · purging · CNV dosage · growth curve</text>
+<text x="56" y="537" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12.5" fill="#F2C14E" font-weight="600" text-anchor="start">20 gated verdicts, 20 passes  ·  1,211 tests  ·  every one can fail</text>
+<line x1="160" y1="400" x2="160" y2="263" stroke="#F2C14E" stroke-width="2" stroke-linecap="round" stroke-dasharray="5 5"/>
+<line x1="160" y1="263" x2="160.0" y2="244.0" stroke="#F2C14E" stroke-width="2" stroke-linecap="round"/>
+<polygon points="160.0,235.0 163.5,245.4 156.5,245.4" fill="#F2C14E"/>
+<text x="176" y="255" font-family="ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace" font-size="10.5" fill="#6E7B8B" font-weight="600" text-anchor="start">reads output back</text>
+<text x="176" y="273" font-family="ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace" font-size="10.5" fill="#6E7B8B" font-weight="600" text-anchor="start">never writes into it</text>
+<text x="772" y="428" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="13" fill="#AEBAC8" font-weight="400" text-anchor="start">No code path evaluates a population-genetics law</text>
+<text x="772" y="448" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="13" fill="#AEBAC8" font-weight="400" text-anchor="start">in order to produce output. Those appear only in</text>
+<text x="772" y="468" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="13" fill="#AEBAC8" font-weight="400" text-anchor="start">the harness, reading the output back and testing</text>
+<text x="772" y="488" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="13" fill="#AEBAC8" font-weight="400" text-anchor="start">it against closed form.</text>
+<text x="772" y="518" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="13" fill="#4EC9E0" font-weight="600" text-anchor="start">That is the whole methodological claim.</text>
+</svg>
