@@ -154,3 +154,15 @@ unity/**/UserSettings/
 unity/**/obj/
 *.csproj
 *.sln
+
+# ---------------------------------------------------------------------
+# uv and Hypothesis
+# ---------------------------------------------------------------------
+# uv.lock IS tracked, deliberately. It is the pin the reproducibility claim
+# rests on: requirements.txt names the eight direct dependencies, the lock
+# names all 49 with hashes. A lock nobody commits pins nothing.
+#
+# The environment it builds is not tracked, and neither is Hypothesis's
+# example database, which is a local cache of inputs that have failed here.
+.venv/
+.hypothesis/

@@ -1,7 +1,19 @@
-# extNPC Health Engine — pinned dependencies
+# SAMARA: direct dependencies, with the reason for each.
 #
-# Versions are the ones the 735-test suite was last verified green against
-# (2026-08-13, Python 3.14.5, Windows 11). Pinned exactly rather than with
+# THIS FILE IS NOT THE AUTHORITATIVE PIN. It lists the eight packages this
+# project imports directly and says why each is here, which is worth keeping.
+# It does not pin what they depend on: a working environment holds 63
+# packages, so 55 of them float. `uv.lock` pins the whole resolved graph with
+# hashes and is what a reproducibility claim should rest on.
+#
+#   uv sync                      the locked graph, exactly
+#   pip install -r requirements.txt   the direct pins only, still fine
+#
+# tools/check_repo.py fails if this file and pyproject.toml disagree about a
+# version, so the two cannot drift apart.
+#
+# Versions are the ones the suite was last verified green against
+# (2026-08-31, Python 3.14.5, Windows 11). Pinned exactly rather than with
 # `>=` on purpose: this project's central claim is that a seeded run is
 # reproducible, and numpy in particular has changed RNG and floating-point
 # reduction behaviour across minor versions before. A reviewer re-running the
@@ -10,7 +22,7 @@
 #   python -m pip install -r requirements.txt
 #
 # Verified with:
-#   python -m pytest tests/ -q          -> 735 passed, 1 skipped
+#   python -m pytest tests/ -q          -> 1210 passed, 1 skipped
 #   python health_engine_prototype.py   -> writes outputs/*.png
 #   python export_for_unity.py          -> writes a world bundle for the viewer
 
@@ -23,12 +35,15 @@ networkx==3.6.1       # simulation/pedigree.py — pedigree graph + kinship trav
 matplotlib==3.11.0
 
 # --- live dashboard (dashboard/, run_dashboard.py) --------------------
-# Not needed to run the engine or the tests; only for `python run_dashboard.py`.
+# Required by the test suite, not merely by the dashboard: ten test files
+# under tests/ import plotly or dash directly. This block used to say they
+# were optional, which was wrong from the first dashboard test onward.
 dash==4.4.1
 plotly==6.9.0
 
 # --- tests ------------------------------------------------------------
 pytest==9.1.1
+hypothesis==6.167.1   # tests/test_properties.py, property-based invariants
 
 # --- optional, authoring only -----------------------------------------
 # Pillow is used solely by dashboard/assets/sprites/make_villager.py, the

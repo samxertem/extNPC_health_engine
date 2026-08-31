@@ -1,0 +1,46 @@
+SAMARA
+Simulated Ancestry, Meiosis And Regulatory Architecture
+
+Copyright 2026 Murathan Sam Ertem
+
+Licensed under the Apache License, Version 2.0. See the LICENSE file at the
+root of this repository, or http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------
+THIRD-PARTY MATERIAL BUNDLED IN THIS REPOSITORY
+--------------------------------------------------------------------------
+
+Terrain art
+    Kenney, "Tiny Town", CC0 1.0 Universal (public domain dedication).
+    See dashboard/assets/sprites/tiny_town_LICENSE.txt
+
+Villager sprite sheet
+    Authored in this repository and dedicated to the public domain under
+    CC0 1.0 Universal. Regenerable via
+    dashboard/assets/sprites/make_villager.py
+
+--------------------------------------------------------------------------
+THIRD-PARTY MATERIAL DELIBERATELY *NOT* BUNDLED
+--------------------------------------------------------------------------
+
+MPFB2 / MakeHuman
+    MPFB2's code is GPLv3 and is therefore never vendored here. The `mpfb/`
+    package drives an MPFB2 installed on the developer's own machine and
+    contains none of its code; the boundary is stated in mpfb/__init__.py
+    and is a licensing constraint rather than a stylistic one.
+
+    MPFB2's *assets* are CC0, so the bodies baked through that path carry no
+    copyleft obligation and the exported meshes may ship anywhere.
+
+--------------------------------------------------------------------------
+SCOPE OF THIS LICENCE
+--------------------------------------------------------------------------
+
+The Apache-2.0 grant covers the source in this repository: the engine
+(health_engine/), the simulation layer (simulation/), the dashboard
+(dashboard/), the Unity viewer package (unity/com.samal.extnpc/), the build
+and analysis tooling (mpfb/, tools/, docs/), and the tests.
+
+It does not extend to the third-party art listed above, which carries its own
+terms, nor to any world bundle, mesh or figure you generate with this software.
+Output is yours.

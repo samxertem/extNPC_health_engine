@@ -101,6 +101,33 @@ shots = list((ROOT / "docs" / "showcase").glob("*.png"))
 gate("showcase images present", len(shots) >= 12, "%d files" % len(shots))
 
 
+print("\nDEPENDENCIES")
+# requirements.txt keeps the per-package rationale; pyproject.toml is what
+# uv.lock is resolved from. Two files naming versions will disagree
+# eventually, so the disagreement is a failure rather than a surprise.
+req = {}
+for line in read("requirements.txt").splitlines():
+    line = line.split("#")[0].strip()
+    if "==" in line:
+        name, ver = line.split("==", 1)
+        req[name.strip().lower()] = ver.strip()
+
+proj = {}
+for m in re.finditer(r'"([A-Za-z0-9_.-]+)==([^"]+)"', read("pyproject.toml")):
+    proj[m.group(1).lower()] = m.group(2)
+
+drift = {k: (req[k], proj[k]) for k in set(req) & set(proj) if req[k] != proj[k]}
+only_req = sorted(set(req) - set(proj))
+gate("requirements.txt agrees with pyproject.toml", not drift,
+     str(drift) if drift else "%d versions cross-checked" % len(set(req) & set(proj)))
+gate("every direct dependency is in pyproject.toml", not only_req,
+     ", ".join(only_req))
+
+lock = read("uv.lock")
+gate("uv.lock exists and carries hashes",
+     bool(lock) and 'hash = "sha256:' in lock,
+     "%d packages" % lock.count("[[package]]"))
+
 print("\nPACKAGING")
 gate("a licence exists", (ROOT / "LICENSE").exists(),
      "" if (ROOT / "LICENSE").exists() else "blocks any public release")

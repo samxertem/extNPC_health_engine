@@ -3,6 +3,7 @@
   "version": "0.3.0",
   "displayName": "SAMARA World Viewer",
   "description": "Reads a world bundle exported by the SAMARA quantitative-genetics engine and renders its villagers. A viewer: it performs no biology and computes no phenotype. Every number it shows came from a file the engine wrote.",
+  "license": "Apache-2.0",
   "unity": "6000.0",
   "dependencies": {
     "com.unity.nuget.newtonsoft-json": "3.2.1",

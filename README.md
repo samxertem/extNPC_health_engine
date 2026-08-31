@@ -350,19 +350,36 @@ dashboard.
 ## Quick start
 
 ```bash
-python -m pip install -r requirements.txt
+uv sync                                    # the exact locked graph, 49 packages
 
-python run_dashboard.py                    # the live population sim at :8050
-python health_engine_prototype.py          # engine demo + validation harness + figures
-python health_engine_prototype.py --fast   # smoke run (widened tolerances)
-python -m pytest tests/ -q                 # 1,211 tests, ~8 min: the rigorous gate
-python export_for_unity.py                 # write a world bundle for the viewer
+uv run python run_dashboard.py             # the live population sim at :8050
+uv run python health_engine_prototype.py   # engine demo + harness + figures
+uv run python -m pytest tests/ -q          # the suite, ~8 min: the rigorous gate
+uv run python export_for_unity.py          # write a world bundle for the viewer
 ```
 
-Python **3.14.5** is what the suite is verified against. Dependencies are
-pinned exactly rather than with `>=`, because the project's central claim is
-that a seeded run is reproducible and numpy has changed RNG behaviour across
-minor versions before.
+<details>
+<summary>Using pip instead</summary>
+
+```bash
+python -m pip install -r requirements.txt
+python -m pytest tests/ -q
+```
+
+This works and gets you the same eight direct versions. It does **not** get
+you the same stack: `requirements.txt` pins what this project imports
+directly, and a working environment holds 63 packages, so the other 55 float.
+`uv.lock` pins all 49 resolved packages with hashes, which is what a
+reproducibility claim should actually rest on. `tools/check_repo.py` fails if
+the two files ever disagree about a version.
+
+</details>
+
+Python **3.14** is what the suite is verified against, and `requires-python`
+in `pyproject.toml` is the single place that says so. Versions are pinned
+exactly rather than with `>=`, because the project's central claim is that a
+seeded run is reproducible and numpy has changed RNG behaviour across minor
+versions before.
 
 The demo drives the **engine** on a hand-built nine-person pedigree. The
 **simulation layer** and its dashboard are separate: that is `run_dashboard.py`.
@@ -658,6 +675,22 @@ Terrain art is Kenney's "Tiny Town" (CC0); see
 authored here and regenerable via `dashboard/assets/sprites/make_villager.py`
 (requires Pillow); it is also CC0. Body meshes are baked through MPFB2 and
 MakeHuman; see `mpfb/` for the licensing notes.
+
+## Licence
+
+Apache-2.0. The full text is in [`LICENSE`](LICENSE) and the attribution
+notices are in [`NOTICE`](NOTICE).
+
+The licence story is part of the architecture rather than an afterthought, so
+it is worth one paragraph. MPFB2, which bakes the bodies, is **GPLv3**, and its
+code is therefore never vendored here: `mpfb/` drives an MPFB2 installed on
+your own machine and contains none of it. MPFB2's *assets* are **CC0**, so a
+mesh you bake and ship in a game carries no copyleft obligation. That
+separation is why the bake path sits outside the Unity package instead of
+inside it. Terrain art is Kenney's "Tiny Town", also CC0.
+
+Anything you generate with this software, a world bundle, a mesh or a figure,
+is yours.
 
 ## Citation
 

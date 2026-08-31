@@ -1,0 +1,94 @@
+#=======================================================================
+# SAMARA: Simulated Ancestry, Meiosis And Regulatory Architecture
+#
+# This file exists for one reason: requirements.txt pins the eight packages
+# this project imports directly, and nothing they depend on. Sixty-three
+# packages are installed in a working environment. Fifty-five of them are
+# unpinned, so "a seeded run is reproducible" has been resting on a stack
+# that is not actually fixed. `uv.lock`, generated from this file, pins the
+# whole resolved graph with hashes.
+#
+#   uv sync              install exactly the locked graph
+#   uv run pytest -q     run the suite against it
+#   uv lock --upgrade    deliberately move, and see what moved
+#
+# requirements.txt is KEPT and is generated from the lock by
+#   uv export --format requirements-txt --no-hashes -o requirements.txt
+# so a reader with only pip still gets the same versions.
+#=======================================================================
+
+[project]
+name = "samara"
+version = "0.5.0"
+description = "A quantitative-genetics engine for believable non-player characters: real meiosis, a declared heritability, and twenty population-genetics laws measured from its own output."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+requires-python = ">=3.14,<3.15"
+authors = [{ name = "Murathan Sam Ertem" }]
+keywords = [
+    "population-genetics",
+    "quantitative-genetics",
+    "agent-based-simulation",
+    "procedural-generation",
+    "non-player-characters",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Games/Entertainment :: Simulation",
+]
+
+# The engine and the simulation layer. Everything a seeded run and the
+# validation harness need, and nothing else.
+dependencies = [
+    "numpy==2.4.4",
+    "scipy==1.17.1",
+    "networkx==3.6.1",
+    "matplotlib==3.11.0",
+    # The dashboard is a surface of this project, not an add-on: ten test
+    # files import plotly, so the suite does not run without these. They were
+    # classified as optional until `uv sync` installed only what was declared
+    # and the suite failed to collect.
+    "dash==4.4.1",
+    "plotly==6.9.0",
+]
+
+[project.optional-dependencies]
+# Authoring only, and genuinely optional: the one-off script that draws the
+# villager sprite sheet, and the rasteriser used to look at a generated
+# figure or document rather than to produce one.
+authoring = [
+    "pillow==12.3.0",
+    "pymupdf==1.26.7",
+]
+
+[dependency-groups]
+# PEP 735. Development dependencies are not part of what a consumer installs,
+# which is why they are here rather than in optional-dependencies.
+dev = [
+    "pytest==9.1.1",
+    "hypothesis==6.167.1",
+]
+
+[project.urls]
+Repository = "https://github.com/samxertem/samara_engine"
+
+[tool.uv]
+# This repository is an application and a set of packages run from the root,
+# not a library that gets installed into site-packages. `package = false`
+# stops uv building and installing it, which would otherwise shadow the
+# working tree that the tests actually import.
+package = false
+# Groups installed by default for `uv sync`.
+default-groups = ["dev"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Hypothesis needs a home for its example database; keeping it out of the
+# repository root means a failing example is remembered locally and never
+# committed by accident.
+addopts = "-q"
+filterwarnings = ["error::DeprecationWarning:health_engine.*"]
