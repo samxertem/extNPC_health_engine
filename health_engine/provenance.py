@@ -159,6 +159,18 @@ def _series_from_axis(ax) -> List[Dict[str, Any]]:
     return out
 
 
+def axes_digest(axes: List[Dict[str, Any]]) -> str:
+    """One digest over every series digest, so a single field answers "did any
+    number in this figure move".
+
+    Exported so that the writer and the checker cannot disagree about how it is
+    computed: `tools/check_figures.py` recomputes it from a manifest's own
+    content rather than trusting the stored field.
+    """
+    blob = json.dumps([a.get("series", []) for a in axes], sort_keys=True)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
+
+
 def figure_manifest(fig, png_path: str,
                     extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Describe a figure by the numbers it draws."""
@@ -173,14 +185,11 @@ def figure_manifest(fig, png_path: str,
             "series": series,
         })
 
-    # One digest over every series digest, so a single field answers "did any
-    # number in this figure move".
-    blob = json.dumps([a["series"] for a in axes], sort_keys=True)
     return {
         "figure": os.path.basename(png_path),
         "generated_by": "health_engine.viz",
         "schema": 1,
-        "digest": hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16],
+        "digest": axes_digest(axes),
         "provenance": run_provenance(extra),
         "axes": axes,
     }

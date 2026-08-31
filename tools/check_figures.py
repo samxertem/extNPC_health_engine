@@ -41,6 +41,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from health_engine.provenance import axes_digest      # noqa: E402
 
 # Fields of a series summary that are compared numerically.
 _STATS = ("n", "min", "max", "mean", "std")
@@ -145,11 +148,23 @@ def main() -> int:
             continue
         old = json.loads(raw)
 
-        if old.get("digest") == new.get("digest"):
+        # Never trust a stored digest without recomputing it. A manifest whose
+        # digest field disagrees with its own content has been edited by hand
+        # or truncated, and reporting that is the point of having a digest.
+        for tag, man in (("baseline", old), ("regenerated", new)):
+            if man.get("digest") != axes_digest(man.get("axes", [])):
+                print("  TAMPERED %s  (%s manifest's digest does not match "
+                      "its own content)" % (p.name, tag))
+                failures.append(p.name)
+
+        # The statistics are compared whatever the digests say. The digest only
+        # decides, once the statistics agree, whether this is identical output
+        # or the last bit of a float landing elsewhere.
+        changed, noise = compare(old, new, args.tol)
+        if not changed and old.get("digest") == new.get("digest"):
             n_ok += 1
             continue
 
-        changed, noise = compare(old, new, args.tol)
         if changed:
             print("  CHANGED  %s" % p.name)
             for line in changed[:12]:
@@ -168,6 +183,10 @@ def main() -> int:
                 print(line)
             noises.append(p.name)
             n_ok += 1
+
+    # One file can trip both the tamper check and the comparison; it is still
+    # one broken figure.
+    failures = sorted(set(failures))
 
     print()
     print("%d unchanged, %d float-noise, %d new, %d changed"
