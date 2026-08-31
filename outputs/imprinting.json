@@ -1,0 +1,171 @@
+{
+  "axes": [
+    {
+      "index": 0,
+      "series": [
+        {
+          "kind": "line",
+          "label": "_child3",
+          "x": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          },
+          "y": {
+            "digest": "d705d8715084e9a2",
+            "max": 167.209729892,
+            "mean": 167.209729892,
+            "min": 167.209729892,
+            "n": 2,
+            "std": 0.0
+          }
+        },
+        {
+          "kind": "bars",
+          "label": "patches",
+          "v": {
+            "digest": "5dc0f0087048fb9a",
+            "max": 167.950002862,
+            "mean": 167.209729892,
+            "min": 166.469456921,
+            "n": 3,
+            "std": 0.604430349
+          }
+        }
+      ],
+      "title": "Same genotype at IGF2 (dosage 1)\ndifferent parent of origin",
+      "xlabel": "",
+      "ylabel": "cm"
+    },
+    {
+      "index": 1,
+      "series": [
+        {
+          "kind": "line",
+          "label": "closed form  $2\\cdot s\\cdot a$",
+          "x": {
+            "digest": "d42a40c6712e1322",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 11,
+            "std": 0.316227766
+          },
+          "y": {
+            "digest": "6d538f7a16ae95e6",
+            "max": 0.182783449,
+            "mean": 0.091391725,
+            "min": 0.0,
+            "n": 11,
+            "std": 0.057801202
+          }
+        },
+        {
+          "kind": "line",
+          "label": "simulated",
+          "x": {
+            "digest": "d42a40c6712e1322",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 11,
+            "std": 0.316227766
+          },
+          "y": {
+            "digest": "6d538f7a16ae95e6",
+            "max": 0.182783449,
+            "mean": 0.091391725,
+            "min": 0.0,
+            "n": 11,
+            "std": 0.057801202
+          }
+        }
+      ],
+      "title": "The law\n$s=0$ biallelic  ...  $s=1$ monoallelic",
+      "xlabel": "silencing strength $s$",
+      "ylabel": "reciprocal gap (liability SD)"
+    },
+    {
+      "index": 2,
+      "series": [
+        {
+          "kind": "line",
+          "label": "_child60",
+          "x": {
+            "digest": "8aa390450af9ad7b",
+            "max": 170.103987332,
+            "mean": 170.103987332,
+            "min": 170.103987332,
+            "n": 2,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child61",
+          "x": {
+            "digest": "e58d0854089bec63",
+            "max": 170.114351154,
+            "mean": 170.114351154,
+            "min": 170.114351154,
+            "n": 2,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          }
+        },
+        {
+          "kind": "bars",
+          "label": "patches",
+          "v": {
+            "digest": "7a7a6559569e6b95",
+            "max": 242.0,
+            "mean": 67.796610169,
+            "min": 0.0,
+            "n": 59,
+            "std": 76.142101688
+          }
+        }
+      ],
+      "title": "Population, n=4000\nmean 170.10 -> 170.11   sd 9.050 -> 9.056",
+      "xlabel": "cm",
+      "ylabel": "individuals"
+    }
+  ],
+  "digest": "ddd8e3b530b47ab0",
+  "figure": "imprinting.png",
+  "generated_by": "health_engine.viz",
+  "provenance": {
+    "catalogue": "synthetic",
+    "git_commit": "49719a8",
+    "git_dirty": true,
+    "libraries": {
+      "dash": "4.4.1",
+      "matplotlib": "3.11.0",
+      "networkx": "3.6.1",
+      "numpy": "2.4.4",
+      "plotly": "6.9.0",
+      "scipy": "1.17.1"
+    },
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.14.5"
+  },
+  "schema": 1
+}

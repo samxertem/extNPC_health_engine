@@ -1,0 +1,159 @@
+{
+  "axes": [
+    {
+      "index": 0,
+      "series": [
+        {
+          "kind": "line",
+          "label": "founding B = 1.40",
+          "x": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          },
+          "y": {
+            "digest": "af403fc163c71849",
+            "max": 1.4,
+            "mean": 1.4,
+            "min": 1.4,
+            "n": 2,
+            "std": 0.0
+          }
+        },
+        {
+          "kind": "line",
+          "label": "random mating (n=1500)",
+          "x": {
+            "digest": "13a22b00aae835fa",
+            "max": 8.0,
+            "mean": 4.0,
+            "min": 0.0,
+            "n": 9,
+            "std": 2.581988897
+          },
+          "y": {
+            "digest": "e70470878e715c3b",
+            "max": 1.385029924,
+            "mean": 1.337557692,
+            "min": 1.305679176,
+            "n": 9,
+            "std": 0.023705005
+          }
+        },
+        {
+          "kind": "line",
+          "label": "full-sib lines (150 started)",
+          "x": {
+            "digest": "13a22b00aae835fa",
+            "max": 8.0,
+            "mean": 4.0,
+            "min": 0.0,
+            "n": 9,
+            "std": 2.581988897
+          },
+          "y": {
+            "digest": "928941633bb97675",
+            "max": 1.382676157,
+            "mean": 1.151468672,
+            "min": 0.876296025,
+            "n": 9,
+            "std": 0.182162892
+          }
+        }
+      ],
+      "title": "Sustained inbreeding purges the load: -37% in 8 generations\n(control holds under the identical survival rule)",
+      "xlabel": "generation of the mating scheme",
+      "ylabel": "realised lethal equivalents  B(t)"
+    },
+    {
+      "index": 1,
+      "series": [
+        {
+          "kind": "line",
+          "label": "severe, s > 0.3  (-52%)",
+          "x": {
+            "digest": "13a22b00aae835fa",
+            "max": 8.0,
+            "mean": 4.0,
+            "min": 0.0,
+            "n": 9,
+            "std": 2.581988897
+          },
+          "y": {
+            "digest": "97bcc4c1a48d64de",
+            "max": 1.0,
+            "mean": 0.773602389,
+            "min": 0.477805405,
+            "n": 9,
+            "std": 0.184338186
+          }
+        },
+        {
+          "kind": "line",
+          "label": "mild, s <= 0.3  (-28%)",
+          "x": {
+            "digest": "13a22b00aae835fa",
+            "max": 8.0,
+            "mean": 4.0,
+            "min": 0.0,
+            "n": 9,
+            "std": 2.581988897
+          },
+          "y": {
+            "digest": "9d443251e52cb5e3",
+            "max": 1.004648992,
+            "mean": 0.867636497,
+            "min": 0.719517626,
+            "n": 9,
+            "std": 0.104545424
+          }
+        }
+      ],
+      "title": "Purging strips the severe, nearly-recessive load\nand barely touches the mild (Hedrick & Garcia-Dorado)",
+      "xlabel": "generation of sib mating",
+      "ylabel": "component of B, relative to start"
+    },
+    {
+      "index": 2,
+      "series": [
+        {
+          "kind": "bars",
+          "label": "patches",
+          "v": {
+            "digest": "3da441162344beec",
+            "max": 150.0,
+            "mean": 121.111111111,
+            "min": 82.0,
+            "n": 9,
+            "std": 24.740629851
+          }
+        }
+      ],
+      "title": "The price: 68 of 150 lines went extinct\n(purging is measured on the survivors, and only on them)",
+      "xlabel": "generation of sib mating",
+      "ylabel": "lines still alive"
+    }
+  ],
+  "digest": "dd2f246bd4fd1775",
+  "figure": "load_purging.png",
+  "generated_by": "health_engine.viz",
+  "provenance": {
+    "catalogue": "synthetic",
+    "git_commit": "49719a8",
+    "git_dirty": true,
+    "libraries": {
+      "dash": "4.4.1",
+      "matplotlib": "3.11.0",
+      "networkx": "3.6.1",
+      "numpy": "2.4.4",
+      "plotly": "6.9.0",
+      "scipy": "1.17.1"
+    },
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.14.5"
+  },
+  "schema": 1
+}

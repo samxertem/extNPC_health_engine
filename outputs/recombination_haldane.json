@@ -1,0 +1,91 @@
+{
+  "axes": [
+    {
+      "index": 0,
+      "series": [
+        {
+          "kind": "line",
+          "label": "Haldane:  $r = (1-e^{-2d})/2$",
+          "x": {
+            "digest": "9c324c59f4e59cfb",
+            "max": 119.978156937,
+            "mean": 59.989078469,
+            "min": 0.0,
+            "n": 300,
+            "std": 34.750352696
+          },
+          "y": {
+            "digest": "d203bc2cb60723a2",
+            "max": 0.454621203,
+            "mean": 0.310261567,
+            "min": 0.0,
+            "n": 300,
+            "std": 0.12614297
+          }
+        },
+        {
+          "kind": "line",
+          "label": "free assortment (r = 0.5)",
+          "x": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          },
+          "y": {
+            "digest": "606e5166986dd9f1",
+            "max": 0.5,
+            "mean": 0.5,
+            "min": 0.5,
+            "n": 2,
+            "std": 0.0
+          }
+        },
+        {
+          "kind": "points",
+          "label": "simulated meiosis (4000 gametes/pair)",
+          "x": {
+            "digest": "f711792f3004e9aa",
+            "max": 117.625644056,
+            "mean": 49.552361997,
+            "min": 1.625529285,
+            "n": 40,
+            "std": 31.552794944
+          },
+          "y": {
+            "digest": "0837f39c8119f54d",
+            "max": 0.4495,
+            "mean": 0.27549375,
+            "min": 0.0135,
+            "n": 40,
+            "std": 0.124825785
+          }
+        }
+      ],
+      "title": "Linkage emerges from the map, not from a fitted parameter",
+      "xlabel": "genetic distance between loci (cM)",
+      "ylabel": "recombination fraction  r"
+    }
+  ],
+  "digest": "8b59da0bcc9a0587",
+  "figure": "recombination_haldane.png",
+  "generated_by": "health_engine.viz",
+  "provenance": {
+    "catalogue": "synthetic",
+    "git_commit": "49719a8",
+    "git_dirty": true,
+    "libraries": {
+      "dash": "4.4.1",
+      "matplotlib": "3.11.0",
+      "networkx": "3.6.1",
+      "numpy": "2.4.4",
+      "plotly": "6.9.0",
+      "scipy": "1.17.1"
+    },
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.14.5"
+  },
+  "schema": 1
+}

@@ -1,0 +1,103 @@
+{
+  "axes": [
+    {
+      "index": 0,
+      "series": [
+        {
+          "kind": "line",
+          "label": "_child9",
+          "x": {
+            "digest": "374708fff7719dd5",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          }
+        },
+        {
+          "kind": "bars",
+          "label": "patches",
+          "v": {
+            "digest": "09809ea23fcaceaf",
+            "max": 0.8,
+            "mean": 0.8,
+            "min": 0.8,
+            "n": 9,
+            "std": 0.0
+          }
+        }
+      ],
+      "title": "RUNX2 knockout -> a coherent syndrome",
+      "xlabel": "mean liability shift under knockout (SD units)",
+      "ylabel": ""
+    },
+    {
+      "index": 1,
+      "series": [
+        {
+          "kind": "line",
+          "label": "_child14",
+          "x": {
+            "digest": "374708fff7719dd5",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          }
+        },
+        {
+          "kind": "bars",
+          "label": "patches",
+          "v": {
+            "digest": "6bf8d142682baa13",
+            "max": 0.8,
+            "mean": 0.8,
+            "min": 0.8,
+            "n": 14,
+            "std": 0.0
+          }
+        }
+      ],
+      "title": "RUNX2's downstream program (top edges)",
+      "xlabel": "trans-regulatory edge weight",
+      "ylabel": ""
+    }
+  ],
+  "digest": "fa653c5a61d0f887",
+  "figure": "grn_network.png",
+  "generated_by": "health_engine.viz",
+  "provenance": {
+    "catalogue": "synthetic",
+    "git_commit": "49719a8",
+    "git_dirty": true,
+    "libraries": {
+      "dash": "4.4.1",
+      "matplotlib": "3.11.0",
+      "networkx": "3.6.1",
+      "numpy": "2.4.4",
+      "plotly": "6.9.0",
+      "scipy": "1.17.1"
+    },
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.14.5"
+  },
+  "schema": 1
+}

@@ -30,12 +30,21 @@ import numpy as np
 from .genetic_map import haldane_recombination_fraction
 from .loci import CM_POS, CHROM, LOCI, N_LOCI
 from .npc import NPC, genomic_relatedness
+from .provenance import write_manifest
 from .traits import ARCHITECTURE, OCEAN_TRAITS, TRAIT_TABLE
 
 
 def _save(fig, path: str) -> str:
+    """Write the figure, and beside it a JSON manifest of the numbers it plots.
+
+    The manifest is written BEFORE `plt.close`, because closing the figure
+    discards the artists the manifest reads its values off. It is written from
+    here rather than from each `plot_*` function so that a figure added later
+    cannot forget to carry its provenance. See `health_engine.provenance`.
+    """
     os.makedirs(os.path.dirname(path), exist_ok=True)
     fig.savefig(path, dpi=150, bbox_inches="tight")
+    write_manifest(fig, path)
     plt.close(fig)
     return path
 

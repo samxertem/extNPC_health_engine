@@ -1,0 +1,219 @@
+{
+  "axes": [
+    {
+      "index": 0,
+      "series": [
+        {
+          "kind": "line",
+          "label": "simulated",
+          "x": {
+            "digest": "a6ff6227ffc38c97",
+            "max": 3.0,
+            "mean": 1.5,
+            "min": 0.0,
+            "n": 25,
+            "std": 0.901387819
+          },
+          "y": {
+            "digest": "9353e3f22ace0c44",
+            "max": 3.20698005,
+            "mean": 1.681659996,
+            "min": 1.006105578,
+            "n": 25,
+            "std": 0.725104985
+          }
+        },
+        {
+          "kind": "line",
+          "label": "$k^2 V_{gen} + V_{env}$",
+          "x": {
+            "digest": "a6ff6227ffc38c97",
+            "max": 3.0,
+            "mean": 1.5,
+            "min": 0.0,
+            "n": 25,
+            "std": 0.901387819
+          },
+          "y": {
+            "digest": "768ecbecfa4f8b36",
+            "max": 3.212164837,
+            "mean": 1.683422823,
+            "min": 1.006105578,
+            "n": 25,
+            "std": 0.726881119
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child2",
+          "x": {
+            "digest": "5f07eef034c5a21f",
+            "max": 1.0,
+            "mean": 1.0,
+            "min": 1.0,
+            "n": 2,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          }
+        }
+      ],
+      "title": "Canalization: variance vs stress",
+      "xlabel": "developmental stress",
+      "ylabel": "phenotypic variance (liability)"
+    },
+    {
+      "index": 1,
+      "series": [
+        {
+          "kind": "line",
+          "label": "simulated",
+          "x": {
+            "digest": "a6ff6227ffc38c97",
+            "max": 3.0,
+            "mean": 1.5,
+            "min": 0.0,
+            "n": 25,
+            "std": 0.901387819
+          },
+          "y": {
+            "digest": "c77349a3d800a38b",
+            "max": 0.951453593,
+            "mean": 0.887712866,
+            "min": 0.840104112,
+            "n": 25,
+            "std": 0.042685979
+          }
+        },
+        {
+          "kind": "line",
+          "label": "$k^2h^2_0/(k^2h^2_0+1-h^2_0)$",
+          "x": {
+            "digest": "a6ff6227ffc38c97",
+            "max": 3.0,
+            "mean": 1.5,
+            "min": 0.0,
+            "n": 25,
+            "std": 0.901387819
+          },
+          "y": {
+            "digest": "2492f82ca24c39b0",
+            "max": 0.949917843,
+            "mean": 0.886990683,
+            "min": 0.840104112,
+            "n": 25,
+            "std": 0.042063628
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child2",
+          "x": {
+            "digest": "5f07eef034c5a21f",
+            "max": 1.0,
+            "mean": 1.0,
+            "min": 1.0,
+            "n": 2,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          }
+        }
+      ],
+      "title": "Released heritability",
+      "xlabel": "developmental stress",
+      "ylabel": "genetic fraction of variance"
+    },
+    {
+      "index": 2,
+      "series": [
+        {
+          "kind": "line",
+          "label": "_child55",
+          "x": {
+            "digest": "71d8a088d06f99eb",
+            "max": 169.989709176,
+            "mean": 169.989709176,
+            "min": 169.989709176,
+            "n": 2,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child56",
+          "x": {
+            "digest": "4129e815f45e85fb",
+            "max": 170.000486951,
+            "mean": 170.000486951,
+            "min": 170.000486951,
+            "n": 2,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          }
+        },
+        {
+          "kind": "bars",
+          "label": "patches",
+          "v": {
+            "digest": "1db716b6b54fea17",
+            "max": 272.0,
+            "mean": 55.555555556,
+            "min": 0.0,
+            "n": 54,
+            "std": 81.255351201
+          }
+        }
+      ],
+      "title": "Same genotypes, same mean, wider spread\nmean 169.99 -> 170.00   sd 9.027 -> 12.521",
+      "xlabel": "cm",
+      "ylabel": "individuals"
+    }
+  ],
+  "digest": "0133b46f6ab8fe60",
+  "figure": "canalization.png",
+  "generated_by": "health_engine.viz",
+  "provenance": {
+    "catalogue": "synthetic",
+    "git_commit": "49719a8",
+    "git_dirty": true,
+    "libraries": {
+      "dash": "4.4.1",
+      "matplotlib": "3.11.0",
+      "networkx": "3.6.1",
+      "numpy": "2.4.4",
+      "plotly": "6.9.0",
+      "scipy": "1.17.1"
+    },
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.14.5"
+  },
+  "schema": 1
+}

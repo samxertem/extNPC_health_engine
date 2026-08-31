@@ -1,0 +1,123 @@
+{
+  "axes": [
+    {
+      "index": 0,
+      "series": [
+        {
+          "kind": "line",
+          "label": "q = 0.08 (male expect)",
+          "x": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          },
+          "y": {
+            "digest": "f76e445175defb28",
+            "max": 8.0,
+            "mean": 8.0,
+            "min": 8.0,
+            "n": 2,
+            "std": 0.0
+          }
+        },
+        {
+          "kind": "line",
+          "label": "q\u00b2 = 0.0064 (female expect)",
+          "x": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          },
+          "y": {
+            "digest": "b006e45e3b5cf3aa",
+            "max": 0.64,
+            "mean": 0.64,
+            "min": 0.64,
+            "n": 2,
+            "std": 0.0
+          }
+        },
+        {
+          "kind": "bars",
+          "label": "patches",
+          "v": {
+            "digest": "3c14e410ce4f2711",
+            "max": 8.148495611,
+            "mean": 4.482153888,
+            "min": 0.815812164,
+            "n": 2,
+            "std": 3.666341723
+          }
+        }
+      ],
+      "title": "(a) Hemizygosity:\nred-green colour blindness",
+      "xlabel": "",
+      "ylabel": "prevalence (%)"
+    },
+    {
+      "index": 1,
+      "series": [
+        {
+          "kind": "bars",
+          "label": "patches",
+          "v": {
+            "digest": "cbf9e02b52812c4b",
+            "max": 26.001474234,
+            "mean": 0.952380952,
+            "min": 0.0,
+            "n": 58,
+            "std": 3.453282108
+          }
+        }
+      ],
+      "title": "(b) X-inactivation (Lyon 1961):\ncarriers are intermediate",
+      "xlabel": "relative G6PD activity",
+      "ylabel": "density"
+    },
+    {
+      "index": 2,
+      "series": [
+        {
+          "kind": "bars",
+          "label": "patches",
+          "v": {
+            "digest": "81632bcfa9aac8a2",
+            "max": 29.243449709,
+            "mean": 14.621724854,
+            "min": 0.0,
+            "n": 2,
+            "std": 14.621724854
+          }
+        }
+      ],
+      "title": "(c) Sex-limited expression:\nAR / male-pattern baldness",
+      "xlabel": "",
+      "ylabel": "manifesting androgenetic alopecia (%)"
+    }
+  ],
+  "digest": "013fcf9b67b399e4",
+  "figure": "sex_linked.png",
+  "generated_by": "health_engine.viz",
+  "provenance": {
+    "catalogue": "synthetic",
+    "git_commit": "49719a8",
+    "git_dirty": true,
+    "libraries": {
+      "dash": "4.4.1",
+      "matplotlib": "3.11.0",
+      "networkx": "3.6.1",
+      "numpy": "2.4.4",
+      "plotly": "6.9.0",
+      "scipy": "1.17.1"
+    },
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.14.5"
+  },
+  "schema": 1
+}

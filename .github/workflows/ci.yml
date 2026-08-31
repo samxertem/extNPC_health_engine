@@ -1,0 +1,109 @@
+# Continuous integration.
+#
+# The project's central claim is that a seeded run is reproducible. Until this
+# file existed, that claim was checked when somebody thought to check it, which
+# is how a reproducibility defect survived several development cycles: it was
+# real from the commit that introduced it and found much later.
+#
+# Three jobs, deliberately separate, because they fail for different reasons
+# and a reader should be able to tell which one broke:
+#
+#   repo     seconds   house rules, dead links, generated artefacts
+#   tests    ~8 min    the 1,211-test suite
+#   figures  ~12 min   regenerate every figure and diff what it PLOTS
+#
+# The Unity EditMode suite is NOT here. Running it needs a Unity licence in
+# the runner, and a job that cannot pass is worse than a job that does not
+# exist. It runs locally through run_unity_tests.py.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A second push supersedes the first; there is no value in finishing a run
+# whose commit is already stale.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.14"
+
+jobs:
+  repo:
+    name: repository hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Install the little that check_repo needs
+        run: python -m pip install --upgrade pip pillow numpy
+      - name: House rules, links, and generated artefacts
+        run: python tools/check_repo.py
+
+  tests:
+    name: test suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install pinned dependencies
+        # Pinned exactly rather than by lower bound, because the reproducibility
+        # claim is only as strong as the numerical stack beneath it.
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+      - name: Report the stack the results are conditioned on
+        run: |
+          python -c "import sys, numpy, scipy, matplotlib; print(sys.version)"
+          python -c "import numpy, scipy, matplotlib; print('numpy', numpy.__version__, '| scipy', scipy.__version__, '| matplotlib', matplotlib.__version__)"
+      - name: Run the suite
+        run: python -m pytest tests/ -q --durations=10
+
+  figures:
+    name: figures reproduce
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # check_figures reads the committed manifest out of git, so the job
+          # needs the object, not just the worktree.
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install pinned dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+      - name: Regenerate every figure and its manifest
+        run: python health_engine_prototype.py
+      - name: Diff what the figures plot, not how they were rasterised
+        # PNG bytes differ across platforms for font reasons that say nothing
+        # about the model. The manifests carry the numbers; those are compared
+        # with an explicit tolerance. See tools/check_figures.py.
+        run: python tools/check_figures.py --tol 1e-9
+      - name: Keep the regenerated figures when they disagree
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regenerated-figures
+          path: |
+            outputs/*.png
+            outputs/*.json
+          retention-days: 14

@@ -1,0 +1,103 @@
+{
+  "axes": [
+    {
+      "index": 0,
+      "series": [
+        {
+          "kind": "bars",
+          "label": "patches",
+          "v": {
+            "digest": "6c3c396ed6b5c36d",
+            "max": 1.0,
+            "mean": 1.0,
+            "min": 1.0,
+            "n": 1,
+            "std": 0.0
+          }
+        },
+        {
+          "kind": "image",
+          "label": "_child0",
+          "v": {
+            "digest": "a84cc4ecf060308e",
+            "max": 2.2,
+            "mean": 0.015483871,
+            "min": -1.2,
+            "n": 961,
+            "std": 0.148518876
+          }
+        }
+      ],
+      "title": "Pleiotropy: core gene x trait weight matrix\n(31 genes touching >= 2 traits; EDAR outlined)",
+      "xlabel": "",
+      "ylabel": ""
+    },
+    {
+      "index": 1,
+      "series": [
+        {
+          "kind": "points",
+          "label": "_child0",
+          "x": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          }
+        },
+        {
+          "kind": "points",
+          "label": "_child1",
+          "x": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          }
+        }
+      ],
+      "title": "",
+      "xlabel": "",
+      "ylabel": "additive weight (alt allele)"
+    }
+  ],
+  "digest": "06589e6991d5a5b7",
+  "figure": "pleiotropy_matrix.png",
+  "generated_by": "health_engine.viz",
+  "provenance": {
+    "catalogue": "synthetic",
+    "git_commit": "49719a8",
+    "git_dirty": true,
+    "libraries": {
+      "dash": "4.4.1",
+      "matplotlib": "3.11.0",
+      "networkx": "3.6.1",
+      "numpy": "2.4.4",
+      "plotly": "6.9.0",
+      "scipy": "1.17.1"
+    },
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.14.5"
+  },
+  "schema": 1
+}

@@ -1,0 +1,267 @@
+{
+  "axes": [
+    {
+      "index": 0,
+      "series": [
+        {
+          "kind": "line",
+          "label": "Elira",
+          "x": {
+            "digest": "1eccb926521dcd98",
+            "max": 5.026548246,
+            "mean": 2.094395102,
+            "min": 0.0,
+            "n": 6,
+            "std": 1.873283928
+          },
+          "y": {
+            "digest": "242f1cfafa4d017e",
+            "max": 0.799767549,
+            "mean": 0.398917204,
+            "min": 0.128592116,
+            "n": 6,
+            "std": 0.201583333
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Tomas",
+          "x": {
+            "digest": "1eccb926521dcd98",
+            "max": 5.026548246,
+            "mean": 2.094395102,
+            "min": 0.0,
+            "n": 6,
+            "std": 1.873283928
+          },
+          "y": {
+            "digest": "692fda8e4f85dbe2",
+            "max": 0.96507035,
+            "mean": 0.706604081,
+            "min": 0.442759217,
+            "n": 6,
+            "std": 0.155344155
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Sena",
+          "x": {
+            "digest": "1eccb926521dcd98",
+            "max": 5.026548246,
+            "mean": 2.094395102,
+            "min": 0.0,
+            "n": 6,
+            "std": 1.873283928
+          },
+          "y": {
+            "digest": "f696f9f0dc71d7b8",
+            "max": 0.798801554,
+            "mean": 0.557337492,
+            "min": 0.370447248,
+            "n": 6,
+            "std": 0.152474695
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Kaan",
+          "x": {
+            "digest": "1eccb926521dcd98",
+            "max": 5.026548246,
+            "mean": 2.094395102,
+            "min": 0.0,
+            "n": 6,
+            "std": 1.873283928
+          },
+          "y": {
+            "digest": "227b10a32e1c15b8",
+            "max": 1.0,
+            "mean": 0.636769475,
+            "min": 0.302301807,
+            "n": 6,
+            "std": 0.223994884
+          }
+        }
+      ],
+      "title": "Family A: Elira x Tomas",
+      "xlabel": "",
+      "ylabel": ""
+    },
+    {
+      "index": 1,
+      "series": [
+        {
+          "kind": "line",
+          "label": "Ines",
+          "x": {
+            "digest": "1eccb926521dcd98",
+            "max": 5.026548246,
+            "mean": 2.094395102,
+            "min": 0.0,
+            "n": 6,
+            "std": 1.873283928
+          },
+          "y": {
+            "digest": "156f1660ce6f925d",
+            "max": 0.738813419,
+            "mean": 0.658982967,
+            "min": 0.491406561,
+            "n": 6,
+            "std": 0.087710657
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Darius",
+          "x": {
+            "digest": "1eccb926521dcd98",
+            "max": 5.026548246,
+            "mean": 2.094395102,
+            "min": 0.0,
+            "n": 6,
+            "std": 1.873283928
+          },
+          "y": {
+            "digest": "6ed3e129f3e896b8",
+            "max": 0.637741949,
+            "mean": 0.352173482,
+            "min": 0.223741292,
+            "n": 6,
+            "std": 0.138630774
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Mira",
+          "x": {
+            "digest": "1eccb926521dcd98",
+            "max": 5.026548246,
+            "mean": 2.094395102,
+            "min": 0.0,
+            "n": 6,
+            "std": 1.873283928
+          },
+          "y": {
+            "digest": "2100dc6a8da4cb08",
+            "max": 0.63887623,
+            "mean": 0.581440759,
+            "min": 0.45028293,
+            "n": 6,
+            "std": 0.06578867
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Baran",
+          "x": {
+            "digest": "1eccb926521dcd98",
+            "max": 5.026548246,
+            "mean": 2.094395102,
+            "min": 0.0,
+            "n": 6,
+            "std": 1.873283928
+          },
+          "y": {
+            "digest": "1635bef45f622405",
+            "max": 0.593154735,
+            "mean": 0.494093797,
+            "min": 0.245275813,
+            "n": 6,
+            "std": 0.131297516
+          }
+        }
+      ],
+      "title": "Family B: Ines x Darius",
+      "xlabel": "",
+      "ylabel": ""
+    },
+    {
+      "index": 2,
+      "series": [
+        {
+          "kind": "line",
+          "label": "Sena",
+          "x": {
+            "digest": "1eccb926521dcd98",
+            "max": 5.026548246,
+            "mean": 2.094395102,
+            "min": 0.0,
+            "n": 6,
+            "std": 1.873283928
+          },
+          "y": {
+            "digest": "f696f9f0dc71d7b8",
+            "max": 0.798801554,
+            "mean": 0.557337492,
+            "min": 0.370447248,
+            "n": 6,
+            "std": 0.152474695
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Baran",
+          "x": {
+            "digest": "1eccb926521dcd98",
+            "max": 5.026548246,
+            "mean": 2.094395102,
+            "min": 0.0,
+            "n": 6,
+            "std": 1.873283928
+          },
+          "y": {
+            "digest": "1635bef45f622405",
+            "max": 0.593154735,
+            "mean": 0.494093797,
+            "min": 0.245275813,
+            "n": 6,
+            "std": 0.131297516
+          }
+        },
+        {
+          "kind": "line",
+          "label": "Deren",
+          "x": {
+            "digest": "1eccb926521dcd98",
+            "max": 5.026548246,
+            "mean": 2.094395102,
+            "min": 0.0,
+            "n": 6,
+            "std": 1.873283928
+          },
+          "y": {
+            "digest": "e484c52be7beab1f",
+            "max": 0.933273073,
+            "mean": 0.690763974,
+            "min": 0.537267954,
+            "n": 6,
+            "std": 0.132617267
+          }
+        }
+      ],
+      "title": "Cross-family: Sena x Baran",
+      "xlabel": "",
+      "ylabel": ""
+    }
+  ],
+  "digest": "244f301a14810deb",
+  "figure": "family_ocean_radars.png",
+  "generated_by": "health_engine.viz",
+  "provenance": {
+    "catalogue": "synthetic",
+    "git_commit": "49719a8",
+    "git_dirty": true,
+    "libraries": {
+      "dash": "4.4.1",
+      "matplotlib": "3.11.0",
+      "networkx": "3.6.1",
+      "numpy": "2.4.4",
+      "plotly": "6.9.0",
+      "scipy": "1.17.1"
+    },
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.14.5"
+  },
+  "schema": 1
+}

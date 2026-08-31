@@ -1,0 +1,219 @@
+{
+  "axes": [
+    {
+      "index": 0,
+      "series": [
+        {
+          "kind": "bars",
+          "label": "patches",
+          "v": {
+            "digest": "dfe593eb92783864",
+            "max": 0.611419927,
+            "mean": 0.125,
+            "min": 0.003221371,
+            "n": 16,
+            "std": 0.169721323
+          }
+        }
+      ],
+      "title": "(a) State biases behaviour\n(the Stage-1 benchmark)",
+      "xlabel": "",
+      "ylabel": "P(action class)"
+    },
+    {
+      "index": 1,
+      "series": [
+        {
+          "kind": "line",
+          "label": "cortisol",
+          "x": {
+            "digest": "fa5e8d86cd8706e8",
+            "max": 23.5,
+            "mean": 11.75,
+            "min": 0.0,
+            "n": 48,
+            "std": 6.926699551
+          },
+          "y": {
+            "digest": "7e4e875a87bf0ec1",
+            "max": 0.773251934,
+            "mean": 0.360094608,
+            "min": 0.184060628,
+            "n": 48,
+            "std": 0.126932366
+          }
+        },
+        {
+          "kind": "line",
+          "label": "adrenaline",
+          "x": {
+            "digest": "fa5e8d86cd8706e8",
+            "max": 23.5,
+            "mean": 11.75,
+            "min": 0.0,
+            "n": 48,
+            "std": 6.926699551
+          },
+          "y": {
+            "digest": "287c4a78b785cea9",
+            "max": 1.0,
+            "mean": 0.045246212,
+            "min": 0.0,
+            "n": 48,
+            "std": 0.200101965
+          }
+        },
+        {
+          "kind": "line",
+          "label": "circadian drive",
+          "x": {
+            "digest": "fa5e8d86cd8706e8",
+            "max": 23.5,
+            "mean": 11.75,
+            "min": 0.0,
+            "n": 48,
+            "std": 6.926699551
+          },
+          "y": {
+            "digest": "7376be8264a91ee4",
+            "max": 0.349995439,
+            "mean": 0.21,
+            "min": 0.070004561,
+            "n": 48,
+            "std": 0.098994949
+          }
+        },
+        {
+          "kind": "bars",
+          "label": "patches",
+          "v": {
+            "digest": "6c3c396ed6b5c36d",
+            "max": 1.0,
+            "mean": 1.0,
+            "min": 1.0,
+            "n": 1,
+            "std": 0.0
+          }
+        }
+      ],
+      "title": "(b) HPA axis: fast adrenaline,\nlagging cortisol, negative feedback",
+      "xlabel": "hour of day",
+      "ylabel": "level"
+    },
+    {
+      "index": 2,
+      "series": [
+        {
+          "kind": "line",
+          "label": "calm day",
+          "x": {
+            "digest": "734ee8a0ff488212",
+            "max": 72.0,
+            "mean": 36.0,
+            "min": 0.0,
+            "n": 73,
+            "std": 21.071307506
+          },
+          "y": {
+            "digest": "2f81c3c85f3d0260",
+            "max": 0.062194266,
+            "mean": 0.010450156,
+            "min": 0.0,
+            "n": 73,
+            "std": 0.015043016
+          }
+        },
+        {
+          "kind": "line",
+          "label": "chronic stress",
+          "x": {
+            "digest": "734ee8a0ff488212",
+            "max": 72.0,
+            "mean": 36.0,
+            "min": 0.0,
+            "n": 73,
+            "std": 21.071307506
+          },
+          "y": {
+            "digest": "66dc04d90266474a",
+            "max": 8.044055771,
+            "mean": 3.736151082,
+            "min": 0.0,
+            "n": 73,
+            "std": 2.388700494
+          }
+        }
+      ],
+      "title": "(c) Allostatic load accumulates\nunder chronic stress (-> clock, #24)",
+      "xlabel": "hours under load",
+      "ylabel": "allostatic load"
+    },
+    {
+      "index": 3,
+      "series": [
+        {
+          "kind": "line",
+          "label": "EDAR absent (shelter 0.86)",
+          "x": {
+            "digest": "329f5ae25dc7eb9f",
+            "max": 6.0,
+            "mean": 3.0,
+            "min": 0.0,
+            "n": 7,
+            "std": 2.0
+          },
+          "y": {
+            "digest": "76fc4dd8ede5f548",
+            "max": 0.815846359,
+            "mean": 0.580911806,
+            "min": 0.0,
+            "n": 7,
+            "std": 0.274624153
+          }
+        },
+        {
+          "kind": "line",
+          "label": "EDAR present (shelter 0.80)",
+          "x": {
+            "digest": "329f5ae25dc7eb9f",
+            "max": 6.0,
+            "mean": 3.0,
+            "min": 0.0,
+            "n": 7,
+            "std": 2.0
+          },
+          "y": {
+            "digest": "41321a6291389d45",
+            "max": 0.640022167,
+            "mean": 0.481069356,
+            "min": 0.0,
+            "n": 7,
+            "std": 0.216240535
+          }
+        }
+      ],
+      "title": "(d) One gene reaches behaviour:\nEDAR -> sweat glands -> heat -> action",
+      "xlabel": "hours in heat",
+      "ylabel": "core temperature (deviation)"
+    }
+  ],
+  "digest": "977a6e87a9b7c782",
+  "figure": "physiology.png",
+  "generated_by": "health_engine.viz",
+  "provenance": {
+    "catalogue": "synthetic",
+    "git_commit": "49719a8",
+    "git_dirty": true,
+    "libraries": {
+      "dash": "4.4.1",
+      "matplotlib": "3.11.0",
+      "networkx": "3.6.1",
+      "numpy": "2.4.4",
+      "plotly": "6.9.0",
+      "scipy": "1.17.1"
+    },
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.14.5"
+  },
+  "schema": 1
+}

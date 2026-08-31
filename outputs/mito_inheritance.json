@@ -1,0 +1,679 @@
+{
+  "axes": [
+    {
+      "index": 0,
+      "series": [
+        {
+          "kind": "line",
+          "label": "_child0",
+          "x": {
+            "digest": "8762740b35b36fa3",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 200,
+            "std": 0.290122137
+          },
+          "y": {
+            "digest": "892afa7adda7b0e1",
+            "max": 1.0,
+            "mean": 0.732514917,
+            "min": 0.12,
+            "n": 200,
+            "std": 0.342363223
+          }
+        },
+        {
+          "kind": "line",
+          "label": "threshold ~70%",
+          "x": {
+            "digest": "af655371a408d24d",
+            "max": 0.7,
+            "mean": 0.7,
+            "min": 0.7,
+            "n": 2,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          }
+        }
+      ],
+      "title": "(a) Threshold effect\n(Rossignol 2003)",
+      "xlabel": "pathogenic mtDNA heteroplasmy",
+      "ylabel": "relative OXPHOS capacity"
+    },
+    {
+      "index": 1,
+      "series": [
+        {
+          "kind": "line",
+          "label": "closed form\nvar = h(1-h)/30",
+          "x": {
+            "digest": "abeb33b5f3376cfc",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 300,
+            "std": 0.289638994
+          },
+          "y": {
+            "digest": "561f4720aedca7a5",
+            "max": 4.369460538,
+            "mean": 0.996666628,
+            "min": 1.337e-06,
+            "n": 300,
+            "std": 1.444489046
+          }
+        },
+        {
+          "kind": "line",
+          "label": "mother = 0.50",
+          "x": {
+            "digest": "606e5166986dd9f1",
+            "max": 0.5,
+            "mean": 0.5,
+            "min": 0.5,
+            "n": 2,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          }
+        },
+        {
+          "kind": "bars",
+          "label": "patches",
+          "v": {
+            "digest": "9be0fb3ccd4d3f6e",
+            "max": 4.4115,
+            "mean": 0.967741935,
+            "min": 0.0,
+            "n": 31,
+            "std": 1.432571672
+          }
+        }
+      ],
+      "title": "(b) Bottleneck (N_e = 30)\nmean preserved, wide scatter",
+      "xlabel": "offspring heteroplasmy",
+      "ylabel": "density"
+    },
+    {
+      "index": 2,
+      "series": [
+        {
+          "kind": "line",
+          "label": "_child0",
+          "x": {
+            "digest": "94e5ca5b80a5b2d6",
+            "max": 60.0,
+            "mean": 30.0,
+            "min": 0.0,
+            "n": 61,
+            "std": 17.606816862
+          },
+          "y": {
+            "digest": "9df58bab98c737a7",
+            "max": 1.0,
+            "mean": 0.859562842,
+            "min": 0.4,
+            "n": 61,
+            "std": 0.188572893
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child1",
+          "x": {
+            "digest": "94e5ca5b80a5b2d6",
+            "max": 60.0,
+            "mean": 30.0,
+            "min": 0.0,
+            "n": 61,
+            "std": 17.606816862
+          },
+          "y": {
+            "digest": "e07e7fcfb0eb2161",
+            "max": 1.0,
+            "mean": 0.554098361,
+            "min": 0.1,
+            "n": 61,
+            "std": 0.294525888
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child2",
+          "x": {
+            "digest": "94e5ca5b80a5b2d6",
+            "max": 60.0,
+            "mean": 30.0,
+            "min": 0.0,
+            "n": 61,
+            "std": 17.606816862
+          },
+          "y": {
+            "digest": "1316095b9092f014",
+            "max": 1.0,
+            "mean": 0.946448087,
+            "min": 0.466666667,
+            "n": 61,
+            "std": 0.119238429
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child3",
+          "x": {
+            "digest": "94e5ca5b80a5b2d6",
+            "max": 60.0,
+            "mean": 30.0,
+            "min": 0.0,
+            "n": 61,
+            "std": 17.606816862
+          },
+          "y": {
+            "digest": "75a93d19d93a5375",
+            "max": 0.9,
+            "mean": 0.592896175,
+            "min": 0.133333333,
+            "n": 61,
+            "std": 0.228251831
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child4",
+          "x": {
+            "digest": "94e5ca5b80a5b2d6",
+            "max": 60.0,
+            "mean": 30.0,
+            "min": 0.0,
+            "n": 61,
+            "std": 17.606816862
+          },
+          "y": {
+            "digest": "7edeee16bbf7c6ab",
+            "max": 0.666666667,
+            "mean": 0.186885246,
+            "min": 0.0,
+            "n": 61,
+            "std": 0.213759708
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child5",
+          "x": {
+            "digest": "94e5ca5b80a5b2d6",
+            "max": 60.0,
+            "mean": 30.0,
+            "min": 0.0,
+            "n": 61,
+            "std": 17.606816862
+          },
+          "y": {
+            "digest": "80a55582d87090c5",
+            "max": 1.0,
+            "mean": 0.917486339,
+            "min": 0.5,
+            "n": 61,
+            "std": 0.152645948
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child6",
+          "x": {
+            "digest": "94e5ca5b80a5b2d6",
+            "max": 60.0,
+            "mean": 30.0,
+            "min": 0.0,
+            "n": 61,
+            "std": 17.606816862
+          },
+          "y": {
+            "digest": "7d64f94e3c84f3a3",
+            "max": 1.0,
+            "mean": 0.867759563,
+            "min": 0.3,
+            "n": 61,
+            "std": 0.207769595
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child7",
+          "x": {
+            "digest": "94e5ca5b80a5b2d6",
+            "max": 60.0,
+            "mean": 30.0,
+            "min": 0.0,
+            "n": 61,
+            "std": 17.606816862
+          },
+          "y": {
+            "digest": "c5f0abe37f8ec52d",
+            "max": 0.666666667,
+            "mean": 0.235519126,
+            "min": 0.0,
+            "n": 61,
+            "std": 0.235305394
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child8",
+          "x": {
+            "digest": "94e5ca5b80a5b2d6",
+            "max": 60.0,
+            "mean": 30.0,
+            "min": 0.0,
+            "n": 61,
+            "std": 17.606816862
+          },
+          "y": {
+            "digest": "60f260681e5bcb8d",
+            "max": 0.666666667,
+            "mean": 0.210382514,
+            "min": 0.0,
+            "n": 61,
+            "std": 0.226604056
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child9",
+          "x": {
+            "digest": "94e5ca5b80a5b2d6",
+            "max": 60.0,
+            "mean": 30.0,
+            "min": 0.0,
+            "n": 61,
+            "std": 17.606816862
+          },
+          "y": {
+            "digest": "13f732d8233e74f2",
+            "max": 0.9,
+            "mean": 0.492349727,
+            "min": 0.166666667,
+            "n": 61,
+            "std": 0.173088672
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child10",
+          "x": {
+            "digest": "94e5ca5b80a5b2d6",
+            "max": 60.0,
+            "mean": 30.0,
+            "min": 0.0,
+            "n": 61,
+            "std": 17.606816862
+          },
+          "y": {
+            "digest": "5ce5965741f0da45",
+            "max": 0.766666667,
+            "mean": 0.174863388,
+            "min": 0.0,
+            "n": 61,
+            "std": 0.261678465
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child11",
+          "x": {
+            "digest": "94e5ca5b80a5b2d6",
+            "max": 60.0,
+            "mean": 30.0,
+            "min": 0.0,
+            "n": 61,
+            "std": 17.606816862
+          },
+          "y": {
+            "digest": "74bf5932dcf1c906",
+            "max": 1.0,
+            "mean": 0.758469945,
+            "min": 0.166666667,
+            "n": 61,
+            "std": 0.28767365
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child12",
+          "x": {
+            "digest": "94e5ca5b80a5b2d6",
+            "max": 60.0,
+            "mean": 30.0,
+            "min": 0.0,
+            "n": 61,
+            "std": 17.606816862
+          },
+          "y": {
+            "digest": "f778cc404c5b0fdb",
+            "max": 1.0,
+            "mean": 0.915300546,
+            "min": 0.433333333,
+            "n": 61,
+            "std": 0.16491691
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child13",
+          "x": {
+            "digest": "94e5ca5b80a5b2d6",
+            "max": 60.0,
+            "mean": 30.0,
+            "min": 0.0,
+            "n": 61,
+            "std": 17.606816862
+          },
+          "y": {
+            "digest": "2f2e542e2fb7ea6e",
+            "max": 0.5,
+            "mean": 0.038797814,
+            "min": 0.0,
+            "n": 61,
+            "std": 0.11000585
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child14",
+          "x": {
+            "digest": "94e5ca5b80a5b2d6",
+            "max": 60.0,
+            "mean": 30.0,
+            "min": 0.0,
+            "n": 61,
+            "std": 17.606816862
+          },
+          "y": {
+            "digest": "c386996714311246",
+            "max": 0.766666667,
+            "mean": 0.236612022,
+            "min": 0.0,
+            "n": 61,
+            "std": 0.274986664
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child15",
+          "x": {
+            "digest": "94e5ca5b80a5b2d6",
+            "max": 60.0,
+            "mean": 30.0,
+            "min": 0.0,
+            "n": 61,
+            "std": 17.606816862
+          },
+          "y": {
+            "digest": "ef9ce35ba6d3582b",
+            "max": 0.7,
+            "mean": 0.13442623,
+            "min": 0.0,
+            "n": 61,
+            "std": 0.226959568
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child16",
+          "x": {
+            "digest": "94e5ca5b80a5b2d6",
+            "max": 60.0,
+            "mean": 30.0,
+            "min": 0.0,
+            "n": 61,
+            "std": 17.606816862
+          },
+          "y": {
+            "digest": "650c8b567e9e6b9d",
+            "max": 0.533333333,
+            "mean": 0.059016393,
+            "min": 0.0,
+            "n": 61,
+            "std": 0.14237044
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child17",
+          "x": {
+            "digest": "94e5ca5b80a5b2d6",
+            "max": 60.0,
+            "mean": 30.0,
+            "min": 0.0,
+            "n": 61,
+            "std": 17.606816862
+          },
+          "y": {
+            "digest": "7e9c00d9722b415f",
+            "max": 1.0,
+            "mean": 0.970491803,
+            "min": 0.466666667,
+            "n": 61,
+            "std": 0.102801976
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child18",
+          "x": {
+            "digest": "94e5ca5b80a5b2d6",
+            "max": 60.0,
+            "mean": 30.0,
+            "min": 0.0,
+            "n": 61,
+            "std": 17.606816862
+          },
+          "y": {
+            "digest": "b9229b96618bc2af",
+            "max": 0.7,
+            "mean": 0.067759563,
+            "min": 0.0,
+            "n": 61,
+            "std": 0.161726479
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child19",
+          "x": {
+            "digest": "94e5ca5b80a5b2d6",
+            "max": 60.0,
+            "mean": 30.0,
+            "min": 0.0,
+            "n": 61,
+            "std": 17.606816862
+          },
+          "y": {
+            "digest": "3880b210b076357b",
+            "max": 1.0,
+            "mean": 0.643715847,
+            "min": 0.133333333,
+            "n": 61,
+            "std": 0.254828846
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child20",
+          "x": {
+            "digest": "94e5ca5b80a5b2d6",
+            "max": 60.0,
+            "mean": 30.0,
+            "min": 0.0,
+            "n": 61,
+            "std": 17.606816862
+          },
+          "y": {
+            "digest": "405f66e0f0061b4e",
+            "max": 1.0,
+            "mean": 0.887978142,
+            "min": 0.366666667,
+            "n": 61,
+            "std": 0.19342873
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child21",
+          "x": {
+            "digest": "94e5ca5b80a5b2d6",
+            "max": 60.0,
+            "mean": 30.0,
+            "min": 0.0,
+            "n": 61,
+            "std": 17.606816862
+          },
+          "y": {
+            "digest": "1548562f13975e2c",
+            "max": 1.0,
+            "mean": 0.900546448,
+            "min": 0.433333333,
+            "n": 61,
+            "std": 0.172783049
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child22",
+          "x": {
+            "digest": "94e5ca5b80a5b2d6",
+            "max": 60.0,
+            "mean": 30.0,
+            "min": 0.0,
+            "n": 61,
+            "std": 17.606816862
+          },
+          "y": {
+            "digest": "d5160678e8e4a32a",
+            "max": 1.0,
+            "mean": 0.94863388,
+            "min": 0.5,
+            "n": 61,
+            "std": 0.125678308
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child23",
+          "x": {
+            "digest": "94e5ca5b80a5b2d6",
+            "max": 60.0,
+            "mean": 30.0,
+            "min": 0.0,
+            "n": 61,
+            "std": 17.606816862
+          },
+          "y": {
+            "digest": "bac5510cf9561b09",
+            "max": 0.5,
+            "mean": 0.091256831,
+            "min": 0.0,
+            "n": 61,
+            "std": 0.137886947
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child24",
+          "x": {
+            "digest": "94e5ca5b80a5b2d6",
+            "max": 60.0,
+            "mean": 30.0,
+            "min": 0.0,
+            "n": 61,
+            "std": 17.606816862
+          },
+          "y": {
+            "digest": "76b04f16895aa3ac",
+            "max": 1.0,
+            "mean": 0.962295082,
+            "min": 0.5,
+            "n": 61,
+            "std": 0.112994577
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child25",
+          "x": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          },
+          "y": {
+            "digest": "374708fff7719dd5",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.0
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child26",
+          "x": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          },
+          "y": {
+            "digest": "5f07eef034c5a21f",
+            "max": 1.0,
+            "mean": 1.0,
+            "min": 1.0,
+            "n": 2,
+            "std": 0.0
+          }
+        }
+      ],
+      "title": "(c) Segregation:\ndrift toward fixation",
+      "xlabel": "generations down a maternal line",
+      "ylabel": "heteroplasmy"
+    }
+  ],
+  "digest": "3c237b80695114f5",
+  "figure": "mito_inheritance.png",
+  "generated_by": "health_engine.viz",
+  "provenance": {
+    "catalogue": "synthetic",
+    "git_commit": "49719a8",
+    "git_dirty": true,
+    "libraries": {
+      "dash": "4.4.1",
+      "matplotlib": "3.11.0",
+      "networkx": "3.6.1",
+      "numpy": "2.4.4",
+      "plotly": "6.9.0",
+      "scipy": "1.17.1"
+    },
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.14.5"
+  },
+  "schema": 1
+}

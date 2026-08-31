@@ -1,0 +1,239 @@
+{
+  "axes": [
+    {
+      "index": 0,
+      "series": [
+        {
+          "kind": "line",
+          "label": "closed form  $-BF$, B = 1.400",
+          "x": {
+            "digest": "f9c8256d4fa47ed4",
+            "max": 0.27,
+            "mean": 0.135,
+            "min": 0.0,
+            "n": 60,
+            "std": 0.079252332
+          },
+          "y": {
+            "digest": "af6185ae1fed7f78",
+            "max": -0.0,
+            "mean": -0.189,
+            "min": -0.378,
+            "n": 60,
+            "std": 0.110953265
+          }
+        },
+        {
+          "kind": "line",
+          "label": "simulated cohorts (n=3000 each)",
+          "x": {
+            "digest": "8d1537fc872cb9f2",
+            "max": 0.25,
+            "mean": 0.09375,
+            "min": 0.0,
+            "n": 5,
+            "std": 0.088388348
+          },
+          "y": {
+            "digest": "121744929dedd9d9",
+            "max": 0.0,
+            "mean": -0.127214282,
+            "min": -0.350045632,
+            "n": 5,
+            "std": 0.124862907
+          }
+        }
+      ],
+      "title": "Lethal equivalents recovered: B = 1.412\n(closed form 1.400)",
+      "xlabel": "pedigree inbreeding coefficient  F",
+      "ylabel": "$\\ln S(F) - \\ln S_0$"
+    },
+    {
+      "index": 1,
+      "series": [
+        {
+          "kind": "line",
+          "label": "realised = pedigree",
+          "x": {
+            "digest": "bf881abdd02907ef",
+            "max": 0.25,
+            "mean": 0.125,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.125
+          },
+          "y": {
+            "digest": "bf881abdd02907ef",
+            "max": 0.25,
+            "mean": 0.125,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.125
+          }
+        },
+        {
+          "kind": "points",
+          "label": "_child0",
+          "x": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          }
+        },
+        {
+          "kind": "points",
+          "label": "_child1",
+          "x": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          }
+        },
+        {
+          "kind": "points",
+          "label": "_child2",
+          "x": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          }
+        },
+        {
+          "kind": "points",
+          "label": "_child3",
+          "x": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          }
+        },
+        {
+          "kind": "points",
+          "label": "_child4",
+          "x": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          }
+        },
+        {
+          "kind": "points",
+          "label": "_child5",
+          "x": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          }
+        }
+      ],
+      "title": "Pedigree F is an expectation;\nrealised F is a measurement",
+      "xlabel": "pedigree F",
+      "ylabel": "realised F (excess homozygosity)"
+    },
+    {
+      "index": 2,
+      "series": [
+        {
+          "kind": "bars",
+          "label": "patches",
+          "v": {
+            "digest": "9f9a554693c2dba2",
+            "max": 1892.0,
+            "mean": 142.857142857,
+            "min": 0.0,
+            "n": 42,
+            "std": 325.542446317
+          }
+        }
+      ],
+      "title": "Inbreeding exposes what heterozygosity hid",
+      "xlabel": "load loci homozygous for the deleterious allele",
+      "ylabel": "individuals"
+    }
+  ],
+  "digest": "d13960064d98d2c7",
+  "figure": "inbreeding_depression.png",
+  "generated_by": "health_engine.viz",
+  "provenance": {
+    "catalogue": "synthetic",
+    "git_commit": "49719a8",
+    "git_dirty": true,
+    "libraries": {
+      "dash": "4.4.1",
+      "matplotlib": "3.11.0",
+      "networkx": "3.6.1",
+      "numpy": "2.4.4",
+      "plotly": "6.9.0",
+      "scipy": "1.17.1"
+    },
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.14.5"
+  },
+  "schema": 1
+}

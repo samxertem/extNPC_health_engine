@@ -1,0 +1,191 @@
+{
+  "axes": [
+    {
+      "index": 0,
+      "series": [
+        {
+          "kind": "line",
+          "label": "smoking intensity 1",
+          "x": {
+            "digest": "bc29a8152a631a1f",
+            "max": 50.0,
+            "mean": 25.0,
+            "min": 0.0,
+            "n": 51,
+            "std": 14.719601444
+          },
+          "y": {
+            "digest": "87cb5b998c3c5209",
+            "max": 0.5,
+            "mean": 0.378729033,
+            "min": 0.271877814,
+            "n": 51,
+            "std": 0.087997142
+          }
+        },
+        {
+          "kind": "line",
+          "label": "smoking intensity 0.5",
+          "x": {
+            "digest": "bc29a8152a631a1f",
+            "max": 50.0,
+            "mean": 25.0,
+            "min": 0.0,
+            "n": 51,
+            "std": 14.719601444
+          },
+          "y": {
+            "digest": "c4c6e41af584cff1",
+            "max": 0.5,
+            "mean": 0.439364516,
+            "min": 0.385938907,
+            "n": 51,
+            "std": 0.043998571
+          }
+        },
+        {
+          "kind": "line",
+          "label": "baseline",
+          "x": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          },
+          "y": {
+            "digest": "606e5166986dd9f1",
+            "max": 0.5,
+            "mean": 0.5,
+            "min": 0.5,
+            "n": 2,
+            "std": 0.0
+          }
+        },
+        {
+          "kind": "bars",
+          "label": "patches",
+          "v": {
+            "digest": "5f07eef034c5a21f",
+            "max": 1.0,
+            "mean": 1.0,
+            "min": 1.0,
+            "n": 2,
+            "std": 0.0
+          }
+        }
+      ],
+      "title": "(a) Smoking hypomethylates AHRR;\npartial recovery on cessation",
+      "xlabel": "age (years)",
+      "ylabel": "AHRR cg05575921 methylation"
+    },
+    {
+      "index": 1,
+      "series": [
+        {
+          "kind": "line",
+          "label": "calm (stress 1.0)",
+          "x": {
+            "digest": "bc29a8152a631a1f",
+            "max": 50.0,
+            "mean": 25.0,
+            "min": 0.0,
+            "n": 51,
+            "std": 14.719601444
+          },
+          "y": {
+            "digest": "b564a57b7ff7c6bc",
+            "max": 50.9,
+            "mean": 25.605882353,
+            "min": 0.0,
+            "n": 51,
+            "std": 15.017446217
+          }
+        },
+        {
+          "kind": "line",
+          "label": "chronic stress (2.0)",
+          "x": {
+            "digest": "bc29a8152a631a1f",
+            "max": 50.0,
+            "mean": 25.0,
+            "min": 0.0,
+            "n": 51,
+            "std": 14.719601444
+          },
+          "y": {
+            "digest": "46a9e526cd59e034",
+            "max": 82.285533727,
+            "mean": 40.281612768,
+            "min": 0.0,
+            "n": 51,
+            "std": 24.517935877
+          }
+        },
+        {
+          "kind": "line",
+          "label": "1:1 (no acceleration)",
+          "x": {
+            "digest": "2fba37c16dc3dd4e",
+            "max": 50.0,
+            "mean": 25.0,
+            "min": 0.0,
+            "n": 2,
+            "std": 25.0
+          },
+          "y": {
+            "digest": "2fba37c16dc3dd4e",
+            "max": 50.0,
+            "mean": 25.0,
+            "min": 0.0,
+            "n": 2,
+            "std": 25.0
+          }
+        }
+      ],
+      "title": "(b) The epigenetic clock:\nstress accelerates biological aging",
+      "xlabel": "chronological age (years)",
+      "ylabel": "epigenetic age (years)"
+    },
+    {
+      "index": 2,
+      "series": [
+        {
+          "kind": "bars",
+          "label": "patches",
+          "v": {
+            "digest": "c6cf222744c3ddab",
+            "max": 0.3,
+            "mean": 0.16725,
+            "min": 0.0068,
+            "n": 4,
+            "std": 0.134187211
+          }
+        }
+      ],
+      "title": "(c) The germline firewall:\nacquired marks rarely cross",
+      "xlabel": "",
+      "ylabel": "methylation deviation from baseline"
+    }
+  ],
+  "digest": "63df604fef5716d4",
+  "figure": "epigenetics.png",
+  "generated_by": "health_engine.viz",
+  "provenance": {
+    "catalogue": "synthetic",
+    "git_commit": "49719a8",
+    "git_dirty": true,
+    "libraries": {
+      "dash": "4.4.1",
+      "matplotlib": "3.11.0",
+      "networkx": "3.6.1",
+      "numpy": "2.4.4",
+      "plotly": "6.9.0",
+      "scipy": "1.17.1"
+    },
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.14.5"
+  },
+  "schema": 1
+}

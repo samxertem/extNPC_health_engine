@@ -1,0 +1,311 @@
+{
+  "axes": [
+    {
+      "index": 0,
+      "series": [
+        {
+          "kind": "line",
+          "label": "closed form  $-F\\sum 2pqd$  (-12.00 cm/F)",
+          "x": {
+            "digest": "f9c8256d4fa47ed4",
+            "max": 0.27,
+            "mean": 0.135,
+            "min": 0.0,
+            "n": 60,
+            "std": 0.079252332
+          },
+          "y": {
+            "digest": "8e93332fe7ed7eaf",
+            "max": 170.353971718,
+            "mean": 168.733971718,
+            "min": 167.113971718,
+            "n": 60,
+            "std": 0.95102799
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_nolegend_",
+          "x": {
+            "digest": "8d1537fc872cb9f2",
+            "max": 0.25,
+            "mean": 0.09375,
+            "min": 0.0,
+            "n": 5,
+            "std": 0.088388348
+          },
+          "y": {
+            "digest": "0b8c0aefad52744f",
+            "max": 170.353971718,
+            "mean": 169.10410766,
+            "min": 167.126185225,
+            "n": 5,
+            "std": 1.111989399
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_nolegend_",
+          "x": {
+            "digest": "8d1537fc872cb9f2",
+            "max": 0.25,
+            "mean": 0.09375,
+            "min": 0.0,
+            "n": 5,
+            "std": 0.088388348
+          },
+          "y": {
+            "digest": "d794472ffb179c6a",
+            "max": 170.129693684,
+            "mean": 168.865546596,
+            "min": 166.868192008,
+            "n": 5,
+            "std": 1.122822609
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_nolegend_",
+          "x": {
+            "digest": "8d1537fc872cb9f2",
+            "max": 0.25,
+            "mean": 0.09375,
+            "min": 0.0,
+            "n": 5,
+            "std": 0.088388348
+          },
+          "y": {
+            "digest": "82cc25519470fb7b",
+            "max": 170.578249752,
+            "mean": 169.342668724,
+            "min": 167.384178442,
+            "n": 5,
+            "std": 1.101178289
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_nolegend_",
+          "x": {
+            "digest": "8d1537fc872cb9f2",
+            "max": 0.25,
+            "mean": 0.09375,
+            "min": 0.0,
+            "n": 5,
+            "std": 0.088388348
+          },
+          "y": {
+            "digest": "67d6039a272a7f14",
+            "max": 170.415889519,
+            "mean": 170.124373909,
+            "min": 169.825721163,
+            "n": 5,
+            "std": 0.223917252
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_nolegend_",
+          "x": {
+            "digest": "8d1537fc872cb9f2",
+            "max": 0.25,
+            "mean": 0.09375,
+            "min": 0.0,
+            "n": 5,
+            "std": 0.088388348
+          },
+          "y": {
+            "digest": "f9bbb4c51cb4864d",
+            "max": 170.191611485,
+            "mean": 169.885812845,
+            "min": 169.567727946,
+            "n": 5,
+            "std": 0.230823021
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_nolegend_",
+          "x": {
+            "digest": "8d1537fc872cb9f2",
+            "max": 0.25,
+            "mean": 0.09375,
+            "min": 0.0,
+            "n": 5,
+            "std": 0.088388348
+          },
+          "y": {
+            "digest": "0dfb5c7e5761ec53",
+            "max": 170.640167553,
+            "mean": 170.362934973,
+            "min": 170.083714379,
+            "n": 5,
+            "std": 0.217444233
+          }
+        },
+        {
+          "kind": "points",
+          "label": "_nolegend_",
+          "x": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          }
+        },
+        {
+          "kind": "points",
+          "label": "_nolegend_",
+          "x": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          }
+        }
+      ],
+      "title": "-1.24 cm per 10% F\n(published -1.20; Joshi et al. 2015, Nature 523:459)",
+      "xlabel": "pedigree inbreeding coefficient  F",
+      "ylabel": "mean height_cm  (cm)"
+    },
+    {
+      "index": 1,
+      "series": [
+        {
+          "kind": "line",
+          "label": "_child88",
+          "x": {
+            "digest": "374708fff7719dd5",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          }
+        },
+        {
+          "kind": "bars",
+          "label": "patches",
+          "v": {
+            "digest": "b1f971671d7be088",
+            "max": 177.0,
+            "mean": 7.022727273,
+            "min": 0.0,
+            "n": 88,
+            "std": 22.201032568
+          }
+        }
+      ],
+      "title": "The plain sum cancels; the sum of squares does not\n$V_D$ is an OUTPUT here, and lands at 1.4% of $V_P$",
+      "xlabel": "per-locus contribution  $2p_jq_jd_j$",
+      "ylabel": "loci"
+    },
+    {
+      "index": 2,
+      "series": [
+        {
+          "kind": "line",
+          "label": "Joshi et al. 2015",
+          "x": {
+            "digest": "bded93875777f42d",
+            "max": -0.0,
+            "mean": -0.050763889,
+            "min": -0.17125,
+            "n": 6,
+            "std": 0.072620596
+          },
+          "y": {
+            "digest": "84a6e8b7afdd286a",
+            "max": 5.0,
+            "mean": 2.5,
+            "min": 0.0,
+            "n": 6,
+            "std": 1.707825128
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child7",
+          "x": {
+            "digest": "374708fff7719dd5",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          }
+        },
+        {
+          "kind": "bars",
+          "label": "patches",
+          "v": {
+            "digest": "3c7c1c06d5b4bf43",
+            "max": 0.55,
+            "mean": 0.55,
+            "min": 0.55,
+            "n": 6,
+            "std": 0.0
+          }
+        }
+      ],
+      "title": "Two positives reproduced -- and so are\nthe four nulls, which is the harder half",
+      "xlabel": "depression per 10% F  (phenotypic SD)",
+      "ylabel": ""
+    }
+  ],
+  "digest": "95fe88c0e89a06f4",
+  "figure": "directional_dominance.png",
+  "generated_by": "health_engine.viz",
+  "provenance": {
+    "catalogue": "synthetic",
+    "git_commit": "49719a8",
+    "git_dirty": true,
+    "libraries": {
+      "dash": "4.4.1",
+      "matplotlib": "3.11.0",
+      "networkx": "3.6.1",
+      "numpy": "2.4.4",
+      "plotly": "6.9.0",
+      "scipy": "1.17.1"
+    },
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.14.5"
+  },
+  "schema": 1
+}

@@ -1,0 +1,239 @@
+{
+  "axes": [
+    {
+      "index": 0,
+      "series": [
+        {
+          "kind": "line",
+          "label": "observed slope = 0.840",
+          "x": {
+            "digest": "2655e541477a69e7",
+            "max": 2.654658753,
+            "mean": 0.101170607,
+            "min": -2.452317538,
+            "n": 50,
+            "std": 1.504043048
+          },
+          "y": {
+            "digest": "6d5c0f31ddc2776f",
+            "max": 2.222271426,
+            "mean": 0.078202374,
+            "min": -2.065866678,
+            "n": 50,
+            "std": 1.262889024
+          }
+        },
+        {
+          "kind": "line",
+          "label": "theory: $h^2$ = 0.800",
+          "x": {
+            "digest": "2655e541477a69e7",
+            "max": 2.654658753,
+            "mean": 0.101170607,
+            "min": -2.452317538,
+            "n": 50,
+            "std": 1.504043048
+          },
+          "y": {
+            "digest": "1a9fa0e0f2a99c9c",
+            "max": 2.123727002,
+            "mean": 0.080936486,
+            "min": -1.961854031,
+            "n": 50,
+            "std": 1.203234439
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child3",
+          "x": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          },
+          "y": {
+            "digest": "374708fff7719dd5",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.0
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child4",
+          "x": {
+            "digest": "374708fff7719dd5",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          }
+        },
+        {
+          "kind": "points",
+          "label": "_child0",
+          "x": {
+            "digest": "6fca958fbd0db8c0",
+            "max": 2.654658753,
+            "mean": 0.038857746,
+            "min": -2.452317538,
+            "n": 1500,
+            "std": 0.732644344
+          },
+          "y": {
+            "digest": "b6d031e5651e7733",
+            "max": 4.223468257,
+            "mean": 0.025880581,
+            "min": -3.3149248,
+            "n": 1500,
+            "std": 1.022785621
+          }
+        }
+      ],
+      "title": "height_cm\n309 loci",
+      "xlabel": "midparent liability (z)",
+      "ylabel": "offspring liability (z)"
+    },
+    {
+      "index": 1,
+      "series": [
+        {
+          "kind": "line",
+          "label": "observed slope = 0.367",
+          "x": {
+            "digest": "b3a1efaef24a8a1f",
+            "max": 2.358761825,
+            "mean": -0.068564003,
+            "min": -2.495889831,
+            "n": 50,
+            "std": 1.429731539
+          },
+          "y": {
+            "digest": "fd9384c50c48dfd2",
+            "max": 0.880918082,
+            "mean": -0.010981869,
+            "min": -0.90288182,
+            "n": 50,
+            "std": 0.525342529
+          }
+        },
+        {
+          "kind": "line",
+          "label": "theory: $h^2$ = 0.400",
+          "x": {
+            "digest": "b3a1efaef24a8a1f",
+            "max": 2.358761825,
+            "mean": -0.068564003,
+            "min": -2.495889831,
+            "n": 50,
+            "std": 1.429731539
+          },
+          "y": {
+            "digest": "a724fce88c9631ab",
+            "max": 0.94350473,
+            "mean": -0.027425601,
+            "min": -0.998355932,
+            "n": 50,
+            "std": 0.571892616
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child3",
+          "x": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          },
+          "y": {
+            "digest": "374708fff7719dd5",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.0
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child4",
+          "x": {
+            "digest": "374708fff7719dd5",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          }
+        },
+        {
+          "kind": "points",
+          "label": "_child0",
+          "x": {
+            "digest": "ecbd2ef702c10877",
+            "max": 2.358761825,
+            "mean": 0.009138407,
+            "min": -2.495889831,
+            "n": 1500,
+            "std": 0.699560658
+          },
+          "y": {
+            "digest": "8c9870bb1ba1def1",
+            "max": 4.034565133,
+            "mean": 0.017569211,
+            "min": -4.305900353,
+            "n": 1500,
+            "std": 1.005072075
+          }
+        }
+      ],
+      "title": "neuroticism\n402 loci",
+      "xlabel": "midparent liability (z)",
+      "ylabel": "offspring liability (z)"
+    }
+  ],
+  "digest": "09caca5840f5d330",
+  "figure": "heritability_validation.png",
+  "generated_by": "health_engine.viz",
+  "provenance": {
+    "catalogue": "synthetic",
+    "git_commit": "49719a8",
+    "git_dirty": true,
+    "libraries": {
+      "dash": "4.4.1",
+      "matplotlib": "3.11.0",
+      "networkx": "3.6.1",
+      "numpy": "2.4.4",
+      "plotly": "6.9.0",
+      "scipy": "1.17.1"
+    },
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.14.5"
+  },
+  "schema": 1
+}

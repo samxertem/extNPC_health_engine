@@ -1,0 +1,479 @@
+{
+  "axes": [
+    {
+      "index": 0,
+      "series": [
+        {
+          "kind": "line",
+          "label": "eye_color",
+          "x": {
+            "digest": "a68de4b5e96a60c8",
+            "max": 3.0,
+            "mean": 2.0,
+            "min": 1.0,
+            "n": 3,
+            "std": 0.816496581
+          },
+          "y": {
+            "digest": "f88f52691e5818ec",
+            "max": 0.195041041,
+            "mean": 0.0,
+            "min": -0.195041041,
+            "n": 3,
+            "std": 0.159250343
+          }
+        },
+        {
+          "kind": "line",
+          "label": "hair_pigment",
+          "x": {
+            "digest": "a68de4b5e96a60c8",
+            "max": 3.0,
+            "mean": 2.0,
+            "min": 1.0,
+            "n": 3,
+            "std": 0.816496581
+          },
+          "y": {
+            "digest": "7f8995929c2391ae",
+            "max": 0.077698329,
+            "mean": 0.0,
+            "min": -0.077698329,
+            "n": 3,
+            "std": 0.06344042
+          }
+        },
+        {
+          "kind": "line",
+          "label": "skin_tone",
+          "x": {
+            "digest": "a68de4b5e96a60c8",
+            "max": 3.0,
+            "mean": 2.0,
+            "min": 1.0,
+            "n": 3,
+            "std": 0.816496581
+          },
+          "y": {
+            "digest": "076d13489120521e",
+            "max": 0.070506109,
+            "mean": -0.0,
+            "min": -0.070506109,
+            "n": 3,
+            "std": 0.057567997
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child3",
+          "x": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          },
+          "y": {
+            "digest": "374708fff7719dd5",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.0
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child4",
+          "x": {
+            "digest": "f266388db081c554",
+            "max": 2.0,
+            "mean": 2.0,
+            "min": 2.0,
+            "n": 2,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          }
+        }
+      ],
+      "title": "Dosage response is linear and mirror-symmetric",
+      "xlabel": "copies of 15q11-q13",
+      "ylabel": "mean liability shift (SD)"
+    },
+    {
+      "index": 1,
+      "series": [
+        {
+          "kind": "line",
+          "label": "_nolegend_",
+          "x": {
+            "digest": "d7523c23eec3ba2d",
+            "max": 0.194874423,
+            "mean": 0.0,
+            "min": -0.194874423,
+            "n": 3,
+            "std": 0.1591143
+          },
+          "y": {
+            "digest": "f88f52691e5818ec",
+            "max": 0.195041041,
+            "mean": 0.0,
+            "min": -0.195041041,
+            "n": 3,
+            "std": 0.159250343
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_nolegend_",
+          "x": {
+            "digest": "a3f8c4f27575c44b",
+            "max": 0.184459823,
+            "mean": -0.0104146,
+            "min": -0.205289024,
+            "n": 3,
+            "std": 0.1591143
+          },
+          "y": {
+            "digest": "f88f52691e5818ec",
+            "max": 0.195041041,
+            "mean": 0.0,
+            "min": -0.195041041,
+            "n": 3,
+            "std": 0.159250343
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_nolegend_",
+          "x": {
+            "digest": "1f22ba230f050b2d",
+            "max": 0.205289024,
+            "mean": 0.0104146,
+            "min": -0.184459823,
+            "n": 3,
+            "std": 0.1591143
+          },
+          "y": {
+            "digest": "f88f52691e5818ec",
+            "max": 0.195041041,
+            "mean": 0.0,
+            "min": -0.195041041,
+            "n": 3,
+            "std": 0.159250343
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child4",
+          "x": {
+            "digest": "f88f52691e5818ec",
+            "max": 0.195041041,
+            "mean": 0.0,
+            "min": -0.195041041,
+            "n": 3,
+            "std": 0.159250343
+          },
+          "y": {
+            "digest": "f88f52691e5818ec",
+            "max": 0.195041041,
+            "mean": 0.0,
+            "min": -0.195041041,
+            "n": 3,
+            "std": 0.159250343
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_nolegend_",
+          "x": {
+            "digest": "a0351172ba68dcee",
+            "max": 0.076992602,
+            "mean": 0.0,
+            "min": -0.076992602,
+            "n": 3,
+            "std": 0.062864197
+          },
+          "y": {
+            "digest": "7f8995929c2391ae",
+            "max": 0.077698329,
+            "mean": 0.0,
+            "min": -0.077698329,
+            "n": 3,
+            "std": 0.06344042
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_nolegend_",
+          "x": {
+            "digest": "d64f6a4ed954efdd",
+            "max": 0.071803587,
+            "mean": -0.005189015,
+            "min": -0.082181617,
+            "n": 3,
+            "std": 0.062864197
+          },
+          "y": {
+            "digest": "7f8995929c2391ae",
+            "max": 0.077698329,
+            "mean": 0.0,
+            "min": -0.077698329,
+            "n": 3,
+            "std": 0.06344042
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_nolegend_",
+          "x": {
+            "digest": "db1bee241fd59fc9",
+            "max": 0.082181617,
+            "mean": 0.005189015,
+            "min": -0.071803587,
+            "n": 3,
+            "std": 0.062864197
+          },
+          "y": {
+            "digest": "7f8995929c2391ae",
+            "max": 0.077698329,
+            "mean": 0.0,
+            "min": -0.077698329,
+            "n": 3,
+            "std": 0.06344042
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child9",
+          "x": {
+            "digest": "dfe3aac8b981a2ff",
+            "max": 0.077698329,
+            "mean": 0.0,
+            "min": -0.077698329,
+            "n": 3,
+            "std": 0.06344042
+          },
+          "y": {
+            "digest": "7f8995929c2391ae",
+            "max": 0.077698329,
+            "mean": 0.0,
+            "min": -0.077698329,
+            "n": 3,
+            "std": 0.06344042
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_nolegend_",
+          "x": {
+            "digest": "a70850e11008a036",
+            "max": 0.070263481,
+            "mean": 0.0,
+            "min": -0.070263481,
+            "n": 3,
+            "std": 0.057369892
+          },
+          "y": {
+            "digest": "076d13489120521e",
+            "max": 0.070506109,
+            "mean": -0.0,
+            "min": -0.070506109,
+            "n": 3,
+            "std": 0.057567997
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_nolegend_",
+          "x": {
+            "digest": "e660cabcf462dd88",
+            "max": 0.067292541,
+            "mean": -0.00297094,
+            "min": -0.073234421,
+            "n": 3,
+            "std": 0.057369892
+          },
+          "y": {
+            "digest": "076d13489120521e",
+            "max": 0.070506109,
+            "mean": -0.0,
+            "min": -0.070506109,
+            "n": 3,
+            "std": 0.057567997
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_nolegend_",
+          "x": {
+            "digest": "9e2043b98ccbc9f6",
+            "max": 0.073234421,
+            "mean": 0.00297094,
+            "min": -0.067292541,
+            "n": 3,
+            "std": 0.057369892
+          },
+          "y": {
+            "digest": "076d13489120521e",
+            "max": 0.070506109,
+            "mean": -0.0,
+            "min": -0.070506109,
+            "n": 3,
+            "std": 0.057567997
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child14",
+          "x": {
+            "digest": "1b6b7867a6dae013",
+            "max": 0.070506109,
+            "mean": 0.0,
+            "min": -0.070506109,
+            "n": 3,
+            "std": 0.057567997
+          },
+          "y": {
+            "digest": "076d13489120521e",
+            "max": 0.070506109,
+            "mean": -0.0,
+            "min": -0.070506109,
+            "n": 3,
+            "std": 0.057567997
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child15",
+          "x": {
+            "digest": "996bc7082eab0a8c",
+            "max": 0.243801301,
+            "mean": 0.0,
+            "min": -0.243801301,
+            "n": 2,
+            "std": 0.243801301
+          },
+          "y": {
+            "digest": "996bc7082eab0a8c",
+            "max": 0.243801301,
+            "mean": 0.0,
+            "min": -0.243801301,
+            "n": 2,
+            "std": 0.243801301
+          }
+        },
+        {
+          "kind": "points",
+          "label": "_nolegend_",
+          "x": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          }
+        },
+        {
+          "kind": "points",
+          "label": "_nolegend_",
+          "x": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          }
+        },
+        {
+          "kind": "points",
+          "label": "_nolegend_",
+          "x": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          }
+        }
+      ],
+      "title": "Closed form vs measurement\ncrosses land exactly on the line",
+      "xlabel": "predicted shift  (o = catalogue p,  x = realised p)",
+      "ylabel": "observed shift"
+    },
+    {
+      "index": 2,
+      "series": [
+        {
+          "kind": "bars",
+          "label": "patches",
+          "v": {
+            "digest": "606e5166986dd9f1",
+            "max": 0.5,
+            "mean": 0.5,
+            "min": 0.5,
+            "n": 2,
+            "std": 0.0
+          }
+        }
+      ],
+      "title": "Emergent mutation-selection balance\n$q = \\mu/s$;  de novo fraction $= s$",
+      "xlabel": "deletion carriers per 100,000 births",
+      "ylabel": ""
+    }
+  ],
+  "digest": "b5e9e88f5419043a",
+  "figure": "cnv_dosage.png",
+  "generated_by": "health_engine.viz",
+  "provenance": {
+    "catalogue": "synthetic",
+    "git_commit": "49719a8",
+    "git_dirty": true,
+    "libraries": {
+      "dash": "4.4.1",
+      "matplotlib": "3.11.0",
+      "networkx": "3.6.1",
+      "numpy": "2.4.4",
+      "plotly": "6.9.0",
+      "scipy": "1.17.1"
+    },
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.14.5"
+  },
+  "schema": 1
+}

@@ -1,0 +1,279 @@
+{
+  "axes": [
+    {
+      "index": 0,
+      "series": [
+        {
+          "kind": "line",
+          "label": "engine = literature",
+          "x": {
+            "digest": "98285e4660149afd",
+            "max": 0.03,
+            "mean": 0.0165,
+            "min": 0.003,
+            "n": 2,
+            "std": 0.0135
+          },
+          "y": {
+            "digest": "98285e4660149afd",
+            "max": 0.03,
+            "mean": 0.0165,
+            "min": 0.003,
+            "n": 2,
+            "std": 0.0135
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child1",
+          "x": {
+            "digest": "a59cb3e417f5b9d4",
+            "max": 0.02,
+            "mean": 0.010545025,
+            "min": 0.004545455,
+            "n": 9,
+            "std": 0.004671689
+          },
+          "y": {
+            "digest": "ff8e36c4f42842af",
+            "max": 0.015385296,
+            "mean": 0.010029307,
+            "min": 0.00619222,
+            "n": 9,
+            "std": 0.002910772
+          }
+        }
+      ],
+      "title": "The assignment, in the open\n(CFTR off the line: MSB cannot hold q=0.02 at s~1)",
+      "xlabel": "literature allele frequency  q",
+      "ylabel": "assigned load-locus frequency  q"
+    },
+    {
+      "index": 1,
+      "series": [
+        {
+          "kind": "line",
+          "label": "closed form  $\\sum_j q_j^2 + Fp_jq_j$",
+          "x": {
+            "digest": "f9c8256d4fa47ed4",
+            "max": 0.27,
+            "mean": 0.135,
+            "min": 0.0,
+            "n": 60,
+            "std": 0.079252332
+          },
+          "y": {
+            "digest": "bb0ef053b223834c",
+            "max": 0.025087739,
+            "mean": 0.013034638,
+            "min": 0.000981536,
+            "n": 60,
+            "std": 0.007075825
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_nolegend_",
+          "x": {
+            "digest": "8d1537fc872cb9f2",
+            "max": 0.25,
+            "mean": 0.09375,
+            "min": 0.0,
+            "n": 5,
+            "std": 0.088388348
+          },
+          "y": {
+            "digest": "a356d8d37953021f",
+            "max": 0.024,
+            "mean": 0.009066667,
+            "min": 0.001,
+            "n": 5,
+            "std": 0.007914544
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_nolegend_",
+          "x": {
+            "digest": "8d1537fc872cb9f2",
+            "max": 0.25,
+            "mean": 0.09375,
+            "min": 0.0,
+            "n": 5,
+            "std": 0.088388348
+          },
+          "y": {
+            "digest": "e88127dae906885f",
+            "max": 0.021165763,
+            "mean": 0.007480725,
+            "min": 0.000422842,
+            "n": 5,
+            "std": 0.007196225
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_nolegend_",
+          "x": {
+            "digest": "8d1537fc872cb9f2",
+            "max": 0.25,
+            "mean": 0.09375,
+            "min": 0.0,
+            "n": 5,
+            "std": 0.088388348
+          },
+          "y": {
+            "digest": "1d4205369d96d47b",
+            "max": 0.026834237,
+            "mean": 0.010652608,
+            "min": 0.001577158,
+            "n": 5,
+            "std": 0.008636644
+          }
+        },
+        {
+          "kind": "points",
+          "label": "_nolegend_",
+          "x": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          }
+        }
+      ],
+      "title": "Named-disease incidence is exactly linear in F\n(Wright 1922 inbred genotype frequencies)",
+      "xlabel": "pedigree inbreeding coefficient  F",
+      "ylabel": "named diagnoses per child"
+    },
+    {
+      "index": 2,
+      "series": [
+        {
+          "kind": "line",
+          "label": "_nolegend_",
+          "x": {
+            "digest": "0e296c3e70b4c425",
+            "max": 4.2,
+            "mean": 2.2,
+            "min": 0.2,
+            "n": 5,
+            "std": 1.414213562
+          },
+          "y": {
+            "digest": "c0a92e7358c7fef1",
+            "max": 9.861228583,
+            "mean": 3.558629232,
+            "min": 0.183775721,
+            "n": 5,
+            "std": 3.334802108
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_nolegend_",
+          "x": {
+            "digest": "0e296c3e70b4c425",
+            "max": 4.2,
+            "mean": 2.2,
+            "min": 0.2,
+            "n": 5,
+            "std": 1.414213562
+          },
+          "y": {
+            "digest": "8b816965c23d3106",
+            "max": 38.138771417,
+            "mean": 14.574704101,
+            "min": 1.816224279,
+            "n": 5,
+            "std": 12.494335123
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child13",
+          "x": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          },
+          "y": {
+            "digest": "5f07eef034c5a21f",
+            "max": 1.0,
+            "mean": 1.0,
+            "min": 1.0,
+            "n": 2,
+            "std": 0.0
+          }
+        },
+        {
+          "kind": "points",
+          "label": "_nolegend_",
+          "x": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          }
+        },
+        {
+          "kind": "bars",
+          "label": "patches",
+          "v": {
+            "digest": "7b229ebc6d720869",
+            "max": 24.0,
+            "mean": 9.297163506,
+            "min": 1.0,
+            "n": 10,
+            "std": 7.980825097
+          }
+        }
+      ],
+      "title": "Consanguinity multiplies rare-recessive risk\nmany-fold (Modell & Darr 2002)",
+      "xlabel": "",
+      "ylabel": "relative risk of a named recessive diagnosis"
+    }
+  ],
+  "digest": "bdb04e96b0548c86",
+  "figure": "mendelian_diseases.png",
+  "generated_by": "health_engine.viz",
+  "provenance": {
+    "catalogue": "synthetic",
+    "git_commit": "49719a8",
+    "git_dirty": true,
+    "libraries": {
+      "dash": "4.4.1",
+      "matplotlib": "3.11.0",
+      "networkx": "3.6.1",
+      "numpy": "2.4.4",
+      "plotly": "6.9.0",
+      "scipy": "1.17.1"
+    },
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.14.5"
+  },
+  "schema": 1
+}

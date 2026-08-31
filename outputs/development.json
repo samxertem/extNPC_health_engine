@@ -1,0 +1,647 @@
+{
+  "axes": [
+    {
+      "index": 0,
+      "series": [
+        {
+          "kind": "line",
+          "label": "_child0",
+          "x": {
+            "digest": "91bd86154a62fb90",
+            "max": 80.0,
+            "mean": 40.0,
+            "min": 0.0,
+            "n": 400,
+            "std": 23.151818144
+          },
+          "y": {
+            "digest": "2b93bebb564867d9",
+            "max": 175.308341106,
+            "mean": 163.601308946,
+            "min": 50.839418921,
+            "n": 400,
+            "std": 24.543619693
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child1",
+          "x": {
+            "digest": "91bd86154a62fb90",
+            "max": 80.0,
+            "mean": 40.0,
+            "min": 0.0,
+            "n": 400,
+            "std": 23.151818144
+          },
+          "y": {
+            "digest": "2ac492ef52b18af9",
+            "max": 174.578876224,
+            "mean": 162.920557484,
+            "min": 50.627874105,
+            "n": 400,
+            "std": 24.441492729
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child2",
+          "x": {
+            "digest": "91bd86154a62fb90",
+            "max": 80.0,
+            "mean": 40.0,
+            "min": 0.0,
+            "n": 400,
+            "std": 23.151818144
+          },
+          "y": {
+            "digest": "5d0c5f5539933fff",
+            "max": 185.866555324,
+            "mean": 174.4857168,
+            "min": 53.901301044,
+            "n": 400,
+            "std": 25.097300915
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child3",
+          "x": {
+            "digest": "91bd86154a62fb90",
+            "max": 80.0,
+            "mean": 40.0,
+            "min": 0.0,
+            "n": 400,
+            "std": 23.151818144
+          },
+          "y": {
+            "digest": "a694325b1d5cd15e",
+            "max": 165.319559815,
+            "mean": 155.19683918,
+            "min": 47.942672346,
+            "n": 400,
+            "std": 22.322868859
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child4",
+          "x": {
+            "digest": "91bd86154a62fb90",
+            "max": 80.0,
+            "mean": 40.0,
+            "min": 0.0,
+            "n": 400,
+            "std": 23.151818144
+          },
+          "y": {
+            "digest": "43c078c51183d286",
+            "max": 169.674679742,
+            "mean": 159.285289739,
+            "min": 49.205657125,
+            "n": 400,
+            "std": 22.91093461
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child5",
+          "x": {
+            "digest": "91bd86154a62fb90",
+            "max": 80.0,
+            "mean": 40.0,
+            "min": 0.0,
+            "n": 400,
+            "std": 23.151818144
+          },
+          "y": {
+            "digest": "111a03d80f475b0e",
+            "max": 161.792692877,
+            "mean": 151.885926656,
+            "min": 46.919880934,
+            "n": 400,
+            "std": 21.846640951
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child6",
+          "x": {
+            "digest": "91bd86154a62fb90",
+            "max": 80.0,
+            "mean": 40.0,
+            "min": 0.0,
+            "n": 400,
+            "std": 23.151818144
+          },
+          "y": {
+            "digest": "292246a8214479af",
+            "max": 172.530895748,
+            "mean": 161.966616116,
+            "min": 50.033959767,
+            "n": 400,
+            "std": 23.296605461
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child7",
+          "x": {
+            "digest": "91bd86154a62fb90",
+            "max": 80.0,
+            "mean": 40.0,
+            "min": 0.0,
+            "n": 400,
+            "std": 23.151818144
+          },
+          "y": {
+            "digest": "a58984933cc5d390",
+            "max": 173.771945698,
+            "mean": 163.131675045,
+            "min": 50.393864252,
+            "n": 400,
+            "std": 23.464182699
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child8",
+          "x": {
+            "digest": "91bd86154a62fb90",
+            "max": 80.0,
+            "mean": 40.0,
+            "min": 0.0,
+            "n": 400,
+            "std": 23.151818144
+          },
+          "y": {
+            "digest": "5c0fe2bab8d6daa1",
+            "max": 157.737908814,
+            "mean": 148.079422025,
+            "min": 45.743993556,
+            "n": 400,
+            "std": 21.299129132
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child9",
+          "x": {
+            "digest": "91bd86154a62fb90",
+            "max": 80.0,
+            "mean": 40.0,
+            "min": 0.0,
+            "n": 400,
+            "std": 23.151818144
+          },
+          "y": {
+            "digest": "c789a2d2d763e0dd",
+            "max": 160.840410459,
+            "mean": 150.09954185,
+            "min": 46.643719033,
+            "n": 400,
+            "std": 22.518072105
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child10",
+          "x": {
+            "digest": "91bd86154a62fb90",
+            "max": 80.0,
+            "mean": 40.0,
+            "min": 0.0,
+            "n": 400,
+            "std": 23.151818144
+          },
+          "y": {
+            "digest": "48db0f9e33e4b0df",
+            "max": 173.740470265,
+            "mean": 163.102126893,
+            "min": 50.384736377,
+            "n": 400,
+            "std": 23.459932616
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child11",
+          "x": {
+            "digest": "91bd86154a62fb90",
+            "max": 80.0,
+            "mean": 40.0,
+            "min": 0.0,
+            "n": 400,
+            "std": 23.151818144
+          },
+          "y": {
+            "digest": "9cff6facbc7be172",
+            "max": 172.135249493,
+            "mean": 160.640115325,
+            "min": 49.919222353,
+            "n": 400,
+            "std": 24.099378687
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child12",
+          "x": {
+            "digest": "32ffabd0ee4844ec",
+            "max": 20.0,
+            "mean": 20.0,
+            "min": 20.0,
+            "n": 2,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          }
+        }
+      ],
+      "title": "Individual growth to a genetic endpoint",
+      "xlabel": "age (years)",
+      "ylabel": "stature (cm)"
+    },
+    {
+      "index": 1,
+      "series": [
+        {
+          "kind": "line",
+          "label": "female (fitted)",
+          "x": {
+            "digest": "82d85c1c2b5f1931",
+            "max": 20.0,
+            "mean": 10.0,
+            "min": 0.0,
+            "n": 400,
+            "std": 5.787954536
+          },
+          "y": {
+            "digest": "46f8c1ceba7c7984",
+            "max": 100.0,
+            "mean": 78.440387501,
+            "min": 29.0,
+            "n": 400,
+            "std": 19.738655254
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child1",
+          "x": {
+            "digest": "370ef4c257dc98c1",
+            "max": 18.0,
+            "mean": 10.625,
+            "min": 2.0,
+            "n": 8,
+            "std": 5.121950312
+          },
+          "y": {
+            "digest": "60f48ec240144266",
+            "max": 99.9,
+            "mean": 81.675,
+            "min": 50.0,
+            "n": 8,
+            "std": 17.377481837
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child2",
+          "x": {
+            "digest": "d685fe7c86456814",
+            "max": 20.0,
+            "mean": 11.503759398,
+            "min": 3.007518797,
+            "n": 340,
+            "std": 4.919755451
+          },
+          "y": {
+            "digest": "42c53f0eeb8c393e",
+            "max": 43.481409313,
+            "mean": 34.508588688,
+            "min": 26.017463009,
+            "n": 340,
+            "std": 5.850491719
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child3",
+          "x": {
+            "digest": "58af473f96fbb47c",
+            "max": 11.613403351,
+            "mean": 11.613403351,
+            "min": 11.613403351,
+            "n": 2,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          }
+        },
+        {
+          "kind": "line",
+          "label": "male (fitted)",
+          "x": {
+            "digest": "82d85c1c2b5f1931",
+            "max": 20.0,
+            "mean": 10.0,
+            "min": 0.0,
+            "n": 400,
+            "std": 5.787954536
+          },
+          "y": {
+            "digest": "126ae48e7dd215da",
+            "max": 100.0,
+            "mean": 76.220805242,
+            "min": 29.0,
+            "n": 400,
+            "std": 19.290949026
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child6",
+          "x": {
+            "digest": "370ef4c257dc98c1",
+            "max": 18.0,
+            "mean": 10.625,
+            "min": 2.0,
+            "n": 8,
+            "std": 5.121950312
+          },
+          "y": {
+            "digest": "b4676a25ddef0673",
+            "max": 99.8,
+            "mean": 79.1,
+            "min": 49.0,
+            "n": 8,
+            "std": 16.979988221
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child7",
+          "x": {
+            "digest": "d685fe7c86456814",
+            "max": 20.0,
+            "mean": 11.503759398,
+            "min": 3.007518797,
+            "n": 340,
+            "std": 4.919755451
+          },
+          "y": {
+            "digest": "e15d602cbee04fe7",
+            "max": 40.466384753,
+            "mean": 34.758653325,
+            "min": 26.182282359,
+            "n": 340,
+            "std": 4.513508125
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child8",
+          "x": {
+            "digest": "36595883950acdce",
+            "max": 12.871217804,
+            "mean": 12.871217804,
+            "min": 12.871217804,
+            "n": 2,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          }
+        }
+      ],
+      "title": "Preece-Baines 1978 vs Tanner landmarks\n(rings = fitted targets)",
+      "xlabel": "age (years)",
+      "ylabel": "% of adult stature"
+    },
+    {
+      "index": 2,
+      "series": [
+        {
+          "kind": "line",
+          "label": "height_cm",
+          "x": {
+            "digest": "91bd86154a62fb90",
+            "max": 80.0,
+            "mean": 40.0,
+            "min": 0.0,
+            "n": 400,
+            "std": 23.151818144
+          },
+          "y": {
+            "digest": "29994b92ec2b5731",
+            "max": 1.0,
+            "mean": 0.938768766,
+            "min": 0.29,
+            "n": 400,
+            "std": 0.135028601
+          }
+        },
+        {
+          "kind": "line",
+          "label": "aerobic_capacity",
+          "x": {
+            "digest": "91bd86154a62fb90",
+            "max": 80.0,
+            "mean": 40.0,
+            "min": 0.0,
+            "n": 400,
+            "std": 23.151818144
+          },
+          "y": {
+            "digest": "8d41542ba550c2c5",
+            "max": 1.0,
+            "mean": 0.802484056,
+            "min": 0.358796465,
+            "n": 400,
+            "std": 0.209764061
+          }
+        },
+        {
+          "kind": "line",
+          "label": "lung_capacity",
+          "x": {
+            "digest": "91bd86154a62fb90",
+            "max": 80.0,
+            "mean": 40.0,
+            "min": 0.0,
+            "n": 400,
+            "std": 23.151818144
+          },
+          "y": {
+            "digest": "c939be2907efcd68",
+            "max": 1.0,
+            "mean": 0.760016382,
+            "min": 0.035356934,
+            "n": 400,
+            "std": 0.221622263
+          }
+        },
+        {
+          "kind": "line",
+          "label": "conscientiousness (1 + offset)",
+          "x": {
+            "digest": "91bd86154a62fb90",
+            "max": 80.0,
+            "mean": 40.0,
+            "min": 0.0,
+            "n": 400,
+            "std": 23.151818144
+          },
+          "y": {
+            "digest": "b76c7e022891d9f5",
+            "max": 1.48,
+            "mean": 1.134303759,
+            "min": 0.712,
+            "n": 400,
+            "std": 0.295218451
+          }
+        },
+        {
+          "kind": "line",
+          "label": "agreeableness (1 + offset)",
+          "x": {
+            "digest": "91bd86154a62fb90",
+            "max": 80.0,
+            "mean": 40.0,
+            "min": 0.0,
+            "n": 400,
+            "std": 23.151818144
+          },
+          "y": {
+            "digest": "2d6a7bef65623b06",
+            "max": 1.33,
+            "mean": 1.092333835,
+            "min": 0.802,
+            "n": 400,
+            "std": 0.202962685
+          }
+        },
+        {
+          "kind": "line",
+          "label": "neuroticism (1 + offset)",
+          "x": {
+            "digest": "91bd86154a62fb90",
+            "max": 80.0,
+            "mean": 40.0,
+            "min": 0.0,
+            "n": 400,
+            "std": 23.151818144
+          },
+          "y": {
+            "digest": "9cfd0e4f5da10b43",
+            "max": 1.234,
+            "mean": 0.890878195,
+            "min": 0.61,
+            "n": 400,
+            "std": 0.239864991
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child6",
+          "x": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          },
+          "y": {
+            "digest": "5f07eef034c5a21f",
+            "max": 1.0,
+            "mean": 1.0,
+            "min": 1.0,
+            "n": 2,
+            "std": 0.0
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child7",
+          "x": {
+            "digest": "32ffabd0ee4844ec",
+            "max": 20.0,
+            "mean": 20.0,
+            "min": 20.0,
+            "n": 2,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          }
+        },
+        {
+          "kind": "line",
+          "label": "_child8",
+          "x": {
+            "digest": "cc9f2a90f6a647b2",
+            "max": 30.0,
+            "mean": 30.0,
+            "min": 30.0,
+            "n": 2,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "fc62429c3e69001d",
+            "max": 1.0,
+            "mean": 0.5,
+            "min": 0.0,
+            "n": 2,
+            "std": 0.5
+          }
+        }
+      ],
+      "title": "The schedule, and the identity it guarantees",
+      "xlabel": "age (years)",
+      "ylabel": "factor on mature value  /  1 + liability offset"
+    }
+  ],
+  "digest": "848e96e6f4e9c54d",
+  "figure": "development.png",
+  "generated_by": "health_engine.viz",
+  "provenance": {
+    "catalogue": "synthetic",
+    "git_commit": "49719a8",
+    "git_dirty": true,
+    "libraries": {
+      "dash": "4.4.1",
+      "matplotlib": "3.11.0",
+      "networkx": "3.6.1",
+      "numpy": "2.4.4",
+      "plotly": "6.9.0",
+      "scipy": "1.17.1"
+    },
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.14.5"
+  },
+  "schema": 1
+}

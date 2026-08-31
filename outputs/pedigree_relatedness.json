@@ -1,0 +1,91 @@
+{
+  "axes": [
+    {
+      "index": 0,
+      "series": [
+        {
+          "kind": "image",
+          "label": "_child0",
+          "v": {
+            "digest": "56a3da420ef448f3",
+            "max": 1.102324175,
+            "mean": 0.281599467,
+            "min": -0.070464651,
+            "n": 81,
+            "std": 0.32321627
+          }
+        }
+      ],
+      "title": "Realised genomic relatedness across the pedigree\n(GCTA estimator; 0.50 = parent-offspring or full sibs)",
+      "xlabel": "",
+      "ylabel": ""
+    },
+    {
+      "index": 1,
+      "series": [
+        {
+          "kind": "points",
+          "label": "_child0",
+          "x": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          }
+        },
+        {
+          "kind": "points",
+          "label": "_child1",
+          "x": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          },
+          "y": {
+            "digest": "af5570f5a1810b7a",
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0,
+            "n": 1,
+            "std": 0.0
+          }
+        }
+      ],
+      "title": "",
+      "xlabel": "",
+      "ylabel": ""
+    }
+  ],
+  "digest": "cfb46e85b1873bda",
+  "figure": "pedigree_relatedness.png",
+  "generated_by": "health_engine.viz",
+  "provenance": {
+    "catalogue": "synthetic",
+    "git_commit": "49719a8",
+    "git_dirty": true,
+    "libraries": {
+      "dash": "4.4.1",
+      "matplotlib": "3.11.0",
+      "networkx": "3.6.1",
+      "numpy": "2.4.4",
+      "plotly": "6.9.0",
+      "scipy": "1.17.1"
+    },
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.14.5"
+  },
+  "schema": 1
+}
