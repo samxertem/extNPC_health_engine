@@ -190,26 +190,32 @@ namespace ExtNPC.View
             if (!show || _bundle == null) return;
             EnsureStyles();
 
-            float margin = 12f;
-            var area = new Rect(Screen.width - panelWidth - margin, margin,
-                                panelWidth, Screen.height - margin * 2f);
+            // Laid out in the HUD's own units, not display pixels. See HudScale.
+            HudScale.Begin();
+            try
+            {
+                float margin = 12f;
+                var area = new Rect(HudScale.Width - panelWidth - margin, margin,
+                                    panelWidth, HudScale.Height - margin * 2f);
 
-            // Same chrome as the timeline HUD, from the same place, so the two
-            // panels cannot drift into looking like two different tools.
-            HudChrome.Panel(area);
+                // Same chrome as the timeline HUD, from the same place, so the
+                // two panels cannot drift into looking like two different tools.
+                HudChrome.Panel(area);
 
-            GUILayout.BeginArea(new Rect(area.x + 14f, area.y + 12f,
-                                         area.width - 28f, area.height - 24f));
-            _scroll = GUILayout.BeginScrollView(_scroll, false, false);
+                GUILayout.BeginArea(new Rect(area.x + 14f, area.y + 12f,
+                                             area.width - 28f, area.height - 24f));
+                _scroll = GUILayout.BeginScrollView(_scroll, false, false);
 
-            Section("INSPECTOR");
-            GUILayout.Space(8f);
+                Section("INSPECTOR");
+                GUILayout.Space(8f);
 
-            if (string.IsNullOrEmpty(_selected)) DrawEmpty();
-            else DrawVillager();
+                if (string.IsNullOrEmpty(_selected)) DrawEmpty();
+                else DrawVillager();
 
-            GUILayout.EndScrollView();
-            GUILayout.EndArea();
+                GUILayout.EndScrollView();
+                GUILayout.EndArea();
+            }
+            finally { HudScale.End(); }
         }
 
         private void DrawEmpty()

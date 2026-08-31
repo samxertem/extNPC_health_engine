@@ -84,8 +84,15 @@ namespace ExtNPC.View
             if (!show || _bundle == null || _clock == null) return;
             EnsureStyles();
 
-            DrawProvenanceAndKpis();
-            DrawTransport();
+            // Everything below is laid out in the HUD's own units, which are
+            // display pixels only on a 1080p screen at 96 dpi. See HudScale.
+            HudScale.Begin();
+            try
+            {
+                DrawProvenanceAndKpis();
+                DrawTransport();
+            }
+            finally { HudScale.End(); }
         }
 
         /// <summary>Top-left: which run this is, and what it looked like in the
@@ -116,7 +123,7 @@ namespace ExtNPC.View
 
             GUILayout.BeginArea(new Rect(area.x + 12f, area.y + PanelPad,
                                          area.width - 24f,
-                                         Screen.height - area.y - PanelPad));
+                                         HudScale.Height - area.y - PanelPad));
 
             Section("WORLD");
             // Manifest.ToString() carries seed, year, catalogue and commit. The
@@ -214,10 +221,10 @@ namespace ExtNPC.View
         /// markers.</summary>
         private void DrawTransport()
         {
-            float width = Screen.width - reservedRight - 24f;
-            if (width < 260f) width = Mathf.Max(260f, Screen.width - 24f);
+            float width = HudScale.Width - reservedRight - 24f;
+            if (width < 260f) width = Mathf.Max(260f, HudScale.Width - 24f);
 
-            var area = new Rect(12f, Screen.height - barHeight - 12f,
+            var area = new Rect(12f, HudScale.Height - barHeight - 12f,
                                 width, barHeight);
             HudChrome.Panel(area);
 

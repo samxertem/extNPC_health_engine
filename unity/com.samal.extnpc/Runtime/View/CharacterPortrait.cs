@@ -260,17 +260,29 @@ namespace ExtNPC.View
                 : null;
             if (eyeMat == null) eyeIndex = -1;
 
+            // THE PORTRAIT IS A SECOND RENDER PATH and every appearance change
+            // has to arrive here too or the inspector's face and the villager
+            // in the world disagree, which is the parity property the contract
+            // tests exist to hold. Same surfaces, same skin map, same rule for
+            // which channel is which, from the same place.
+            Material[] slots = BodyMaterials.SlotsFor(
+                subs,
+                BodyLibrary.SubmeshChannelsFor(villagerName, lifeStage),
+                BodyLibrary.SubmeshAssetsFor(villagerName, lifeStage),
+                _skin,
+                BodyLibrary.SkinMaterialFor(villagerName, lifeStage),
+                eyeMat);
+
             var current = _renderer.sharedMaterials;
-            bool rebuild = current.Length != subs ||
-                           (eyeIndex >= 0 && current[eyeIndex] != eyeMat) ||
-                           (eyeIndex < 0 && System.Array.IndexOf(current, _skin) < 0);
-            if (rebuild)
+            bool rebuild = current.Length != subs;
+            if (!rebuild)
             {
-                var slots = new Material[subs];
-                for (int i = 0; i < subs; i++) slots[i] = _skin;
-                if (eyeIndex >= 0 && eyeIndex < subs) slots[eyeIndex] = eyeMat;
-                _renderer.sharedMaterials = slots;
+                for (int i = 0; i < subs; i++)
+                {
+                    if (current[i] != slots[i]) { rebuild = true; break; }
+                }
             }
+            if (rebuild) _renderer.sharedMaterials = slots;
 
             if (_block == null) _block = new MaterialPropertyBlock();
 

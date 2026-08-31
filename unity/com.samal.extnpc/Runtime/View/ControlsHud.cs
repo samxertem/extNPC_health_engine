@@ -51,16 +51,22 @@ namespace ExtNPC.View
                 };
             }
 
-            float clearance = (_timeline != null && _timeline.show
-                ? _timeline.barHeight + 12f
-                : 0f) + 12f;
-            var content = new GUIContent(Hint);
-            Vector2 size = _style.CalcSize(content);
-            var area = new Rect(12f, Screen.height - clearance - size.y - 12f,
-                                 size.x + 16f, size.y + 12f);
-            HudChrome.Panel(area);
-            GUI.Label(new Rect(area.x + 8f, area.y + 6f, size.x + 4f, size.y),
-                      content, _style);
+            // Laid out in the HUD's own units, not display pixels. See HudScale.
+            HudScale.Begin();
+            try
+            {
+                float clearance = (_timeline != null && _timeline.show
+                    ? _timeline.barHeight + 12f
+                    : 0f) + 12f;
+                var content = new GUIContent(Hint);
+                Vector2 size = _style.CalcSize(content);
+                var area = new Rect(12f, HudScale.Height - clearance - size.y - 12f,
+                                     size.x + 16f, size.y + 12f);
+                HudChrome.Panel(area);
+                GUI.Label(new Rect(area.x + 8f, area.y + 6f, size.x + 4f, size.y),
+                          content, _style);
+            }
+            finally { HudScale.End(); }
         }
     }
 }

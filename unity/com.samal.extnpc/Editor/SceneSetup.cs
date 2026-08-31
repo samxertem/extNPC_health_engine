@@ -81,8 +81,22 @@ namespace ExtNPC.Editor
                 cam.backgroundColor = InspectorFormat.Surface;
             }
             RenderSettings.skybox = null;
-            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-            RenderSettings.ambientLight = InspectorFormat.Surface;
+            // AMBIENT AS A GRADIENT, NOT ONE COLOUR. Flat ambient adds the
+            // same light to a villager's scalp, their cheek and the underside
+            // of their jaw, which is the one lighting condition under which a
+            // human head looks like a painted egg: nothing in it tells the
+            // eye which way is up. A three-band ambient costs exactly the
+            // same to render and gives every curved surface a free vertical
+            // gradient.
+            //
+            // The three colours are the ONE surface colour lifted and
+            // dropped, not three new hues, so the palette InspectorFormat
+            // pins against the dashboard is untouched -- the same reasoning
+            // HudChrome uses for adding alpha but never a hex.
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+            RenderSettings.ambientSkyColor = InspectorFormat.Surface * 1.35f;
+            RenderSettings.ambientEquatorColor = InspectorFormat.Surface;
+            RenderSettings.ambientGroundColor = InspectorFormat.Surface * 0.55f;
             // Fog reads as a depth cue here, the same reasoning WorldRenderer
             // already uses to justify the ground survey grid: an orbiting
             // camera over a flat plane otherwise gives the eye nothing to
@@ -119,6 +133,37 @@ namespace ExtNPC.Editor
                 fill.type = LightType.Directional;
                 fill.intensity = 0.9f;
                 fill.shadows = LightShadows.None;
+            }
+
+            // A RIM LIGHT, and the problem it solves is separation rather
+            // than visibility. The sun and the camera fill both come from in
+            // front, so a villager and the ground behind them are lit by the
+            // same light from the same side and end up at nearly the same
+            // value. At any distance the silhouette stops resolving and the
+            // village reads as a texture on the ground rather than as people
+            // standing on it.
+            //
+            // Behind and above, aimed back at the camera, cool, and weak.
+            // Cool because a real back light is sky rather than sun, and the
+            // slight hue difference against the warm front is what actually
+            // separates the edge; weak because this is an edge highlight, not
+            // a third opinion about how bright a villager is. Parented to the
+            // camera for the same reason the fill is: a fixed one rims
+            // whichever side happens to face it, which is the wrong side as
+            // often as the right one under an orbiting camera.
+            //
+            // The PORTRAIT already had a rig like this. This is the world
+            // view catching up to it.
+            if (camGo.transform.Find("Rim Light") == null)
+            {
+                var rimGo = new GameObject("Rim Light");
+                rimGo.transform.SetParent(camGo.transform, false);
+                rimGo.transform.localRotation = Quaternion.Euler(-25f, 155f, 0f);
+                var rim = rimGo.AddComponent<Light>();
+                rim.type = LightType.Directional;
+                rim.intensity = 0.55f;
+                rim.color = new Color(0.78f, 0.86f, 1f);
+                rim.shadows = LightShadows.None;
             }
 
             Selection.activeGameObject = root;

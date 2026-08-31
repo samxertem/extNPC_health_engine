@@ -131,6 +131,39 @@ namespace ExtNPC.View
         private static readonly Dictionary<string, string> _eyeLabel =
             new Dictionary<string, string>();
 
+        /// <summary>Per-submesh CHANNEL, parallel to `_submeshColors`.
+        ///
+        /// The colours alone are no longer enough to draw a villager:
+        /// <see cref="BodyMaterials"/> needs to know that submesh 3 is hair
+        /// in order to give it hair's surface rather than skin's. That is the
+        /// same resolution <see cref="ResolveColors"/> already performs and
+        /// used to discard, so it is kept rather than recomputed.</summary>
+        private static readonly Dictionary<string, string[]> _submeshChannels =
+            new Dictionary<string, string[]>();
+
+        /// <summary>Per-submesh SOURCE MESH NAME, parallel to
+        /// `_submeshChannels`: `eyebrow001`, `eyelashes02`, `afro01`.
+        ///
+        /// The channel says what a part IS; this says which asset it is, and
+        /// eyebrows need both. Their shape lives in that specific asset's
+        /// alpha channel, so `eyebrow001` and `eyebrow007` are not
+        /// interchangeable the way two things that are both "eyebrows" would
+        /// be. See <see cref="HairCardMaterials"/>.</summary>
+        private static readonly Dictionary<string, string[]> _submeshAssets =
+            new Dictionary<string, string[]>();
+
+        /// <summary>Stem to the age and sex of THAT BODY, for
+        /// <see cref="SkinMaterials"/>, which picks a detail map per age band
+        /// and sex.
+        ///
+        /// Per body rather than per person, for the same reason `_colors` is:
+        /// a staged bundle carries one entry per life stage, and a villager's
+        /// skin at 5 is not the map that belongs on them at 70.</summary>
+        private static readonly Dictionary<string, float> _bodyAge =
+            new Dictionary<string, float>();
+        private static readonly Dictionary<string, bool> _bodyFemale =
+            new Dictionary<string, bool>();
+
         private static readonly Dictionary<string, string> _mature =
             new Dictionary<string, string>();
         private static readonly Dictionary<string, float> _matureAge =
@@ -204,6 +237,10 @@ namespace ExtNPC.View
             _colors.Clear();
             _channels.Clear();
             _submeshColors.Clear();
+            _submeshChannels.Clear();
+            _submeshAssets.Clear();
+            _bodyAge.Clear();
+            _bodyFemale.Clear();
             _eyeIndex.Clear();
             _eyeLabel.Clear();
             Staged = false;
@@ -292,6 +329,17 @@ namespace ExtNPC.View
                 }
 
                 float age = (float?)entry["age"] ?? 0f;
+
+                // This BODY's own age and sex, for the skin detail map.
+                // `sex` is the manifest's own word ("female"/"male"); a
+                // missing or unrecognised one resolves to male, which is
+                // SkinMaterials' behaviour for a missing map too, and is a
+                // slightly wrong body rather than an absent one.
+                _bodyAge[stem] = age;
+                string sex = (string)entry["sex"];
+                _bodyFemale[stem] = !string.IsNullOrEmpty(sex) &&
+                    sex.ToLowerInvariant() == "female";
+
                 float best;
                 if (!_matureAge.TryGetValue(name, out best) || age > best)
                 {
@@ -478,15 +526,40 @@ namespace ExtNPC.View
         /// manifest is asked.
         ///
         /// AN UNKNOWN CHANNEL FALLS BACK TO SKIN rather than to white. The
-        /// parts with no colour of their own -- teeth, tongue, eyebrows,
-        /// eyelashes -- are all things that read acceptably in skin tone and
-        /// unacceptably in white, and a white tongue is a more visible error
-        /// than a slightly-too-pink one.
+        /// parts with no colour of their own -- teeth and tongue -- both read
+        /// acceptably in skin tone and unacceptably in white, and a white
+        /// tongue is a more visible error than a slightly-too-pink one.
+        ///
+        /// EYEBROWS AND EYELASHES USED TO BE IN THAT LIST AND ARE NOT NOW.
+        /// They have no colour of their own in the manifest, so they fell
+        /// back to skin along with the teeth, and skin-coloured eyebrows are
+        /// not a slightly wrong tone: a face reads as wrong before a viewer
+        /// can say why, and missing brows are most of the reason. They are
+        /// made of hair, so they take `hair` -- the villager's own measured
+        /// `hair_pigment`. This is a CITED trait driving a visible channel,
+        /// which is what item A4 requires; inventing a brow colour from the
+        /// name would not have been.
+        ///
+        /// AND THE HAIR COLOUR IS GATED ON THE CUTOUT BEING INSTALLED, which
+        /// is the correction to the first version of that change. A brow is a
+        /// flat CARD whose hairs are cut out of it by an alpha channel. Given
+        /// the hair colour and no alpha, the whole card renders as a solid
+        /// dark rectangle, and the reported symptom was that every villager
+        /// appeared to be wearing mascara -- measurably so, since only 8 to 18
+        /// percent of one of these cards should be drawn at all. Skin-coloured
+        /// is a hidden defect; dark and solid is a visible one. So the colour
+        /// travels with the shape or not at all: no card, no hair colour, back
+        /// to the skin fallback the viewer used before.
+        /// See <see cref="HairCardMaterials"/>.
         /// </summary>
         private static Color[] ResolveColors(string stem, string[] sourceNames,
-                                             out int eyeIndex)
+                                             out int eyeIndex,
+                                             out string[] submeshChannels,
+                                             out string[] submeshAssets)
         {
             eyeIndex = -1;
+            submeshChannels = null;
+            submeshAssets = null;
             Dictionary<string, Color> byChannel;
             if (!_colors.TryGetValue(stem, out byChannel) || sourceNames == null)
                 return null;
@@ -498,6 +571,10 @@ namespace ExtNPC.View
             if (!byChannel.TryGetValue("skin", out skin)) skin = Color.white;
 
             var out_ = new Color[sourceNames.Length];
+            var channels = new string[sourceNames.Length];
+            var assets = new string[sourceNames.Length];
+            submeshChannels = channels;
+            submeshAssets = assets;
             for (int i = 0; i < sourceNames.Length; i++)
             {
                 out_[i] = skin;
@@ -515,16 +592,85 @@ namespace ExtNPC.View
                     continue;
 
                 if (channel == "eyes") eyeIndex = i;
+                channels[i] = channel;
+                assets[i] = local;
+
+                bool isCard = channel == "eyebrows" || channel == "eyelashes";
 
                 Color c;
                 // `suit` and `shoes` are separate channels in the engine but
                 // the manifest names the garment colour `clothes`, so a suit
-                // asks for `suit` first and settles for `clothes`.
+                // asks for `suit` first and settles for `clothes`. Eyebrows
+                // and eyelashes have no colour of their own and are made of
+                // hair, so they ask for `hair` -- but only if their cutout is
+                // installed, because dark colour without the shape is the
+                // mascara defect. Otherwise they keep the skin fallback
+                // already sitting in `out_[i]`.
                 if (byChannel.TryGetValue(channel, out c) ||
-                    (channel == "suit" && byChannel.TryGetValue("clothes", out c)))
+                    (channel == "suit" && byChannel.TryGetValue("clothes", out c)) ||
+                    (isCard && HairCardMaterials.Has(local) &&
+                     byChannel.TryGetValue("hair", out c)))
                     out_[i] = c;
             }
             return out_;
+        }
+
+        /// <summary>
+        /// Each submesh's appearance channel, in submesh order, or null when
+        /// the bundle carries none.
+        ///
+        /// Null rather than an array of nulls, for the same reason
+        /// <see cref="SubmeshColorsFor"/> returns null: a caller that gets
+        /// channels assigns surfaces from them, and a caller that gets null
+        /// must draw every part as flesh, which is what the viewer did before
+        /// <see cref="BodyMaterials"/> existed.
+        /// </summary>
+        public static string[] SubmeshChannelsFor(string villagerName,
+                                                  string lifeStage)
+        {
+            string stem = StemFor(villagerName, lifeStage);
+            if (stem == null) return null;
+            string[] channels;
+            return _submeshChannels.TryGetValue(stem, out channels) ? channels : null;
+        }
+
+        /// <summary>
+        /// Each submesh's source mesh name, in submesh order, or null when the
+        /// bundle carries none. `eyebrow001`, `eyelashes02`, `afro01`.
+        ///
+        /// Needed because a brow's shape is in ITS OWN asset's alpha channel,
+        /// so knowing that a submesh is "eyebrows" is not enough to draw it.
+        /// </summary>
+        public static string[] SubmeshAssetsFor(string villagerName,
+                                                string lifeStage)
+        {
+            string stem = StemFor(villagerName, lifeStage);
+            if (stem == null) return null;
+            string[] assets;
+            return _submeshAssets.TryGetValue(stem, out assets) ? assets : null;
+        }
+
+        /// <summary>
+        /// The skin detail map for this villager's body, or null when none is
+        /// installed.
+        ///
+        /// Resolved HERE rather than in <see cref="VillagerView"/> because
+        /// the age and the sex that pick it belong to the BODY, and the
+        /// manifest is the only thing that knows which body a staged bundle
+        /// handed back. Asking the CSV row instead would give the person's
+        /// age this year, which for a staged bundle is not the age the body
+        /// on screen was baked at.
+        /// </summary>
+        public static Material SkinMaterialFor(string villagerName,
+                                               string lifeStage)
+        {
+            string stem = StemFor(villagerName, lifeStage);
+            if (stem == null) return null;
+            float age;
+            if (!_bodyAge.TryGetValue(stem, out age)) return null;
+            bool female;
+            _bodyFemale.TryGetValue(stem, out female);
+            return SkinMaterials.For(age, female);
         }
 
         /// <summary>Which submesh index is this villager's EYES channel, or
@@ -613,7 +759,11 @@ namespace ExtNPC.View
             baked.name = "extnpc_body_" + stem;
             _cache[stem] = baked;
             int eyeIdx;
-            _submeshColors[stem] = ResolveColors(stem, sourceNames, out eyeIdx);
+            string[] channels, assets;
+            _submeshColors[stem] = ResolveColors(stem, sourceNames, out eyeIdx,
+                                                 out channels, out assets);
+            _submeshChannels[stem] = channels;
+            _submeshAssets[stem] = assets;
             _eyeIndex[stem] = eyeIdx;
             return baked;
         }

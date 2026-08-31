@@ -31,13 +31,13 @@ namespace ExtNPC.View
         private CapsuleCollider _collider;
         private MaterialPropertyBlock _block;
         private Material _bodyMaterial;
-        // Which submesh slot last got an eye material, and which material it
-        // was. Both are compared each Apply() so that a villager recycled
-        // from the pool onto a different body -- a different eye submesh
-        // index, or a different eye colour -- has its slots rebuilt instead
-        // of keeping the previous occupant's eyes.
-        private int _eyeSlot = -1;
-        private Material _eyeMaterial;
+        // No cached eye slot any more. It existed so that a villager recycled
+        // from the pool onto a different body did not keep the previous
+        // occupant's eyes, and EnsureMaterialSlots now compares the whole
+        // slot array element-wise, which subsumes it: a changed eye material
+        // IS a changed slot. One remembered index that has to agree with the
+        // array is a second source of truth, and this one was already write-
+        // only by the time the comparison changed.
 
         // Where the body stands and how tall it is, kept so the two COSMETIC
         // adjustments below can move it without recomputing anything from the
@@ -215,7 +215,24 @@ namespace ExtNPC.View
                     : null;
                 if (eyeMat == null) eyeIndex = -1;
 
-                EnsureMaterialSlots(parts.Length, eyeIndex, eyeMat);
+                // EACH PART GETS ITS OWN SURFACE, not just its own colour.
+                // Colour is per-submesh through the property block below;
+                // smoothness is a property of the MATERIAL, so hair, wool and
+                // skin needed separate ones or they render as the same
+                // substance in different tints. See <see cref="BodyMaterials"/>.
+                //
+                // The skin slot additionally takes a tone-free detail map
+                // when one is installed, which is why it is resolved from the
+                // manifest rather than from the row: a staged bundle's body
+                // has its own baked age, and that is what picks the map.
+                Material[] slots = BodyMaterials.SlotsFor(
+                    parts.Length,
+                    BodyLibrary.SubmeshChannelsFor(row.Name, row.LifeStage),
+                    BodyLibrary.SubmeshAssetsFor(row.Name, row.LifeStage),
+                    _bodyMaterial,
+                    BodyLibrary.SkinMaterialFor(row.Name, row.LifeStage),
+                    eyeMat);
+                EnsureMaterialSlots(slots);
                 for (int i = 0; i < parts.Length; i++)
                 {
                     // The eye slot keeps its texture's own colours: tinting
@@ -230,7 +247,7 @@ namespace ExtNPC.View
             }
             else
             {
-                EnsureMaterialSlots(1, -1, null);
+                EnsureMaterialSlots(new[] { _bodyMaterial });
                 _renderer.GetPropertyBlock(_block);
                 _block.SetColor(BaseColorId, bodyColour);
                 _block.SetColor(ColorId, bodyColour);
@@ -243,33 +260,42 @@ namespace ExtNPC.View
         }
 
         /// <summary>
-        /// Give the renderer one material slot per submesh, every one
-        /// pointing at the SAME shared body material, EXCEPT the eyes slot
-        /// (if any), which gets the eye-shaded material instead.
+        /// Give the renderer the material slots <see cref="BodyMaterials"/>
+        /// worked out, one per submesh.
         ///
         /// A renderer draws only as many submeshes as it has materials, so a
         /// nine-submesh body on a one-slot renderer loses eight of its parts
         /// and the villager renders as hair alone. That is the failure this
         /// exists to prevent, and it is not a crash.
         ///
-        /// ONE MATERIAL, N SLOTS (TWO, COUNTING THE EYE MATERIAL), and that is
-        /// what keeps this affordable. Colour arrives through
-        /// <c>SetPropertyBlock(block, index)</c>, which takes a submesh
-        /// index, so 600 villagers in nine colours each still share the same
-        /// two material assets instead of instancing 5,400 of them.
+        /// A HANDFUL OF MATERIALS, N SLOTS, and that is what keeps this
+        /// affordable. There are now five shared materials rather than two --
+        /// skin, flesh, hair, cloth and the eyes -- but they are still SHARED:
+        /// colour arrives through <c>SetPropertyBlock(block, index)</c>, which
+        /// takes a submesh index, so 600 villagers in nine colours each use
+        /// the same five assets instead of instancing 5,400 of them.
+        ///
+        /// THE COMPARISON IS ELEMENT-WISE and it has to be. A pooled view
+        /// recycled onto a different body may need the same NUMBER of slots
+        /// filled with different materials -- a different eye colour, an old
+        /// villager's skin map where a young one's was -- and a length check
+        /// alone would leave it wearing the previous occupant's face. Nine
+        /// reference comparisons per changed villager is not a cost worth
+        /// optimising around.
         /// </summary>
-        private void EnsureMaterialSlots(int count, int eyeIndex, Material eyeMaterial)
+        private void EnsureMaterialSlots(Material[] slots)
         {
             var current = _renderer.sharedMaterials;
-            if (current.Length == count && eyeIndex == _eyeSlot &&
-                _eyeMaterial == eyeMaterial) return;
-            var slots = new Material[count];
-            for (int i = 0; i < count; i++) slots[i] = _bodyMaterial;
-            if (eyeIndex >= 0 && eyeIndex < count && eyeMaterial != null)
-                slots[eyeIndex] = eyeMaterial;
+            if (current.Length == slots.Length)
+            {
+                bool same = true;
+                for (int i = 0; i < slots.Length; i++)
+                {
+                    if (current[i] != slots[i]) { same = false; break; }
+                }
+                if (same) return;
+            }
             _renderer.sharedMaterials = slots;
-            _eyeSlot = eyeIndex;
-            _eyeMaterial = eyeMaterial;
         }
 
         // ------------------------------------------------------------------

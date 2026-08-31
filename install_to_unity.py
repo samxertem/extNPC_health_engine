@@ -176,6 +176,369 @@ def install_eye_textures(project: Path) -> dict:
     return {"copied": copied, "missing": missing, "dest": str(dest)}
 
 
+# ----------------------------------------------------------------------
+# Skin: the eye fix generalised, and the one thing that had to change
+# ----------------------------------------------------------------------
+#
+# Eyes were the exception because an eyeball is not one colour. Skin is not
+# one colour either, but it fails DIFFERENTLY: a flat tone is the right
+# AVERAGE and the wrong SURFACE. Lips, nail beds, brow shading, the darkening
+# where a limb folds -- all of it is missing, and a face rendered in one
+# colour is the strongest remaining "not a person" signal on screen.
+#
+# THE CONSTRAINT THAT SHAPES THIS. `skin` is a MEASURED channel: it is the
+# villager's `skin_tone` placed on the Del Bino skin locus with an ITA in
+# degrees, and `bodies.json` records it as measured. The viewer's standing
+# property is that what the inspector prints is what the screen shows. A
+# MakeHuman skin has a tone baked into it, so using one as authored would
+# silently replace the engine's measured colour with an artist's, which is
+# the flat-colour bug arriving from the other direction.
+#
+# SO THE TEXTURE IS NEUTRALISED. It is reduced to its LUMINANCE, divided by
+# the median of that luminance, and clamped. What survives is the RATIO of
+# each pixel to flat skin: pure detail, no tone. URP's Lit shader multiplies
+# `_BaseMap` by `_BaseColor`, so the engine's colour still decides the tone
+# and the texture only darkens where real skin darkens.
+#
+# WHAT THAT COSTS, MEASURED RATHER THAN ASSUMED. Dividing by the median puts
+# the median pixel at exactly 1.0, so the commonest patch of skin renders at
+# the engine's colour to the bit. Every pixel above the median clamps to 1.0,
+# which discards the texture's baked highlights -- correct rather than lossy,
+# since a Lit shader computes its own specular. The MEAN lands below 1.0, so
+# the average square centimetre of skin renders slightly darker than the flat
+# tone. That residual is measured per texture at install time, written into
+# `skins.json` beside the textures, and gated below: a texture that would
+# darken a villager by more than 15 percent is refused rather than shipped.
+SKIN_RESIDUAL_FLOOR = 0.85
+
+# MakeHuman's own three age bands, and the ages at which it switches between
+# them. Taken from the asset pack's own naming rather than invented: the pack
+# ships `young_*`, `middleage_*` and `old_*` and nothing between.
+SKIN_AGE_BANDS = ((65.0, "old"), (45.0, "middleage"), (0.0, "young"))
+
+# (band, sex) to the source FOLDER. Two decisions are recorded here rather
+# than made silently in C#, for the reason item A4 gives.
+#
+#   1. THE CAUCASIAN SET IS USED FOR EVERY VILLAGER. The pack ships african,
+#      asian and caucasian variants of each band. After neutralisation they
+#      differ almost only in the baked tone that neutralisation removes, and
+#      the tone is the engine's to decide. Picking a texture by the villager's
+#      simulated pigmentation would ALSO mean the viewer choosing an ancestry
+#      label the engine never computes, which invariant 5 forbids.
+#   2. THE FILE INSIDE THE FOLDER IS GLOBBED, NOT NAMED. MakeHuman's own
+#      filenames are inconsistent across bands (`_diffuse`, `_diffuse2`,
+#      `_diffuse3`) and each folder ships exactly one PNG, so globbing is
+#      both shorter and more robust than six hardcoded names.
+SKIN_FOLDERS = {
+    ("young", "female"): "young_caucasian_female",
+    ("young", "male"): "young_caucasian_male",
+    ("middleage", "female"): "middleage_caucasian_female",
+    ("middleage", "male"): "middleage_caucasian_male",
+    ("old", "female"): "old_caucasian_female",
+    ("old", "male"): "old_caucasian_male",
+}
+
+
+def skin_band_for_age(age_years: float) -> str:
+    """Which MakeHuman age band a villager of this age is drawn with.
+
+    Mirrored in `SkinMaterials.BandForAge`. Duplicated on purpose and pinned
+    by a test rather than shared through a file: the C# side must resolve a
+    band with no Python in the process, and two implementations that a test
+    holds equal is the pattern the eye labels already use.
+    """
+    for threshold, band in SKIN_AGE_BANDS:
+        if age_years >= threshold:
+            return band
+    return "young"
+
+
+def mpfb_skin_dir() -> Path | None:
+    """Where the installed CC0 asset pack keeps its skins.
+
+    Same source of truth as `mpfb_eye_material_dir`, for the same reason: the
+    path moved between Blender 4.x releases and a hardcoded guess silently
+    finds nothing.
+    """
+    catalogue = Path(__file__).resolve().parent / "health_engine" / "data" / "mpfb_assets.json"
+    if not catalogue.is_file():
+        return None
+    try:
+        user_data = json.loads(catalogue.read_text(encoding="utf-8")).get("user_data")
+    except (OSError, ValueError):
+        return None
+    if not user_data:
+        return None
+    directory = Path(user_data) / "skins"
+    return directory if directory.is_dir() else None
+
+
+def _srgb_to_linear(channel):
+    """sRGB transfer function, inverted. The IEC 61966-2-1 curve, not the 2.2
+    approximation: the whole point of this step is that the ratio between two
+    pixels is preserved as the shader will actually compute it, and the
+    approximation is wrong by up to 1.5 percent near black, which is exactly
+    where skin detail lives."""
+    import numpy as np
+    channel = np.asarray(channel, dtype=np.float64)
+    return np.where(channel <= 0.04045,
+                    channel / 12.92,
+                    ((channel + 0.055) / 1.055) ** 2.4)
+
+
+def _linear_to_srgb(channel):
+    import numpy as np
+    channel = np.asarray(channel, dtype=np.float64)
+    return np.where(channel <= 0.0031308,
+                    channel * 12.92,
+                    1.055 * np.clip(channel, 0.0, None) ** (1 / 2.4) - 0.055)
+
+
+def neutralise_skin(source: Path, dest: Path) -> dict:
+    """Write `source` out as a tone-free luminance detail map.
+
+    Returns the measurement, so the caller can report and gate it rather than
+    trust it. `residual` is the mean of the written map: the factor by which
+    an average patch of skin renders darker than the engine's flat tone.
+    """
+    import numpy as np
+    from PIL import Image
+
+    with Image.open(source) as handle:
+        rgb = np.asarray(handle.convert("RGB"), dtype=np.float64) / 255.0
+
+    linear = _srgb_to_linear(rgb)
+    # Rec. 709 luminance, in LINEAR light. Computing it on the sRGB values
+    # instead would weight the dark detail wrongly for the multiply the
+    # shader is about to do.
+    luminance = (0.2126 * linear[..., 0] +
+                 0.7152 * linear[..., 1] +
+                 0.0722 * linear[..., 2])
+
+    median = float(np.median(luminance))
+    if median <= 0.0:
+        return {"written": False, "reason": "texture has no light in it"}
+
+    detail = np.clip(luminance / median, 0.0, 1.0)
+    residual = float(detail.mean())
+    clamped = float((luminance >= median).mean())
+
+    encoded = np.clip(_linear_to_srgb(detail), 0.0, 1.0)
+    grey = (encoded * 255.0 + 0.5).astype("uint8")
+    Image.fromarray(np.stack([grey, grey, grey], axis=-1), mode="RGB").save(dest)
+
+    return {"written": True, "residual": residual, "clamped": clamped,
+            "median_luminance": median, "size": list(rgb.shape[:2])}
+
+
+def install_skin_textures(project: Path) -> dict:
+    """Neutralise and copy one skin detail map per (age band, sex).
+
+    A MISSING PACK IS NOT AN ERROR, exactly as for the eyes: the viewer falls
+    back to the flat tone it drew before, which is a worse picture and not a
+    broken one. Nor is a missing Pillow: neutralising a texture is authoring
+    work, so it lives behind the `authoring` extra rather than in the
+    dependencies a consumer of the library installs.
+    """
+    source = mpfb_skin_dir()
+    if source is None:
+        return {"copied": 0, "reason": "no installed MPFB asset pack found"}
+    try:
+        import numpy  # noqa: F401
+        from PIL import Image  # noqa: F401
+    except ImportError:
+        return {"copied": 0,
+                "reason": "Pillow is not installed; `pip install -e .[authoring]`"}
+
+    dest = project / "Assets" / "Resources" / "extnpc" / "skin"
+    dest.mkdir(parents=True, exist_ok=True)
+
+    copied, missing, refused = 0, [], []
+    measured = {}
+    for (band, sex), folder in sorted(SKIN_FOLDERS.items()):
+        pngs = sorted((source / folder).glob("*.png")) if (source / folder).is_dir() else []
+        if not pngs:
+            missing.append(folder)
+            continue
+        key = f"{band}_{sex}"
+        report = neutralise_skin(pngs[0], dest / f"{key}.png")
+        if not report.get("written"):
+            missing.append(folder)
+            continue
+        # A texture dark enough to move the villager's tone is refused, not
+        # shipped with a note. The whole reason for neutralising is that the
+        # rendered tone stays the engine's, and a map that fails that test is
+        # not a detail map, it is a second opinion about skin colour.
+        if report["residual"] < SKIN_RESIDUAL_FLOOR:
+            (dest / f"{key}.png").unlink(missing_ok=True)
+            refused.append((key, report["residual"]))
+            continue
+        measured[key] = {"source": pngs[0].name,
+                         "residual": round(report["residual"], 4),
+                         "clamped": round(report["clamped"], 4)}
+        copied += 1
+
+    if measured:
+        (dest / "skins.json").write_text(json.dumps({
+            "note": ("Luminance detail maps, median-normalised, tone removed. "
+                     "`residual` is the mean of each map: the factor by which "
+                     "an average patch renders darker than the engine's flat "
+                     "skin colour. Generated by install_to_unity.py."),
+            "residual_floor": SKIN_RESIDUAL_FLOOR,
+            "age_bands": [[t, b] for t, b in SKIN_AGE_BANDS],
+            "textures": measured,
+        }, indent=2), encoding="utf-8")
+
+    return {"copied": copied, "missing": missing, "refused": refused,
+            "measured": measured, "dest": str(dest)}
+
+
+# ----------------------------------------------------------------------
+# Eyebrows and eyelashes: the geometry is not the shape
+# ----------------------------------------------------------------------
+#
+# THE DEFECT, REPORTED AS "THEY LOOK LIKE THEY ARE WEARING MASCARA". Giving
+# eyebrows and eyelashes the villager's own `hair_pigment` was right, and it
+# exposed something that had been true all along and invisible while they were
+# painted skin-coloured: an eyebrow is not a solid shape. MakeHuman's brow and
+# lash meshes are flat CARDS, and the individual hairs are carved out of them
+# by the ALPHA CHANNEL of the texture. Drawing the card with a flat opaque
+# colour draws the whole rectangle.
+#
+# MEASURED, over the assets these bundles actually use:
+#
+#     eyelashes02   18.0% of its UV island is opaque
+#     eyebrow001     7.7%
+#     eyebrow003    11.8%
+#
+# So between 82 and 92 percent of what was on screen should not have been
+# there at all. Five to thirteen times too much dark area around each eye is
+# eyeliner, and that is exactly what it looked like.
+#
+# THIS IS THE THIRD TIME THIS EXACT LESSON HAS COME UP. The eyes needed
+# MakeHuman's own texture because an eyeball is not one colour; the skin
+# needed one because skin is not one colour; the brows need one because a brow
+# is not one SHAPE. In every case the mesh is a carrier and the texture is the
+# content, and in every case the fix is to use the asset the pack already
+# ships rather than to infer the missing information.
+#
+# WHY THE COLOUR IS THROWN AWAY AND ONLY THE ALPHA KEPT. The opaque pixels of
+# these textures average RGB (3, 1, 0) and (14, 7, 6): they are black. There
+# is no colour in them to preserve, and multiplying a black texture by the
+# villager's hair colour would produce black whatever their hair does. So the
+# RGB is replaced with white and the alpha is kept exactly, which leaves a
+# pure SHAPE that `hair_pigment` then colours.
+#
+# SCALP HAIR IS DELIBERATELY NOT DONE THIS WAY. Measured at 38 to 100 percent
+# coverage -- `braid01` is a solid mesh with no cutout at all -- so hair reads
+# acceptably as a volume, and `bob02`'s texture is a light blonde (159, 151,
+# 136) whose colour would be double-counted against the tint. Hair keeps its
+# flat tint.
+HAIR_CARD_FOLDERS = ("eyebrows", "eyelashes")
+
+# A card this solid is not a strand sheet, and tinting it dark would produce
+# the very block of colour this exists to remove. Refuse rather than ship it.
+HAIR_CARD_MAX_COVERAGE = 0.50
+
+
+def mpfb_asset_root() -> Path | None:
+    """The installed CC0 pack's data directory. Same source of truth as
+    `mpfb_eye_material_dir`, one level up."""
+    catalogue = Path(__file__).resolve().parent / "health_engine" / "data" / "mpfb_assets.json"
+    if not catalogue.is_file():
+        return None
+    try:
+        user_data = json.loads(catalogue.read_text(encoding="utf-8")).get("user_data")
+    except (OSError, ValueError):
+        return None
+    if not user_data:
+        return None
+    root = Path(user_data)
+    return root if root.is_dir() else None
+
+
+def whiten_alpha_card(source: Path, dest: Path) -> dict:
+    """Write `source` out as a white card with its alpha untouched.
+
+    Returns the measurement, so the caller can gate on it. `coverage` is the
+    opaque fraction WITHIN the used UV island rather than within the whole
+    sheet: a small island in a big sheet is a packing choice and says nothing
+    about how solid the card is, and gating on the sheet fraction would
+    refuse a perfectly good strand texture for being economically packed.
+    """
+    import numpy as np
+    from PIL import Image
+
+    with Image.open(source) as handle:
+        rgba = np.asarray(handle.convert("RGBA"))
+
+    alpha = rgba[..., 3]
+    used = np.nonzero(alpha > 5)
+    if len(used[0]) == 0:
+        return {"written": False, "reason": "the card is entirely transparent"}
+
+    y0, y1 = int(used[0].min()), int(used[0].max())
+    x0, x1 = int(used[1].min()), int(used[1].max())
+    island = alpha[y0:y1 + 1, x0:x1 + 1]
+    coverage = float((island > 127).mean())
+
+    out = np.empty_like(rgba)
+    out[..., 0] = out[..., 1] = out[..., 2] = 255   # pure shape, no colour
+    out[..., 3] = alpha
+    Image.fromarray(out, mode="RGBA").save(dest)
+
+    return {"written": True, "coverage": coverage,
+            "island": [x1 - x0 + 1, y1 - y0 + 1]}
+
+
+def install_hair_cards(project: Path) -> dict:
+    """Copy every eyebrow and eyelash card into Resources as a white cutout.
+
+    ALL OF THEM, not the ones this world happens to use. `cosmetic.py` picks
+    a brow and a lash per villager from a hash of their NAME, so the set in
+    use changes with the cast, and sixteen 512x512 cutouts is a smaller
+    payload than one body. Installing the lot means a newly exported world
+    never arrives wearing a card that was not copied.
+    """
+    root = mpfb_asset_root()
+    if root is None:
+        return {"copied": 0, "reason": "no installed MPFB asset pack found"}
+    try:
+        import numpy  # noqa: F401
+        from PIL import Image  # noqa: F401
+    except ImportError:
+        return {"copied": 0,
+                "reason": "Pillow is not installed; `pip install -e .[authoring]`"}
+
+    dest = project / "Assets" / "Resources" / "extnpc" / "haircards"
+    dest.mkdir(parents=True, exist_ok=True)
+
+    copied, refused, measured = 0, [], {}
+    for folder in HAIR_CARD_FOLDERS:
+        base = root / folder
+        if not base.is_dir():
+            continue
+        for asset in sorted(p for p in base.iterdir() if p.is_dir()):
+            pngs = sorted(asset.glob("*.png"))
+            if not pngs:
+                continue
+            # Named for the ASSET, because that is what the bake writes into
+            # `bodies.json` as the submesh's source mesh name and therefore
+            # what the viewer has to look it up by.
+            report = whiten_alpha_card(pngs[0], dest / f"{asset.name}.png")
+            if not report.get("written"):
+                continue
+            if report["coverage"] > HAIR_CARD_MAX_COVERAGE:
+                (dest / f"{asset.name}.png").unlink(missing_ok=True)
+                refused.append((asset.name, report["coverage"]))
+                continue
+            measured[asset.name] = round(report["coverage"], 4)
+            copied += 1
+
+    return {"copied": copied, "refused": refused, "measured": measured,
+            "dest": str(dest)}
+
+
 def install(bundle: Path, project: Path, clean_bodies: bool = False) -> dict:
     world_name = bundle.name
     manifest = check_bundle(bundle)
@@ -210,6 +573,8 @@ def install(bundle: Path, project: Path, clean_bodies: bool = False) -> dict:
         copied += 1
 
     eyes = install_eye_textures(project)
+    skin = install_skin_textures(project)
+    cards = install_hair_cards(project)
 
     return {
         "world_name": world_name,
@@ -217,6 +582,8 @@ def install(bundle: Path, project: Path, clean_bodies: bool = False) -> dict:
         "bodies_copied": copied,
         "bodies_removed": removed,
         "eye_textures": eyes,
+        "skin_textures": skin,
+        "hair_cards": cards,
         "bodies_present": len(list(dest_bodies.glob("*.fbx"))),
         "staged": bool(manifest.get("staged")),
         "declared": int(manifest.get("count", 0)),
@@ -270,6 +637,25 @@ def main() -> int:
               f"--install-assets` fetches the CC0 pack.")
     if eyes.get("missing"):
         print(f"    missing from the pack: {', '.join(eyes['missing'])}")
+
+    skin = result["skin_textures"]
+    if skin["copied"]:
+        worst = min(skin["measured"].values(), key=lambda m: m["residual"])
+        print(f"    {skin['copied']} skin detail maps (CC0, tone removed) "
+              f"-> Resources/extnpc/skin")
+        print(f"      darkest map renders {(1 - worst['residual']) * 100:.1f}% "
+              f"below the flat tone; the median pixel is exact")
+    else:
+        # Same reasoning as the eyes: the symptom of a silent skip is a
+        # village of flat-shaded mannequins, which looks like a bake that
+        # worked.
+        print(f"    NO skin textures installed ({skin.get('reason', 'not found')}); "
+              f"skin stays a flat tone.")
+    if skin.get("refused"):
+        for key, residual in skin["refused"]:
+            print(f"    REFUSED {key}: residual {residual:.3f} is below the "
+                  f"{SKIN_RESIDUAL_FLOOR} floor, so it would have shifted the "
+                  f"villager's measured skin colour.")
     if result["never_rendered"]:
         who = ", ".join(u["name"] for u in result["never_rendered"][:3])
         print(f"    {len(result['never_rendered'])} people have no body by "
