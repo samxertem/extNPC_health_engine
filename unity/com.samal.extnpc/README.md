@@ -39,7 +39,7 @@ installs will *not* work: the manifest requires Unity 6.
 Add to your project's `Packages/manifest.json`:
 
 ```json
-"com.samal.extnpc": "file:../../extNPC_health_engine/unity/com.samal.extnpc"
+"com.samal.extnpc": "file:../../samara_engine/unity/com.samal.extnpc"
 ```
 
 or *Window → Package Manager → + → Add package from disk…*
